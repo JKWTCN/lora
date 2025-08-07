@@ -1,9 +1,9 @@
 <template>
   <div class="app-container">
     <!-- 自定义标题栏 -->
-    <div class="titlebar" data-tauri-drag-region>
-      <div class="titlebar-left">
-        <span class="app-title">Lora</span>
+    <div class="titlebar">
+      <div class="titlebar-left" data-tauri-drag-region>
+        <span class="app-title" data-tauri-drag-region>Lora</span>
       </div>
       <div class="titlebar-right">
         <button class="titlebar-button" @click="toggleSearch" title="搜索">
@@ -21,7 +21,7 @@
     <!-- 主启动器容器 -->
     <div class="launcher-container">
       <!-- 侧栏 -->
-      <div class="sidebar" :style="{ width: sidebarWidth + 'px' }">
+      <div class="sidebar" :style="sidebarWidth > 0 ? { width: sidebarWidth + 'px' } : {}">
         <!-- <div class="sidebar-header">
         <h2>分类</h2>
       </div> -->
@@ -29,7 +29,6 @@
           <div v-for="category in categories" :key="category.id" class="category-item"
             :class="{ active: selectedCategory === category.id }" @click="selectCategory(category.id)"
             @contextmenu.prevent="showContextMenu($event, category)">
-            <i :class="category.icon"></i>
             <span>{{ category.name }}</span>
           </div>
         </div>
@@ -94,10 +93,11 @@
 
       <!-- 主内容区域 -->
       <div class="main-content">
-        <div class="content-header">
+        <div class="content-header" v-show="showSearchBox">
           <!-- <h1>{{ getCurrentCategoryName() }}</h1> -->
           <div class="search-box">
-            <input v-model="searchQuery" type="text" placeholder="搜索应用..." class="search-input">
+            <input v-model="searchQuery" type="text" placeholder="搜索应用..." class="search-input" ref="searchInputRef"
+              @keyup.escape="hideSearchBox">
           </div>
         </div>
 
@@ -121,10 +121,11 @@ import { ref, computed, onMounted, onUnmounted, Teleport } from 'vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 // 响应式数据
-const sidebarWidth = ref(250)
+const sidebarWidth = ref(0) // 初始化为0，将通过自适应计算
 const isResizing = ref(false)
 const selectedCategory = ref('all')
 const searchQuery = ref('')
+const showSearchBox = ref(false) // 控制搜索框显示状态
 
 // 右键菜单相关
 const contextMenu = ref<{
@@ -147,6 +148,7 @@ const renameDialog = ref({
 })
 
 const renameInput = ref(null)
+const searchInputRef = ref(null)
 
 // 分类数据
 const categories = ref([
@@ -335,6 +337,16 @@ const deleteAllCategories = () => {
 // 拖拽调整侧栏宽度
 const startResize = (e: MouseEvent) => {
   isResizing.value = true
+
+  // 如果当前是自适应状态，先获取当前实际宽度
+  if (sidebarWidth.value === 0) {
+    const sidebar = document.querySelector('.sidebar') as HTMLElement
+    if (sidebar) {
+      const rect = sidebar.getBoundingClientRect()
+      sidebarWidth.value = rect.width
+    }
+  }
+
   document.addEventListener('mousemove', resize)
   document.addEventListener('mouseup', stopResize)
   e.preventDefault()
@@ -344,7 +356,7 @@ const resize = (e: MouseEvent) => {
   if (!isResizing.value) return
 
   const newWidth = e.clientX
-  if (newWidth > 150 && newWidth < 400) {
+  if (newWidth > 80 && newWidth < 200) {
     sidebarWidth.value = newWidth
   }
 }
@@ -357,21 +369,64 @@ const stopResize = () => {
 
 // 生命周期
 onMounted(() => {
-  // 可以在这里初始化应用列表
+  // 计算侧栏的自然宽度
+  const sidebar = document.querySelector('.sidebar') as HTMLElement
+  if (sidebar) {
+    // 先让侧栏自适应，然后获取其实际宽度
+    sidebar.style.width = 'auto'
+    const rect = sidebar.getBoundingClientRect()
+    sidebarWidth.value = Math.max(rect.width, 80) // 确保最小宽度为80px
+  }
+
+  // 添加全局点击监听，点击搜索框外部时隐藏搜索框
+  const handleClickOutside = (event: Event) => {
+    const target = event.target as HTMLElement
+    if (showSearchBox.value &&
+      !target.closest('.content-header') &&
+      !target.closest('.titlebar-button')) {
+      hideSearchBox()
+    }
+  }
+  document.addEventListener('click', handleClickOutside)
+
+  // 全局禁用右键菜单
+  document.addEventListener('contextmenu', disableContextMenu)
 })
+
+// 禁用右键菜单的函数
+const disableContextMenu = (e: Event) => {
+  e.preventDefault()
+  return false
+}
 
 onUnmounted(() => {
   document.removeEventListener('mousemove', resize)
   document.removeEventListener('mouseup', stopResize)
+  // 清理全局右键菜单禁用监听器
+  document.removeEventListener('contextmenu', disableContextMenu)
 })
 
 // 标题栏相关方法
 const toggleSearch = () => {
-  // 切换搜索框的显示/隐藏或聚焦
-  const searchInput = document.querySelector('.search-input') as HTMLInputElement
-  if (searchInput) {
-    searchInput.focus()
+  // 切换搜索框的显示/隐藏
+  showSearchBox.value = !showSearchBox.value
+
+  // 如果显示搜索框，则聚焦到输入框
+  if (showSearchBox.value) {
+    setTimeout(() => {
+      if (searchInputRef.value) {
+        (searchInputRef.value as HTMLInputElement).focus()
+      }
+    }, 50)
+  } else {
+    // 隐藏时清空搜索内容
+    searchQuery.value = ''
   }
+}
+
+const hideSearchBox = () => {
+  showSearchBox.value = false
+  searchQuery.value = ''
 }
 
 const toggleMenu = () => {
@@ -380,8 +435,15 @@ const toggleMenu = () => {
 }
 
 const closeApp = async () => {
-  const appWindow = getCurrentWindow()
-  await appWindow.close()
+  console.log('关闭应用被调用')
+  try {
+    const appWindow = getCurrentWindow()
+    console.log('获取到窗口对象:', appWindow)
+    await appWindow.close()
+    console.log('窗口关闭命令已发送')
+  } catch (error) {
+    console.error('关闭窗口时出错:', error)
+  }
 }
 </script>
 
@@ -411,6 +473,8 @@ const closeApp = async () => {
 .titlebar-left {
   display: flex;
   align-items: center;
+  flex: 1;
+  cursor: move;
 }
 
 .app-title {
@@ -436,6 +500,9 @@ const closeApp = async () => {
   cursor: pointer;
   transition: background-color 0.2s ease;
   font-size: 12px;
+  position: relative;
+  z-index: 1001;
+  pointer-events: auto;
 }
 
 .titlebar-button:hover {
@@ -459,11 +526,13 @@ const closeApp = async () => {
 .sidebar {
   background: #2c3e50;
   color: white;
-  min-width: 150px;
-  max-width: 400px;
+  width: auto;
+  min-width: 100px;
+  max-width: 200px;
   display: flex;
   flex-direction: column;
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
 }
 
 .sidebar-header {
@@ -485,9 +554,10 @@ const closeApp = async () => {
 .category-item {
   display: flex;
   align-items: center;
-  padding: 12px 20px;
+  padding: 8px 12px;
   cursor: pointer;
   transition: background-color 0.2s ease;
+  white-space: nowrap;
 }
 
 .category-item:hover {
@@ -498,9 +568,10 @@ const closeApp = async () => {
   background: #3498db;
 }
 
-.category-item i {
-  margin-right: 10px;
-  width: 16px;
+.category-item span {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
 }
 
 /* 拖拽分隔线 */
@@ -528,8 +599,11 @@ const closeApp = async () => {
   padding: 20px 30px;
   border-bottom: 1px solid #e0e0e0;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
+  min-height: 60px;
+  transition: all 0.3s ease;
+  animation: slideDownFromTop 0.3s ease-out;
 }
 
 .content-header h1 {
@@ -541,6 +615,9 @@ const closeApp = async () => {
 .search-box {
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
+  transition: all 0.3s ease;
 }
 
 .search-input {
@@ -550,7 +627,8 @@ const closeApp = async () => {
   outline: none;
   font-size: 14px;
   width: 250px;
-  transition: border-color 0.2s ease;
+  transition: all 0.3s ease;
+  animation: 0.3s ease-out;
 }
 
 .search-input:focus {
@@ -659,6 +737,31 @@ const closeApp = async () => {
   }
 }
 
+/* 搜索框动画 */
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideDownFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* 对话框样式 */
 .dialog-overlay {
   position: fixed;
@@ -747,6 +850,26 @@ const closeApp = async () => {
 
 <!-- 全局样式，用于Teleport到body的元素 -->
 <style>
+/* 全局禁用右键菜单和文本选择 */
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 允许输入框和可编辑元素的文本选择 */
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
 /* 右键菜单全局样式 */
 .context-menu {
   position: fixed !important;
