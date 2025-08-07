@@ -1,811 +1,807 @@
-<script setup lang="ts">
-import { ref, computed } from "vue";
-
-const searchQuery = ref("");
-const sidebarVisible = ref(false);
-const selectedCategory = ref("All");
-
-// 定义应用类型
-interface App {
-  id: number;
-  name: string;
-  icon: string;
-  category: string;
-}
-
-// 模拟应用数据
-const apps = ref<App[]>([
-  { id: 1, name: "Safari", icon: "🌐", category: "Browser" },
-  { id: 2, name: "VS Code", icon: "💻", category: "Development" },
-  { id: 3, name: "Photoshop", icon: "🎨", category: "Design" },
-  { id: 4, name: "Music", icon: "🎵", category: "Entertainment" },
-  { id: 5, name: "Calendar", icon: "📅", category: "Productivity" },
-  { id: 6, name: "Messages", icon: "💬", category: "Communication" },
-  { id: 7, name: "Photos", icon: "📸", category: "Media" },
-  { id: 8, name: "Notes", icon: "📝", category: "Productivity" },
-  { id: 9, name: "Calculator", icon: "🔢", category: "Utilities" },
-  { id: 10, name: "Settings", icon: "⚙️", category: "System" },
-  { id: 11, name: "Mail", icon: "📧", category: "Communication" },
-  { id: 12, name: "Maps", icon: "🗺️", category: "Navigation" },
-  { id: 13, name: "Weather", icon: "🌤️", category: "Weather" },
-  { id: 14, name: "Contacts", icon: "👥", category: "Productivity" },
-  { id: 15, name: "Terminal", icon: "⚡", category: "Development" },
-  { id: 16, name: "Finder", icon: "📁", category: "System" },
-]);
-
-// 获取所有分类
-const categories = computed(() => {
-  const cats = Array.from(new Set(apps.value.map(app => app.category))).sort();
-  return ["All", ...cats];
-});
-
-// 过滤应用
-const filteredApps = computed(() => {
-  let result = apps.value;
-
-  // 按分类过滤
-  if (selectedCategory.value !== "All") {
-    result = result.filter(app => app.category === selectedCategory.value);
-  }
-
-  // 按搜索词过滤
-  if (searchQuery.value) {
-    result = result.filter((app: App) =>
-      app.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      app.category.toLowerCase().includes(searchQuery.value.toLowerCase())
-    );
-  }
-
-  return result;
-});
-
-// 切换侧栏显示
-const toggleSidebar = () => {
-  sidebarVisible.value = !sidebarVisible.value;
-};
-
-// 选择分类
-const selectCategory = (category: string) => {
-  selectedCategory.value = category;
-  sidebarVisible.value = false; // 选择后关闭侧栏
-};
-
-// 启动应用
-const launchApp = (app: App) => {
-  console.log(`Launching ${app.name}`);
-  // 这里可以添加实际的应用启动逻辑
-  // 比如调用 Tauri 的 API 来打开应用
-};
-</script>
-
 <template>
-  <main class="app-launcher">
-    <!-- 汉堡菜单按钮 -->
-    <button class="menu-button" @click="toggleSidebar" :class="{ active: sidebarVisible }">
-      <span class="menu-line"></span>
-      <span class="menu-line"></span>
-      <span class="menu-line"></span>
-    </button>
-
-    <!-- 侧栏遮罩 -->
-    <div v-if="sidebarVisible" class="sidebar-overlay" @click="toggleSidebar"></div>
-
-    <!-- 侧栏 -->
-    <aside class="sidebar" :class="{ visible: sidebarVisible }">
-      <div class="sidebar-header">
-        <h2 class="sidebar-title">分类</h2>
-        <button class="close-btn" @click="toggleSidebar">✕</button>
+  <div class="app-container">
+    <!-- 自定义标题栏 -->
+    <div class="titlebar" data-tauri-drag-region>
+      <div class="titlebar-left">
+        <span class="app-title">Lora</span>
       </div>
-
-      <div class="sidebar-content">
-        <div class="category-list">
-          <button v-for="category in categories" :key="category" class="category-item"
-            :class="{ active: selectedCategory === category }" @click="selectCategory(category)">
-            <span class="category-icon">
-              {{ category === 'All' ? '📱' :
-                category === 'Browser' ? '🌐' :
-                  category === 'Development' ? '💻' :
-                    category === 'Design' ? '🎨' :
-                      category === 'Entertainment' ? '🎵' :
-                        category === 'Productivity' ? '📅' :
-                          category === 'Communication' ? '💬' :
-                            category === 'Media' ? '📸' :
-                              category === 'Utilities' ? '🔧' :
-                                category === 'System' ? '⚙️' :
-                                  category === 'Navigation' ? '🗺️' :
-                                    category === 'Weather' ? '🌤️' : '📁' }}
-            </span>
-            <span class="category-name">{{ category === 'All' ? '全部应用' : category }}</span>
-            <span class="category-count">{{category === 'All' ? apps.length : apps.filter((app: App) => app.category
-              === category).length}}</span>
-          </button>
-        </div>
-
-        <div class="sidebar-footer">
-          <div class="stats">
-            <p class="stats-text">总计 {{ apps.length }} 个应用</p>
-            <p class="stats-text">{{ filteredApps.length }} 个显示</p>
-          </div>
-        </div>
-      </div>
-    </aside>
-
-    <!-- 主内容区域 -->
-    <div class="main-content" :class="{ 'sidebar-open': sidebarVisible }">
-      <!-- 搜索栏 -->
-      <div class="search-container">
-        <div class="search-box">
-          <span class="search-icon">🔍</span>
-          <input v-model="searchQuery" placeholder="搜索应用..." class="search-input" autocomplete="off" />
-        </div>
-
-        <!-- 当前分类显示 -->
-        <div v-if="selectedCategory !== 'All'" class="current-category">
-          <span class="current-category-text">{{ selectedCategory }}</span>
-          <button class="clear-category" @click="selectCategory('All')">✕</button>
-        </div>
-      </div>
-
-      <!-- 应用网格 -->
-      <div class="apps-grid">
-        <div v-for="app in filteredApps" :key="app.id" class="app-item" @click="launchApp(app)">
-          <div class="app-icon">
-            {{ app.icon }}
-          </div>
-          <div class="app-name">{{ app.name }}</div>
-        </div>
-      </div>
-
-      <!-- 当没有搜索结果时显示 -->
-      <div v-if="filteredApps.length === 0" class="no-results">
-        <div class="no-results-icon">🔍</div>
-        <div class="no-results-text">没有找到匹配的应用</div>
+      <div class="titlebar-right">
+        <button class="titlebar-button" @click="toggleSearch" title="搜索">
+          <i class="icon-search"></i>
+        </button>
+        <button class="titlebar-button" @click="toggleMenu" title="菜单">
+          <i class="icon-menu"></i>
+        </button>
+        <button class="titlebar-button titlebar-close" @click="closeApp" title="关闭">
+          <i class="icon-close"></i>
+        </button>
       </div>
     </div>
-  </main>
+
+    <!-- 主启动器容器 -->
+    <div class="launcher-container">
+      <!-- 侧栏 -->
+      <div class="sidebar" :style="{ width: sidebarWidth + 'px' }">
+        <!-- <div class="sidebar-header">
+        <h2>分类</h2>
+      </div> -->
+        <div class="sidebar-content" @contextmenu.prevent="showContextMenu($event, null)">
+          <div v-for="category in categories" :key="category.id" class="category-item"
+            :class="{ active: selectedCategory === category.id }" @click="selectCategory(category.id)"
+            @contextmenu.prevent="showContextMenu($event, category)">
+            <i :class="category.icon"></i>
+            <span>{{ category.name }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右键菜单 -->
+      <Teleport to="body">
+        <div v-if="contextMenu.visible" class="context-menu"
+          :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }" @click.stop>
+          <div class="context-menu-item" @click="createNewCategory">
+            <i class="icon-plus"></i>
+            <span>新建分组</span>
+          </div>
+          <div v-if="contextMenu.category && !contextMenu.category.isDefault" class="context-menu-item"
+            :class="{ 'context-menu-item-disabled': !contextMenu.category }" @click="renameCategory">
+            <i class="icon-edit"></i>
+            <span>重命名</span>
+          </div>
+          <div v-if="contextMenu.category && !contextMenu.category.isDefault"
+            class="context-menu-item context-menu-item-danger"
+            :class="{ 'context-menu-item-disabled': !contextMenu.category }" @click="deleteCategory">
+            <i class="icon-delete"></i>
+            <span>删除</span>
+          </div>
+          <template v-if="!contextMenu.category">
+            <div class="context-menu-item context-menu-item-disabled">
+              <i class="icon-edit"></i>
+              <span>重命名</span>
+            </div>
+            <div class="context-menu-item context-menu-item-disabled">
+              <i class="icon-delete"></i>
+              <span>删除</span>
+            </div>
+          </template>
+          <div class="context-menu-divider"></div>
+          <div class="context-menu-item context-menu-item-danger" @click="deleteAllCategories">
+            <i class="icon-trash"></i>
+            <span>删除全部分组</span>
+          </div>
+        </div>
+      </Teleport>
+
+      <!-- 重命名对话框 -->
+      <div v-if="renameDialog.visible" class="dialog-overlay" @click="cancelRename">
+        <div class="dialog" @click.stop>
+          <div class="dialog-header">
+            <h3>重命名分组</h3>
+          </div>
+          <div class="dialog-content">
+            <input v-model="renameDialog.newName" type="text" class="dialog-input" placeholder="请输入新名称"
+              @keyup.enter="confirmRename" @keyup.escape="cancelRename" ref="renameInput">
+          </div>
+          <div class="dialog-actions">
+            <button class="dialog-button dialog-button-secondary" @click="cancelRename">取消</button>
+            <button class="dialog-button dialog-button-primary" @click="confirmRename">确认</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 拖拽分隔线 -->
+      <div class="resizer" @mousedown="startResize"></div>
+
+      <!-- 主内容区域 -->
+      <div class="main-content">
+        <div class="content-header">
+          <!-- <h1>{{ getCurrentCategoryName() }}</h1> -->
+          <div class="search-box">
+            <input v-model="searchQuery" type="text" placeholder="搜索应用..." class="search-input">
+          </div>
+        </div>
+
+        <div class="app-grid">
+          <div v-for="app in filteredApps" :key="app.id" class="app-item" @click="launchApp(app)"
+            @dblclick="launchApp(app)">
+            <div class="app-icon">
+              <img :src="app.icon" :alt="app.name" v-if="app.icon" />
+              <div v-else class="default-icon">{{ app.name.charAt(0) }}</div>
+            </div>
+            <div class="app-name">{{ app.name }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, Teleport } from 'vue'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+
+// 响应式数据
+const sidebarWidth = ref(250)
+const isResizing = ref(false)
+const selectedCategory = ref('all')
+const searchQuery = ref('')
+
+// 右键菜单相关
+const contextMenu = ref<{
+  visible: boolean;
+  x: number;
+  y: number;
+  category: any;
+}>({
+  visible: false,
+  x: 0,
+  y: 0,
+  category: null
+})
+
+// 重命名对话框相关
+const renameDialog = ref({
+  visible: false,
+  newName: '',
+  categoryId: ''
+})
+
+const renameInput = ref(null)
+
+// 分类数据
+const categories = ref([
+  { id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true },
+  { id: 'development', name: '开发工具', icon: 'icon-code', isDefault: false },
+  { id: 'productivity', name: '办公软件', icon: 'icon-briefcase', isDefault: false },
+  { id: 'entertainment', name: '娱乐媒体', icon: 'icon-play', isDefault: false },
+  { id: 'utilities', name: '实用工具', icon: 'icon-settings', isDefault: false },
+  { id: 'games', name: '游戏', icon: 'icon-gamepad', isDefault: false }
+])
+
+// 应用数据
+const apps = ref([
+  { id: 1, name: 'Visual Studio Code', category: 'development', icon: '/icons/vscode.png', path: '' },
+  { id: 2, name: 'Chrome', category: 'productivity', icon: '/icons/chrome.png', path: '' },
+  { id: 3, name: 'Photoshop', category: 'development', icon: '/icons/ps.png', path: '' },
+  { id: 4, name: 'Steam', category: 'games', icon: '/icons/steam.png', path: '' },
+  { id: 5, name: 'Spotify', category: 'entertainment', icon: '/icons/spotify.png', path: '' },
+  { id: 6, name: 'Figma', category: 'development', icon: '/icons/figma.png', path: '' },
+  { id: 7, name: 'Discord', category: 'entertainment', icon: '/icons/discord.png', path: '' },
+  { id: 8, name: 'Notion', category: 'productivity', icon: '/icons/notion.png', path: '' },
+  { id: 9, name: 'Calculator', category: 'utilities', icon: '/icons/calc.png', path: '' },
+  { id: 10, name: 'Terminal', category: 'development', icon: '/icons/terminal.png', path: '' }
+])
+
+// 计算属性
+const filteredApps = computed(() => {
+  let result = apps.value
+
+  // 按分类筛选
+  if (selectedCategory.value !== 'all') {
+    result = result.filter(app => app.category === selectedCategory.value)
+  }
+
+  // 按搜索词筛选
+  if (searchQuery.value) {
+    result = result.filter(app =>
+      app.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+    )
+  }
+
+  return result
+})
+
+// 方法
+const selectCategory = (categoryId: string) => {
+  selectedCategory.value = categoryId
+}
+
+const launchApp = (app: any) => {
+  console.log(`启动应用: ${app.name}`)
+  // 这里可以添加 Tauri API 调用来启动应用
+}
+
+// 右键菜单相关方法
+const showContextMenu = (e: MouseEvent, category: any) => {
+  // 获取屏幕坐标而不是相对于窗口的坐标
+  const x = e.clientX
+  const y = e.clientY
+
+  contextMenu.value = {
+    visible: true,
+    x: x,
+    y: y,
+    category: category
+  }
+
+  // 点击其他地方时隐藏菜单
+  document.addEventListener('click', hideContextMenu, { once: true })
+
+  // 阻止默认的右键菜单
+  e.preventDefault()
+  e.stopPropagation()
+}
+
+const hideContextMenu = () => {
+  contextMenu.value.visible = false
+}
+
+const createNewCategory = () => {
+  const newId = Date.now().toString()
+  const newCategory = {
+    id: newId,
+    name: '新分组',
+    icon: 'icon-apps',
+    isDefault: false
+  }
+
+  categories.value.push(newCategory)
+  hideContextMenu()
+
+  // 立即进入重命名模式
+  setTimeout(() => {
+    renameDialog.value = {
+      visible: true,
+      newName: newCategory.name,
+      categoryId: newId
+    }
+    setTimeout(() => {
+      if (renameInput.value) {
+        (renameInput.value as HTMLInputElement).focus();
+        (renameInput.value as HTMLInputElement).select()
+      }
+    }, 50)
+  }, 100)
+}
+
+const renameCategory = () => {
+  if (contextMenu.value.category && !contextMenu.value.category.isDefault) {
+    renameDialog.value = {
+      visible: true,
+      newName: contextMenu.value.category.name,
+      categoryId: contextMenu.value.category.id
+    }
+    hideContextMenu()
+
+    setTimeout(() => {
+      if (renameInput.value) {
+        (renameInput.value as HTMLInputElement).focus();
+        (renameInput.value as HTMLInputElement).select()
+      }
+    }, 50)
+  }
+}
+
+const confirmRename = () => {
+  if (renameDialog.value.newName.trim()) {
+    const categoryIndex = categories.value.findIndex(cat => cat.id === renameDialog.value.categoryId)
+    if (categoryIndex !== -1) {
+      categories.value[categoryIndex].name = renameDialog.value.newName.trim()
+    }
+  }
+  cancelRename()
+}
+
+const cancelRename = () => {
+  renameDialog.value = {
+    visible: false,
+    newName: '',
+    categoryId: ''
+  }
+}
+
+const deleteCategory = () => {
+  if (contextMenu.value.category && !contextMenu.value.category.isDefault) {
+    const categoryId = contextMenu.value.category.id
+
+    // 删除分类
+    categories.value = categories.value.filter(cat => cat.id !== categoryId)
+
+    // 如果当前选中的分类被删除，切换到"全部应用"
+    if (selectedCategory.value === categoryId) {
+      selectedCategory.value = 'all'
+    }
+
+    // 将该分类下的应用移动到"实用工具"分类
+    apps.value.forEach(app => {
+      if (app.category === categoryId) {
+        app.category = 'utilities'
+      }
+    })
+  }
+  hideContextMenu()
+}
+
+const deleteAllCategories = () => {
+  if (confirm('确定要删除所有自定义分组吗？这将把所有应用移动到"实用工具"分类中。')) {
+    const defaultCategories = categories.value.filter(cat => cat.isDefault)
+    const deletedCategoryIds = categories.value.filter(cat => !cat.isDefault).map(cat => cat.id)
+
+    categories.value = defaultCategories
+
+    // 将被删除分类下的应用移动到"实用工具"分类
+    apps.value.forEach(app => {
+      if (deletedCategoryIds.includes(app.category)) {
+        app.category = 'utilities'
+      }
+    })
+
+    // 切换到"全部应用"
+    selectedCategory.value = 'all'
+  }
+  hideContextMenu()
+}
+
+// 拖拽调整侧栏宽度
+const startResize = (e: MouseEvent) => {
+  isResizing.value = true
+  document.addEventListener('mousemove', resize)
+  document.addEventListener('mouseup', stopResize)
+  e.preventDefault()
+}
+
+const resize = (e: MouseEvent) => {
+  if (!isResizing.value) return
+
+  const newWidth = e.clientX
+  if (newWidth > 150 && newWidth < 400) {
+    sidebarWidth.value = newWidth
+  }
+}
+
+const stopResize = () => {
+  isResizing.value = false
+  document.removeEventListener('mousemove', resize)
+  document.removeEventListener('mouseup', stopResize)
+}
+
+// 生命周期
+onMounted(() => {
+  // 可以在这里初始化应用列表
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousemove', resize)
+  document.removeEventListener('mouseup', stopResize)
+})
+
+// 标题栏相关方法
+const toggleSearch = () => {
+  // 切换搜索框的显示/隐藏或聚焦
+  const searchInput = document.querySelector('.search-input') as HTMLInputElement
+  if (searchInput) {
+    searchInput.focus()
+  }
+}
+
+const toggleMenu = () => {
+  // 显示应用菜单或设置
+  console.log('显示菜单')
+}
+
+const closeApp = async () => {
+  const appWindow = getCurrentWindow()
+  await appWindow.close()
+}
+</script>
+
 <style scoped>
-.app-launcher {
-  min-height: 100vh;
+.app-container {
   display: flex;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  position: relative;
+  flex-direction: column;
+  height: 100vh;
   overflow: hidden;
 }
 
-.app-launcher::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background:
-    radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
-  pointer-events: none;
+/* 自定义标题栏样式 */
+.titlebar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 32px;
+  background: #2c3e50;
+  color: white;
+  padding: 0 16px;
+  user-select: none;
+  -webkit-user-select: none;
+  position: relative;
+  z-index: 1000;
 }
 
-/* 汉堡菜单按钮 */
-.menu-button {
-  position: fixed;
-  top: 2rem;
-  left: 2rem;
-  z-index: 1001;
-  width: 50px;
-  height: 50px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
+.titlebar-left {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+}
+
+.app-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.titlebar-button {
+  display: flex;
   align-items: center;
   justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  color: white;
   cursor: pointer;
-  transition: all 0.3s ease;
-  gap: 4px;
-  opacity: 1;
-  visibility: visible;
+  transition: background-color 0.2s ease;
+  font-size: 12px;
 }
 
-.menu-button:hover {
-  background: rgba(255, 255, 255, 0.15);
-  transform: scale(1.05);
-}
-
-/* 当侧栏显示时隐藏菜单按钮 */
-.menu-button.active {
-  opacity: 0;
-  visibility: hidden;
-  transform: translateX(-10px);
-}
-
-.menu-line {
-  width: 20px;
-  height: 2px;
-  background: white;
-  border-radius: 1px;
-  transition: all 0.3s ease;
-  transform-origin: center;
-}
-
-/* 侧栏遮罩 */
-.sidebar-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
-  backdrop-filter: blur(2px);
-}
-
-/* 侧栏 */
-.sidebar {
-  position: fixed;
-  top: 0;
-  left: -350px;
-  width: 350px;
-  height: 100vh;
+.titlebar-button:hover {
   background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(30px);
-  border-right: 1px solid rgba(255, 255, 255, 0.2);
-  z-index: 1000;
-  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.titlebar-close:hover {
+  background: #e74c3c;
+}
+
+.launcher-container {
+  display: flex;
+  flex: 1;
+  background: #f5f5f5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  position: relative;
+  overflow: visible;
+}
+
+/* 侧栏样式 */
+.sidebar {
+  background: #2c3e50;
+  color: white;
+  min-width: 150px;
+  max-width: 400px;
   display: flex;
   flex-direction: column;
-}
-
-.sidebar.visible {
-  left: 0;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
 }
 
 .sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-bottom: 1px solid #34495e;
 }
 
-.sidebar-title {
-  color: white;
-  font-size: 1.5rem;
-  font-weight: 600;
+.sidebar-header h2 {
   margin: 0;
-}
-
-.close-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  color: white;
-  font-size: 1.2rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: scale(1.1);
+  font-size: 18px;
+  font-weight: 600;
 }
 
 .sidebar-content {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 1rem 0;
-}
-
-.category-list {
-  flex: 1;
-  padding: 0 1rem;
+  padding: 10px 0;
 }
 
 .category-item {
-  width: 100%;
   display: flex;
   align-items: center;
-  padding: 1rem 1.5rem;
-  margin-bottom: 0.5rem;
-  background: transparent;
-  border: none;
-  border-radius: 15px;
-  color: white;
-  font-size: 1rem;
+  padding: 12px 20px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  text-align: left;
-  position: relative;
+  transition: background-color 0.2s ease;
 }
 
 .category-item:hover {
-  transform: translateX(5px);
+  background: #34495e;
 }
 
 .category-item.active {
-  transform: translateX(5px);
+  background: #3498db;
 }
 
-.category-item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 6px;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 50%;
-  opacity: 0;
-  transition: all 0.3s ease;
+.category-item i {
+  margin-right: 10px;
+  width: 16px;
 }
 
-.category-item:hover::before {
-  opacity: 0.6;
-  width: 8px;
-  height: 8px;
+/* 拖拽分隔线 */
+.resizer {
+  width: 4px;
+  background: #bdc3c7;
+  cursor: col-resize;
+  transition: background-color 0.2s ease;
 }
 
-.category-item.active::before {
-  opacity: 1;
-  width: 10px;
-  height: 10px;
-  background: white;
-}
-
-.category-icon {
-  font-size: 1.2rem;
-  margin-right: 1rem;
-  min-width: 24px;
-}
-
-.category-name {
-  flex: 1;
-  font-weight: 500;
-}
-
-.category-count {
-  background: rgba(255, 255, 255, 0.2);
-  padding: 0.3rem 0.8rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.sidebar-footer {
-  padding: 1rem 2rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.stats-text {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.9rem;
-  margin: 0.3rem 0;
+.resizer:hover {
+  background: #3498db;
 }
 
 /* 主内容区域 */
 .main-content {
   flex: 1;
-  padding: 2rem;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  transition: margin-left 0.3s ease;
-  position: relative;
-  z-index: 1;
+  overflow: hidden;
 }
 
-/* 搜索容器 */
-.search-container {
-  position: relative;
-  z-index: 10;
-  margin-bottom: 3rem;
-  width: 100%;
-  max-width: 500px;
-  margin-top: 4rem;
+.content-header {
+  background: white;
+  padding: 20px 30px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.content-header h1 {
+  margin: 0;
+  font-size: 24px;
+  color: #2c3e50;
 }
 
 .search-box {
-  position: relative;
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 25px;
-  padding: 0 20px;
-  transition: all 0.3s ease;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-}
-
-.search-box:focus-within {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-}
-
-.search-icon {
-  font-size: 1.2rem;
-  margin-right: 12px;
-  opacity: 0.7;
 }
 
 .search-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  padding: 16px 0;
-  font-size: 1.1rem;
-  color: white;
-  outline: none;
-  font-weight: 300;
-}
-
-.search-input::placeholder {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-/* 当前分类显示 */
-.current-category {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 1rem;
-  padding: 0.5rem 1rem;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 8px 15px;
+  border: 1px solid #ddd;
   border-radius: 20px;
-  width: fit-content;
-  margin-left: auto;
-  margin-right: auto;
+  outline: none;
+  font-size: 14px;
+  width: 250px;
+  transition: border-color 0.2s ease;
 }
 
-.current-category-text {
-  color: white;
-  font-size: 0.9rem;
-  font-weight: 500;
-  margin-right: 0.5rem;
-}
-
-.clear-category {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  color: white;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.clear-category:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
+.search-input:focus {
+  border-color: #3498db;
 }
 
 /* 应用网格 */
-.apps-grid {
-  position: relative;
-  z-index: 10;
+.app-grid {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-  gap: 2rem;
-  max-width: 800px;
-  width: 100%;
-  padding: 0 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+  align-content: start;
 }
 
 .app-item {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 10px;
+  background: white;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  padding: 1rem;
-  border-radius: 20px;
-  position: relative;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
-.app-item::before {
-  content: '';
-  position: absolute;
+.app-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.app-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.default-icon {
+  width: 100%;
+  height: 100%;
+  background: #3498db;
+  color: white;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.app-name {
+  text-align: center;
+  font-size: 11px;
+  color: #2c3e50;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+/* 滚动条样式 */
+.app-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.app-grid::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.app-grid::-webkit-scrollbar-thumb {
+  background: #bdc3c7;
+  border-radius: 3px;
+}
+
+.app-grid::-webkit-scrollbar-thumb:hover {
+  background: #95a5a6;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .app-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 10px;
+    padding: 15px;
+  }
+
+  .content-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+}
+
+/* 对话框样式 */
+.dialog-overlay {
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  opacity: 0;
-  transition: all 0.3s ease;
-}
-
-.app-item:hover::before {
-  opacity: 1;
-}
-
-.app-item:hover {
-  transform: translateY(-8px) scale(1.05);
-}
-
-.app-item:active {
-  transform: translateY(-4px) scale(1.02);
-}
-
-.app-icon {
-  width: 80px;
-  height: 80px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2.5rem;
-  margin-bottom: 0.8rem;
-  transition: all 0.3s ease;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  position: relative;
-  z-index: 1;
+  z-index: 2000;
 }
 
-.app-item:hover .app-icon {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+.dialog {
+  background: white;
+  border-radius: 8px;
+  min-width: 320px;
+  max-width: 90vw;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
-.app-name {
+.dialog-header {
+  padding: 20px 20px 0;
+}
+
+.dialog-header h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.dialog-content {
+  padding: 20px;
+}
+
+.dialog-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  outline: none;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.dialog-input:focus {
+  border-color: #3498db;
+}
+
+.dialog-actions {
+  padding: 0 20px 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.dialog-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.dialog-button-secondary {
+  background: #ecf0f1;
+  color: #2c3e50;
+}
+
+.dialog-button-secondary:hover {
+  background: #d5dbdb;
+}
+
+.dialog-button-primary {
+  background: #3498db;
   color: white;
-  font-size: 0.9rem;
-  font-weight: 500;
-  text-align: center;
-  opacity: 0.9;
-  transition: all 0.3s ease;
-  position: relative;
-  z-index: 1;
 }
 
-.app-item:hover .app-name {
-  opacity: 1;
-  transform: translateY(-2px);
-}
-
-/* 无搜索结果 */
-.no-results {
-  position: relative;
-  z-index: 10;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.7);
-  margin-top: 4rem;
-}
-
-.no-results-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-  opacity: 0.5;
-}
-
-.no-results-text {
-  font-size: 1.2rem;
-  font-weight: 300;
-}
-
-/* 响应式设计 */
-@media (max-width: 1024px) {
-  .sidebar {
-    width: 300px;
-    left: -300px;
-  }
-}
-
-@media (max-width: 768px) {
-  .main-content {
-    padding: 1rem;
-  }
-
-  .apps-grid {
-    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-    gap: 1.5rem;
-    max-width: 400px;
-  }
-
-  .app-icon {
-    width: 60px;
-    height: 60px;
-    font-size: 2rem;
-  }
-
-  .search-container {
-    margin-bottom: 2rem;
-    margin-top: 2rem;
-  }
-
-  .menu-button {
-    top: 1rem;
-    left: 1rem;
-    width: 45px;
-    height: 45px;
-  }
-
-  .sidebar {
-    width: 280px;
-    left: -280px;
-  }
-}
-
-@media (max-width: 480px) {
-  .apps-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-  }
-
-  .app-icon {
-    width: 50px;
-    height: 50px;
-    font-size: 1.5rem;
-  }
-
-  .app-name {
-    font-size: 0.8rem;
-  }
-
-  .sidebar {
-    width: 260px;
-    left: -260px;
-  }
-
-  .sidebar-header {
-    padding: 1.5rem;
-  }
-
-  .category-item {
-    padding: 0.8rem 1rem;
-    font-size: 0.9rem;
-  }
-}
-
-/* 侧栏打开时的动画 */
-@keyframes slideIn {
-  from {
-    transform: translateX(-100%);
-  }
-
-  to {
-    transform: translateX(0);
-  }
-}
-
-.sidebar.visible {
-  animation: slideIn 0.3s ease-out;
+.dialog-button-primary:hover {
+  background: #2980b9;
 }
 </style>
+
+<!-- 全局样式，用于Teleport到body的元素 -->
 <style>
-:root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #ffffff;
-  background: #1a1a1a;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
+/* 右键菜单全局样式 */
+.context-menu {
+  position: fixed !important;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  min-width: 150px;
+  padding: 4px 0;
+  pointer-events: auto;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-* {
-  box-sizing: border-box;
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #2c3e50;
+  transition: background-color 0.2s ease;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
+.context-menu-item:hover {
+  background: #f8f9fa;
 }
 
-/* 自定义滚动条 */
-::-webkit-scrollbar {
-  width: 8px;
+.context-menu-item-disabled {
+  color: #bdc3c7 !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+.context-menu-item-disabled:hover {
+  background: transparent !important;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
+.context-menu-item-danger {
+  color: #e74c3c;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+.context-menu-item-danger:hover {
+  background: #fdf2f2;
 }
 
-/* 选中文本样式 */
-::selection {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
+.context-menu-item i {
+  margin-right: 8px;
+  width: 16px;
+  text-align: center;
 }
 
-/* 焦点样式 */
-*:focus {
-  outline: none;
-}
-
-/* 动画关键帧 */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.05);
-  }
-}
-
-/* 暗色主题适配 */
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #ffffff;
-    background: #0a0a0a;
-  }
-}
-
-/* 高对比度模式适配 */
-@media (prefers-contrast: high) {
-  .app-item::before {
-    border-width: 2px;
-  }
-
-  .search-box {
-    border-width: 2px;
-  }
-}
-
-/* 减少动画模式适配 */
-@media (prefers-reduced-motion: reduce) {
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+.context-menu-divider {
+  height: 1px;
+  background: #e0e0e0;
+  margin: 4px 0;
 }
 </style>

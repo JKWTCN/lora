@@ -1,0 +1,62 @@
+/* 图标字体样式 */
+.icon-apps:before {
+    content: "📱";
+}
+
+.icon-code:before {
+    content: "💻";
+}
+
+.icon-briefcase:before {
+    content: "💼";
+}
+
+.icon-play:before {
+    content: "🎵";
+}
+
+.icon-settings:before {
+    content: "⚙️";
+}
+
+.icon-gamepad:before {
+    content: "🎮";
+}
+
+.icon-plus:before {
+    content: "➕";
+}
+
+.icon-edit:before {
+    content: "✏️";
+}
+
+.icon-delete:before {
+    content: "🗑️";
+}
+
+.icon-trash:before {
+    content: "🗑️";
+}
+
+.icon-search:before {
+    content: "🔍";
+}
+
+.icon-menu:before {
+    content: "☰";
+}
+
+.icon-close:before {
+    content: "✕";
+}
+
+/* 基础图标样式 */
+[class^="icon-"],
+[class*=" icon-"] {
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
