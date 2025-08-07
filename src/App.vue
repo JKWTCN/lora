@@ -39,34 +39,74 @@
         <div v-if="contextMenu.visible" class="context-menu"
           :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }" @click.stop>
           <div class="context-menu-item" @click="createNewCategory">
-            <i class="icon-plus"></i>
             <span>新建分组</span>
           </div>
           <div v-if="contextMenu.category && !contextMenu.category.isDefault" class="context-menu-item"
             :class="{ 'context-menu-item-disabled': !contextMenu.category }" @click="renameCategory">
-            <i class="icon-edit"></i>
             <span>重命名</span>
           </div>
           <div v-if="contextMenu.category && !contextMenu.category.isDefault"
             class="context-menu-item context-menu-item-danger"
             :class="{ 'context-menu-item-disabled': !contextMenu.category }" @click="deleteCategory">
-            <i class="icon-delete"></i>
             <span>删除</span>
           </div>
           <template v-if="!contextMenu.category">
             <div class="context-menu-item context-menu-item-disabled">
-              <i class="icon-edit"></i>
               <span>重命名</span>
             </div>
             <div class="context-menu-item context-menu-item-disabled">
-              <i class="icon-delete"></i>
               <span>删除</span>
             </div>
           </template>
           <div class="context-menu-divider"></div>
           <div class="context-menu-item context-menu-item-danger" @click="deleteAllCategories">
-            <i class="icon-trash"></i>
             <span>删除全部分组</span>
+          </div>
+        </div>
+      </Teleport>
+
+      <!-- 应用右键菜单 -->
+      <Teleport to="body">
+        <div v-if="appContextMenu.visible" class="context-menu"
+          :style="{ left: appContextMenu.x + 'px', top: appContextMenu.y + 'px' }" @click.stop>
+          <div class="context-menu-item" @click="runAsAdmin">
+            <span>管理员权限运行</span>
+          </div>
+          <div class="context-menu-divider"></div>
+          <div class="context-menu-item" @click="openFileLocation">
+            <span>打开文件位置</span>
+          </div>
+          <div class="context-menu-item" @click="showInExplorer">
+            <span>资源管理器菜单</span>
+          </div>
+          <div class="context-menu-item" @click="copyFullPath">
+            <span>复制完整路径</span>
+          </div>
+          <div class="context-menu-divider"></div>
+          <div class="context-menu-item" @click="showMoveToSubmenu">
+            <span>移动到</span>
+            <span class="arrow-right">▶</span>
+          </div>
+          <div class="context-menu-divider"></div>
+          <div class="context-menu-item" @click="editApp">
+            <span>编辑</span>
+          </div>
+          <div class="context-menu-item context-menu-item-danger" @click="deleteApp">
+            <span>删除</span>
+          </div>
+          <div class="context-menu-item context-menu-item-danger" @click="deleteAllApps">
+            <span>删除全部</span>
+          </div>
+        </div>
+      </Teleport>
+
+      <!-- 移动到子菜单 -->
+      <Teleport to="body">
+        <div v-if="moveToSubmenu.visible" class="context-menu submenu"
+          :style="{ left: moveToSubmenu.x + 'px', top: moveToSubmenu.y + 'px' }" @click.stop>
+          <div v-for="category in categories.filter(cat => cat.id !== selectedCategory)" :key="category.id"
+            class="context-menu-item" @click="moveAppToCategory(category.id)">
+            <span>{{ category.name }}</span>
           </div>
         </div>
       </Teleport>
@@ -103,7 +143,7 @@
 
         <div class="app-grid">
           <div v-for="app in filteredApps" :key="app.id" class="app-item" @click="launchApp(app)"
-            @dblclick="launchApp(app)">
+            @dblclick="launchApp(app)" @contextmenu.prevent="showAppContextMenu($event, app)">
             <div class="app-icon">
               <img :src="app.icon" :alt="app.name" v-if="app.icon" />
               <div v-else class="default-icon">{{ app.name.charAt(0) }}</div>
@@ -138,6 +178,30 @@ const contextMenu = ref<{
   x: 0,
   y: 0,
   category: null
+})
+
+// 应用右键菜单相关
+const appContextMenu = ref<{
+  visible: boolean;
+  x: number;
+  y: number;
+  app: any;
+}>({
+  visible: false,
+  x: 0,
+  y: 0,
+  app: null
+})
+
+// 移动到子菜单
+const moveToSubmenu = ref<{
+  visible: boolean;
+  x: number;
+  y: number;
+}>({
+  visible: false,
+  x: 0,
+  y: 0
 })
 
 // 重命名对话框相关
@@ -205,14 +269,37 @@ const launchApp = (app: any) => {
 
 // 右键菜单相关方法
 const showContextMenu = (e: MouseEvent, category: any) => {
-  // 获取屏幕坐标而不是相对于窗口的坐标
+  // 隐藏其他所有菜单
+  hideAppContextMenu()
+  hideMoveToSubmenu()
+
+  // 获取屏幕坐标
   const x = e.clientX
   const y = e.clientY
 
+  // 智能定位：确保菜单不超出屏幕边界
+  const menuWidth = 120
+  const menuHeight = 200 // 估算菜单高度
+  const screenWidth = window.innerWidth
+  const screenHeight = window.innerHeight
+
+  let adjustedX = x
+  let adjustedY = y
+
+  // 如果菜单会超出右边界，则向左偏移
+  if (x + menuWidth > screenWidth) {
+    adjustedX = screenWidth - menuWidth - 10
+  }
+
+  // 如果菜单会超出下边界，则向上偏移
+  if (y + menuHeight > screenHeight) {
+    adjustedY = screenHeight - menuHeight - 10
+  }
+
   contextMenu.value = {
     visible: true,
-    x: x,
-    y: y,
+    x: adjustedX,
+    y: adjustedY,
     category: category
   }
 
@@ -226,6 +313,165 @@ const showContextMenu = (e: MouseEvent, category: any) => {
 
 const hideContextMenu = () => {
   contextMenu.value.visible = false
+  // 同时隐藏子菜单
+  hideMoveToSubmenu()
+}
+
+// 应用右键菜单相关方法
+const showAppContextMenu = (e: MouseEvent, app: any) => {
+  // 隐藏其他所有菜单
+  hideContextMenu()
+  hideMoveToSubmenu()
+
+  // 获取屏幕坐标
+  const x = e.clientX
+  const y = e.clientY
+
+  // 智能定位：确保菜单不超出屏幕边界
+  const menuWidth = 150
+  const menuHeight = 280 // 估算应用菜单高度
+  const screenWidth = window.innerWidth
+  const screenHeight = window.innerHeight
+
+  let adjustedX = x
+  let adjustedY = y
+
+  // 如果菜单会超出右边界，则向左偏移
+  if (x + menuWidth > screenWidth) {
+    adjustedX = screenWidth - menuWidth - 10
+  }
+
+  // 如果菜单会超出下边界，则向上偏移
+  if (y + menuHeight > screenHeight) {
+    adjustedY = screenHeight - menuHeight - 10
+  }
+
+  appContextMenu.value = {
+    visible: true,
+    x: adjustedX,
+    y: adjustedY,
+    app: app
+  }
+
+  // 点击其他地方时隐藏菜单
+  document.addEventListener('click', hideAppContextMenu, { once: true })
+
+  // 阻止默认的右键菜单
+  e.preventDefault()
+  e.stopPropagation()
+}
+
+const hideAppContextMenu = () => {
+  appContextMenu.value.visible = false
+  // 同时隐藏子菜单
+  hideMoveToSubmenu()
+}
+
+// 应用右键菜单功能
+const runAsAdmin = () => {
+  if (appContextMenu.value.app) {
+    console.log(`以管理员权限运行: ${appContextMenu.value.app.name}`)
+    // 这里可以添加 Tauri API 调用以管理员权限启动应用
+  }
+  hideAppContextMenu()
+}
+
+const openFileLocation = () => {
+  if (appContextMenu.value.app) {
+    console.log(`打开文件位置: ${appContextMenu.value.app.path}`)
+    // 这里可以添加 Tauri API 调用打开文件夹
+  }
+  hideAppContextMenu()
+}
+
+const showInExplorer = () => {
+  if (appContextMenu.value.app) {
+    console.log(`在资源管理器中显示: ${appContextMenu.value.app.path}`)
+    // 这里可以添加 Tauri API 调用显示资源管理器菜单
+  }
+  hideAppContextMenu()
+}
+
+const copyFullPath = () => {
+  if (appContextMenu.value.app) {
+    navigator.clipboard.writeText(appContextMenu.value.app.path || '')
+    console.log(`已复制路径: ${appContextMenu.value.app.path}`)
+  }
+  hideAppContextMenu()
+}
+
+const showMoveToSubmenu = () => {
+  // 计算子菜单位置，紧贴主菜单
+  let submenuX = appContextMenu.value.x + 120 // 紧贴主菜单右侧
+  let submenuY = appContextMenu.value.y
+
+  // 智能定位：确保子菜单不超出屏幕边界
+  const submenuWidth = 100
+  const submenuHeight = 150 // 估算子菜单高度
+  const screenWidth = window.innerWidth
+  const screenHeight = window.innerHeight
+
+  // 如果子菜单会超出右边界，则显示在主菜单左侧
+  if (submenuX + submenuWidth > screenWidth) {
+    submenuX = appContextMenu.value.x - submenuWidth
+  }
+
+  // 如果子菜单会超出下边界，则向上偏移
+  if (submenuY + submenuHeight > screenHeight) {
+    submenuY = screenHeight - submenuHeight - 10
+  }
+
+  moveToSubmenu.value = {
+    visible: true,
+    x: submenuX,
+    y: submenuY
+  }
+}
+
+const hideMoveToSubmenu = () => {
+  moveToSubmenu.value.visible = false
+}
+
+const moveAppToCategory = (categoryId: string) => {
+  if (appContextMenu.value.app) {
+    const appIndex = apps.value.findIndex(app => app.id === appContextMenu.value.app.id)
+    if (appIndex !== -1) {
+      apps.value[appIndex].category = categoryId
+      console.log(`已将 ${appContextMenu.value.app.name} 移动到分类: ${categoryId}`)
+    }
+  }
+  hideMoveToSubmenu()
+  hideAppContextMenu()
+}
+
+const editApp = () => {
+  if (appContextMenu.value.app) {
+    console.log(`编辑应用: ${appContextMenu.value.app.name}`)
+    // 这里可以打开编辑对话框
+  }
+  hideAppContextMenu()
+}
+
+const deleteApp = () => {
+  if (appContextMenu.value.app) {
+    if (confirm(`确定要删除应用 "${appContextMenu.value.app.name}" 吗？`)) {
+      apps.value = apps.value.filter(app => app.id !== appContextMenu.value.app.id)
+      console.log(`已删除应用: ${appContextMenu.value.app.name}`)
+    }
+  }
+  hideAppContextMenu()
+}
+
+const deleteAllApps = () => {
+  if (confirm('确定要删除当前分类下的所有应用吗？')) {
+    if (selectedCategory.value === 'all') {
+      apps.value = []
+    } else {
+      apps.value = apps.value.filter(app => app.category !== selectedCategory.value)
+    }
+    console.log('已删除所有应用')
+  }
+  hideAppContextMenu()
 }
 
 const createNewCategory = () => {
@@ -385,6 +631,19 @@ onMounted(() => {
       !target.closest('.content-header') &&
       !target.closest('.titlebar-button')) {
       hideSearchBox()
+    }
+
+    // 隐藏右键菜单 - 统一处理所有菜单的隐藏
+    if (!target.closest('.context-menu')) {
+      if (contextMenu.value.visible) {
+        hideContextMenu()
+      }
+      if (appContextMenu.value.visible) {
+        hideAppContextMenu()
+      }
+      if (moveToSubmenu.value.visible) {
+        hideMoveToSubmenu()
+      }
     }
   }
   document.addEventListener('click', handleClickOutside)
@@ -870,26 +1129,43 @@ textarea,
   user-select: text;
 }
 
+/* 确保整个页面容器允许溢出 */
+html,
+body {
+  overflow: visible !important;
+  position: relative;
+}
+
 /* 右键菜单全局样式 */
 .context-menu {
   position: fixed !important;
   background: white;
   border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 9999;
-  min-width: 150px;
-  padding: 4px 0;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 999999;
+  min-width: 120px;
+  padding: 2px 0;
   pointer-events: auto;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* 确保菜单能够超出窗口边界 */
+  overflow: visible;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.context-menu.submenu {
+  z-index: 1000000;
+  min-width: 100px;
 }
 
 .context-menu-item {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
+  justify-content: space-between;
+  padding: 6px 12px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   color: #2c3e50;
   transition: background-color 0.2s ease;
 }
@@ -916,15 +1192,15 @@ textarea,
   background: #fdf2f2;
 }
 
-.context-menu-item i {
-  margin-right: 8px;
-  width: 16px;
-  text-align: center;
+.arrow-right {
+  margin-left: auto;
+  font-size: 10px;
+  color: #95a5a6;
 }
 
 .context-menu-divider {
   height: 1px;
   background: #e0e0e0;
-  margin: 4px 0;
+  margin: 2px 0;
 }
 </style>
