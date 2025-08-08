@@ -100,6 +100,16 @@
         </div>
       </Teleport>
 
+      <!-- 网格空白处右键菜单 -->
+      <Teleport to="body">
+        <div v-if="gridContextMenu.visible" class="context-menu"
+          :style="{ left: gridContextMenu.x + 'px', top: gridContextMenu.y + 'px' }" @click.stop>
+          <div class="context-menu-item" @click="createNewProject">
+            <span>新建项目</span>
+          </div>
+        </div>
+      </Teleport>
+
       <!-- 移动到子菜单 -->
       <Teleport to="body">
         <div v-if="moveToSubmenu.visible" class="context-menu submenu"
@@ -141,7 +151,7 @@
           </div>
         </div>
 
-        <div class="app-grid">
+        <div class="app-grid" @contextmenu.prevent="showGridContextMenu($event)">
           <div v-for="app in filteredApps" :key="app.id" class="app-item" @click="launchApp(app)"
             @dblclick="launchApp(app)" @contextmenu.prevent="showAppContextMenu($event, app)">
             <div class="app-icon">
@@ -195,6 +205,17 @@ const appContextMenu = ref<{
 
 // 移动到子菜单
 const moveToSubmenu = ref<{
+  visible: boolean;
+  x: number;
+  y: number;
+}>({
+  visible: false,
+  x: 0,
+  y: 0
+})
+
+// 网格右键菜单相关
+const gridContextMenu = ref<{
   visible: boolean;
   x: number;
   y: number;
@@ -365,6 +386,78 @@ const hideAppContextMenu = () => {
   appContextMenu.value.visible = false
   // 同时隐藏子菜单
   hideMoveToSubmenu()
+}
+
+// 网格右键菜单相关方法
+const showGridContextMenu = (e: MouseEvent) => {
+  // 检查点击的是否为网格本身（空白处），而不是应用项
+  const target = e.target as HTMLElement
+  if (target.closest('.app-item')) {
+    return // 如果点击的是应用项，不显示网格菜单
+  }
+
+  // 隐藏其他所有菜单
+  hideContextMenu()
+  hideAppContextMenu()
+  hideMoveToSubmenu()
+
+  // 获取屏幕坐标
+  const x = e.clientX
+  const y = e.clientY
+
+  // 智能定位：确保菜单不超出屏幕边界
+  const menuWidth = 120
+  const menuHeight = 50 // 估算菜单高度
+  const screenWidth = window.innerWidth
+  const screenHeight = window.innerHeight
+
+  let adjustedX = x
+  let adjustedY = y
+
+  // 如果菜单会超出右边界，则向左偏移
+  if (x + menuWidth > screenWidth) {
+    adjustedX = screenWidth - menuWidth - 10
+  }
+
+  // 如果菜单会超出下边界，则向上偏移
+  if (y + menuHeight > screenHeight) {
+    adjustedY = screenHeight - menuHeight - 10
+  }
+
+  gridContextMenu.value = {
+    visible: true,
+    x: adjustedX,
+    y: adjustedY
+  }
+
+  // 点击其他地方时隐藏菜单
+  document.addEventListener('click', hideGridContextMenu, { once: true })
+
+  // 阻止默认的右键菜单
+  e.preventDefault()
+  e.stopPropagation()
+}
+
+const hideGridContextMenu = () => {
+  gridContextMenu.value.visible = false
+}
+
+const createNewProject = () => {
+  console.log('新建项目')
+  // 这里可以添加新建项目的逻辑，比如打开文件选择对话框
+  // 或者添加一个默认的新项目到当前分类
+  const newApp = {
+    id: Date.now(),
+    name: '新项目',
+    category: selectedCategory.value === 'all' ? 'utilities' : selectedCategory.value,
+    icon: '',
+    path: ''
+  }
+
+  apps.value.push(newApp)
+  console.log('已添加新项目:', newApp)
+
+  hideGridContextMenu()
 }
 
 // 应用右键菜单功能
@@ -644,6 +737,9 @@ onMounted(() => {
       if (moveToSubmenu.value.visible) {
         hideMoveToSubmenu()
       }
+      if (gridContextMenu.value.visible) {
+        hideGridContextMenu()
+      }
     }
   }
   document.addEventListener('click', handleClickOutside)
@@ -897,11 +993,11 @@ const closeApp = async () => {
 /* 应用网格 */
 .app-grid {
   flex: 1;
-  padding: 20px;
+  padding: 15px;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 8px;
   align-content: start;
 }
 
@@ -909,23 +1005,23 @@ const closeApp = async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 10px;
+  padding: 6px;
   background: white;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .app-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
 }
 
 .app-icon {
-  width: 40px;
-  height: 40px;
-  margin-bottom: 6px;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -935,7 +1031,7 @@ const closeApp = async () => {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: 8px;
+  border-radius: 4px;
 }
 
 .default-icon {
@@ -943,19 +1039,19 @@ const closeApp = async () => {
   height: 100%;
   background: #3498db;
   color: white;
-  border-radius: 6px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 12px;
   font-weight: bold;
 }
 
 .app-name {
   text-align: center;
-  font-size: 11px;
+  font-size: 10px;
   color: #2c3e50;
-  line-height: 1.3;
+  line-height: 1.2;
   word-break: break-word;
 }
 
@@ -980,9 +1076,9 @@ const closeApp = async () => {
 /* 响应式设计 */
 @media (max-width: 768px) {
   .app-grid {
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 10px;
-    padding: 15px;
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: 6px;
+    padding: 12px;
   }
 
   .content-header {
