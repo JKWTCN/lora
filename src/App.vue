@@ -142,7 +142,7 @@
       <div class="resizer" @mousedown="startResize"></div>
 
       <!-- 主内容区域 -->
-      <div class="main-content">
+      <div class="main-content" :class="{ 'drag-over': isDragOver }">
         <div class="content-header" v-show="showSearchBox">
           <!-- <h1>{{ getCurrentCategoryName() }}</h1> -->
           <div class="search-box">
@@ -161,6 +161,14 @@
             <div class="app-name">{{ app.name }}</div>
           </div>
         </div>
+
+        <!-- 拖拽提示覆盖层 -->
+        <div v-if="isDragOver" class="drag-overlay">
+          <div class="drag-message">
+            <i class="icon-plus"></i>
+            <p>拖拽程序文件到这里添加到启动器</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -169,6 +177,26 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, Teleport } from 'vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { invoke } from '@tauri-apps/api/core'
+// const invoke = window.__TAURI__.core.invoke;
+
+// 定义数据接口
+interface AppData {
+  id: number
+  name: string
+  category: string
+  icon: string
+  path: string
+  target_path?: string
+  is_shortcut?: boolean
+}
+
+interface CategoryData {
+  id: string
+  name: string
+  icon: string
+  isDefault: boolean
+}
 
 // 响应式数据
 const sidebarWidth = ref(0) // 初始化为0，将通过自适应计算
@@ -176,6 +204,10 @@ const isResizing = ref(false)
 const selectedCategory = ref('all')
 const searchQuery = ref('')
 const showSearchBox = ref(false) // 控制搜索框显示状态
+
+// 拖拽相关状态
+const isDragOver = ref(false)
+const dragCounter = ref(0)
 
 // 右键菜单相关
 const contextMenu = ref<{
@@ -236,36 +268,65 @@ const renameInput = ref(null)
 const searchInputRef = ref(null)
 
 // 分类数据
-const categories = ref([
+const categories = ref<CategoryData[]>([
   { id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true },
-  { id: 'development', name: '开发工具', icon: 'icon-code', isDefault: false },
-  { id: 'productivity', name: '办公软件', icon: 'icon-briefcase', isDefault: false },
-  { id: 'entertainment', name: '娱乐媒体', icon: 'icon-play', isDefault: false },
-  { id: 'utilities', name: '实用工具', icon: 'icon-settings', isDefault: false },
-  { id: 'games', name: '游戏', icon: 'icon-gamepad', isDefault: false }
 ])
 
 // 应用数据
-const apps = ref([
-  { id: 1, name: 'Visual Studio Code', category: 'development', icon: '/icons/vscode.png', path: '' },
-  { id: 2, name: 'Chrome', category: 'productivity', icon: '/icons/chrome.png', path: '' },
-  { id: 3, name: 'Photoshop', category: 'development', icon: '/icons/ps.png', path: '' },
-  { id: 4, name: 'Steam', category: 'games', icon: '/icons/steam.png', path: '' },
-  { id: 5, name: 'Spotify', category: 'entertainment', icon: '/icons/spotify.png', path: '' },
-  { id: 6, name: 'Figma', category: 'development', icon: '/icons/figma.png', path: '' },
-  { id: 7, name: 'Discord', category: 'entertainment', icon: '/icons/discord.png', path: '' },
-  { id: 8, name: 'Notion', category: 'productivity', icon: '/icons/notion.png', path: '' },
-  { id: 9, name: 'Calculator', category: 'utilities', icon: '/icons/calc.png', path: '' },
-  { id: 10, name: 'Terminal', category: 'development', icon: '/icons/terminal.png', path: '' }
-])
+const apps = ref<AppData[]>([])
+// 加载应用数据
+const loadAppData = async () => {
+  console.log('开始加载应用数据...')
+  try {
+    const storage = await invoke('load_app_data') as any
+    console.log('从后端加载的数据:', storage)
+    apps.value = storage.apps || []
+    categories.value = storage.categories || [
+      { id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true },
+      { id: 'utilities', name: '实用工具', icon: 'icon-settings', isDefault: false }
+    ]
+    console.log('应用数据加载成功:', { apps: apps.value, categories: categories.value })
+  } catch (error) {
+    console.error('加载应用数据失败:', error)
+    // 使用默认数据
+    categories.value = [
+      { id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true },
+      { id: 'utilities', name: '实用工具', icon: 'icon-settings', isDefault: false }
+    ]
+    apps.value = []
+    console.log('使用默认数据:', { apps: apps.value, categories: categories.value })
+  }
+}
+
+// 保存应用数据
+const saveAppData = async () => {
+  console.log('开始保存应用数据...', { apps: apps.value, categories: categories.value })
+  try {
+    await invoke('save_app_data', {
+      apps: apps.value,
+      categories: categories.value
+    })
+    console.log('应用数据保存成功')
+  } catch (error) {
+    console.error('保存应用数据失败:', error)
+  }
+}
 
 // 计算属性
 const filteredApps = computed(() => {
+  console.log('计算filteredApps:', {
+    totalApps: apps.value.length,
+    selectedCategory: selectedCategory.value,
+    searchQuery: searchQuery.value,
+    apps: apps.value
+  })
+
   let result = apps.value
 
   // 按分类筛选
   if (selectedCategory.value !== 'all') {
     result = result.filter(app => app.category === selectedCategory.value)
+    console.log('按分类筛选后:', result)
   }
 
   // 按搜索词筛选
@@ -273,8 +334,10 @@ const filteredApps = computed(() => {
     result = result.filter(app =>
       app.name.toLowerCase().includes(searchQuery.value.toLowerCase())
     )
+    console.log('按搜索词筛选后:', result)
   }
 
+  console.log('最终结果:', result)
   return result
 })
 
@@ -283,9 +346,22 @@ const selectCategory = (categoryId: string) => {
   selectedCategory.value = categoryId
 }
 
-const launchApp = (app: any) => {
+const launchApp = async (app: any) => {
   console.log(`启动应用: ${app.name}`)
-  // 这里可以添加 Tauri API 调用来启动应用
+
+  if (!app.path) {
+    console.error('应用路径不存在')
+    alert('应用路径不存在，无法启动')
+    return
+  }
+
+  try {
+    const result = await invoke('launch_app', { appPath: app.path })
+    console.log('启动结果:', result)
+  } catch (error) {
+    console.error('启动应用失败:', error)
+    alert(`启动应用失败: ${error}`)
+  }
 }
 
 // 右键菜单相关方法
@@ -442,11 +518,11 @@ const hideGridContextMenu = () => {
   gridContextMenu.value.visible = false
 }
 
-const createNewProject = () => {
+const createNewProject = async () => {
   console.log('新建项目')
   // 这里可以添加新建项目的逻辑，比如打开文件选择对话框
   // 或者添加一个默认的新项目到当前分类
-  const newApp = {
+  const newApp: AppData = {
     id: Date.now(),
     name: '新项目',
     category: selectedCategory.value === 'all' ? 'utilities' : selectedCategory.value,
@@ -456,6 +532,9 @@ const createNewProject = () => {
 
   apps.value.push(newApp)
   console.log('已添加新项目:', newApp)
+
+  // 保存数据
+  await saveAppData()
 
   hideGridContextMenu()
 }
@@ -525,12 +604,15 @@ const hideMoveToSubmenu = () => {
   moveToSubmenu.value.visible = false
 }
 
-const moveAppToCategory = (categoryId: string) => {
+const moveAppToCategory = async (categoryId: string) => {
   if (appContextMenu.value.app) {
     const appIndex = apps.value.findIndex(app => app.id === appContextMenu.value.app.id)
     if (appIndex !== -1) {
       apps.value[appIndex].category = categoryId
       console.log(`已将 ${appContextMenu.value.app.name} 移动到分类: ${categoryId}`)
+
+      // 保存数据
+      await saveAppData()
     }
   }
   hideMoveToSubmenu()
@@ -545,31 +627,57 @@ const editApp = () => {
   hideAppContextMenu()
 }
 
-const deleteApp = () => {
+const deleteApp = async () => {
   if (appContextMenu.value.app) {
     if (confirm(`确定要删除应用 "${appContextMenu.value.app.name}" 吗？`)) {
-      apps.value = apps.value.filter(app => app.id !== appContextMenu.value.app.id)
-      console.log(`已删除应用: ${appContextMenu.value.app.name}`)
+      try {
+        // 调用后端删除
+        await invoke('delete_app', { appId: appContextMenu.value.app.id })
+
+        // 从前端数组中移除
+        apps.value = apps.value.filter(app => app.id !== appContextMenu.value.app.id)
+        console.log(`已删除应用: ${appContextMenu.value.app.name}`)
+      } catch (error) {
+        console.error('删除应用失败:', error)
+        alert('删除应用失败')
+      }
     }
   }
   hideAppContextMenu()
 }
 
-const deleteAllApps = () => {
+const deleteAllApps = async () => {
   if (confirm('确定要删除当前分类下的所有应用吗？')) {
-    if (selectedCategory.value === 'all') {
-      apps.value = []
-    } else {
-      apps.value = apps.value.filter(app => app.category !== selectedCategory.value)
+    try {
+      // 获取要删除的应用列表
+      const appsToDelete = selectedCategory.value === 'all'
+        ? apps.value
+        : apps.value.filter(app => app.category === selectedCategory.value)
+
+      // 删除每个应用
+      for (const app of appsToDelete) {
+        await invoke('delete_app', { appId: app.id })
+      }
+
+      // 从前端数组中移除
+      if (selectedCategory.value === 'all') {
+        apps.value = []
+      } else {
+        apps.value = apps.value.filter(app => app.category !== selectedCategory.value)
+      }
+
+      console.log('已删除所有应用')
+    } catch (error) {
+      console.error('删除应用失败:', error)
+      alert('删除应用失败')
     }
-    console.log('已删除所有应用')
   }
   hideAppContextMenu()
 }
 
-const createNewCategory = () => {
+const createNewCategory = async () => {
   const newId = Date.now().toString()
-  const newCategory = {
+  const newCategory: CategoryData = {
     id: newId,
     name: '新分组',
     icon: 'icon-apps',
@@ -578,6 +686,9 @@ const createNewCategory = () => {
 
   categories.value.push(newCategory)
   hideContextMenu()
+
+  // 保存数据
+  await saveAppData()
 
   // 立即进入重命名模式
   setTimeout(() => {
@@ -613,11 +724,14 @@ const renameCategory = () => {
   }
 }
 
-const confirmRename = () => {
+const confirmRename = async () => {
   if (renameDialog.value.newName.trim()) {
     const categoryIndex = categories.value.findIndex(cat => cat.id === renameDialog.value.categoryId)
     if (categoryIndex !== -1) {
       categories.value[categoryIndex].name = renameDialog.value.newName.trim()
+
+      // 保存数据
+      await saveAppData()
     }
   }
   cancelRename()
@@ -631,7 +745,7 @@ const cancelRename = () => {
   }
 }
 
-const deleteCategory = () => {
+const deleteCategory = async () => {
   if (contextMenu.value.category && !contextMenu.value.category.isDefault) {
     const categoryId = contextMenu.value.category.id
 
@@ -649,11 +763,14 @@ const deleteCategory = () => {
         app.category = 'utilities'
       }
     })
+
+    // 保存数据
+    await saveAppData()
   }
   hideContextMenu()
 }
 
-const deleteAllCategories = () => {
+const deleteAllCategories = async () => {
   if (confirm('确定要删除所有自定义分组吗？这将把所有应用移动到"实用工具"分类中。')) {
     const defaultCategories = categories.value.filter(cat => cat.isDefault)
     const deletedCategoryIds = categories.value.filter(cat => !cat.isDefault).map(cat => cat.id)
@@ -669,6 +786,9 @@ const deleteAllCategories = () => {
 
     // 切换到"全部应用"
     selectedCategory.value = 'all'
+
+    // 保存数据
+    await saveAppData()
   }
   hideContextMenu()
 }
@@ -707,7 +827,14 @@ const stopResize = () => {
 }
 
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
+  // 简单延迟等待 Tauri 完全初始化
+  await new Promise(resolve => setTimeout(resolve, 500))
+  console.log('开始加载应用数据...')
+
+  // 加载应用数据
+  await loadAppData()
+
   // 计算侧栏的自然宽度
   const sidebar = document.querySelector('.sidebar') as HTMLElement
   if (sidebar) {
@@ -746,6 +873,9 @@ onMounted(() => {
 
   // 全局禁用右键菜单
   document.addEventListener('contextmenu', disableContextMenu)
+
+  // 设置拖拽功能
+  setupDragAndDrop()
 })
 
 // 禁用右键菜单的函数
@@ -759,6 +889,9 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', stopResize)
   // 清理全局右键菜单禁用监听器
   document.removeEventListener('contextmenu', disableContextMenu)
+
+  // 清理拖拽功能
+  cleanupDragAndDrop()
 })
 
 // 标题栏相关方法
@@ -798,6 +931,114 @@ const closeApp = async () => {
     console.log('窗口关闭命令已发送')
   } catch (error) {
     console.error('关闭窗口时出错:', error)
+  }
+}
+
+// 拖拽处理函数
+const handleDragEnter = (e: Event) => {
+  e.preventDefault()
+  dragCounter.value++
+  isDragOver.value = true
+}
+
+const handleDragLeave = (e: Event) => {
+  e.preventDefault()
+  dragCounter.value--
+  if (dragCounter.value === 0) {
+    isDragOver.value = false
+  }
+}
+
+const handleDragOver = (e: Event) => {
+  e.preventDefault()
+}
+
+const handleDrop = async (e: Event) => {
+
+  e.preventDefault()
+  isDragOver.value = false
+  dragCounter.value = 0
+
+  console.log('拖拽释放事件触发')
+
+  const dragEvent = e as DragEvent
+  const files = dragEvent.dataTransfer?.files
+  if (!files || files.length === 0) {
+    console.log('没有检测到文件')
+    return
+  }
+
+  console.log('拖拽文件数量:', files.length)
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    const filePath = (file as any).path || file.name
+
+    console.log('处理文件:', filePath)
+    console.log("调用自定义命令")
+    await invoke('my_custom_command');
+
+    try {
+      // 检查 invoke 函数是否可用
+      console.log('检查 invoke 函数可用性...')
+      if (typeof invoke !== 'function') {
+        throw new Error('invoke 函数不可用')
+      }
+
+      // 调用 Rust 后端获取文件信息
+      console.log('调用get_file_info API...')
+      const fileInfo = await invoke('get_file_info', { filePath: filePath }) as any
+      console.log('文件信息获取成功:', fileInfo)
+
+      // 创建新的应用项
+      const newApp: AppData = {
+        id: Date.now() + i, // 避免ID冲突
+        name: fileInfo.name,
+        category: selectedCategory.value === 'all' ? 'utilities' : selectedCategory.value,
+        icon: '', // 可以后续添加图标提取功能
+        path: fileInfo.path,
+        target_path: fileInfo.target_path,
+        is_shortcut: fileInfo.is_shortcut
+      }
+
+      console.log('创建新应用项:', newApp)
+      apps.value.push(newApp)
+      console.log('应用已添加到数组，当前应用数量:', apps.value.length)
+
+      // 自动保存数据
+      console.log('开始保存数据...')
+      await saveAppData()
+      console.log('数据保存完成')
+
+    } catch (error) {
+      console.error('处理文件失败:', error)
+      // 可以显示错误提示
+      alert(`无法添加文件 "${file.name}": ${error}`)
+    }
+  }
+
+  console.log('拖拽处理完成，当前应用总数:', apps.value.length)
+}
+
+// 在 onMounted 中添加拖拽事件监听器
+const setupDragAndDrop = () => {
+  const container = document.querySelector('.launcher-container') as HTMLElement
+  if (container) {
+    container.addEventListener('dragenter', handleDragEnter)
+    container.addEventListener('dragleave', handleDragLeave)
+    container.addEventListener('dragover', handleDragOver)
+    container.addEventListener('drop', handleDrop)
+  }
+}
+
+// 在 onUnmounted 中清理拖拽事件监听器
+const cleanupDragAndDrop = () => {
+  const container = document.querySelector('.launcher-container') as HTMLElement
+  if (container) {
+    container.removeEventListener('dragenter', handleDragEnter)
+    container.removeEventListener('dragleave', handleDragLeave)
+    container.removeEventListener('dragover', handleDragOver)
+    container.removeEventListener('drop', handleDrop)
   }
 }
 </script>
@@ -1298,5 +1539,64 @@ body {
   height: 1px;
   background: #e0e0e0;
   margin: 2px 0;
+}
+
+/* 拖拽相关样式 */
+.main-content.drag-over {
+  position: relative;
+}
+
+.drag-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(52, 152, 219, 0.1);
+  border: 2px dashed #3498db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.drag-message {
+  text-align: center;
+  color: #3498db;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.2);
+}
+
+.drag-message i {
+  font-size: 48px;
+  margin-bottom: 16px;
+  display: block;
+}
+
+.drag-message p {
+  margin: 0;
+  font-size: 16px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* 拖拽时的主内容区域样式 */
+.main-content.drag-over .app-grid {
+  opacity: 0.3;
+  transition: opacity 0.2s ease;
 }
 </style>
