@@ -242,14 +242,14 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            greet,
+            load_app_data,
             my_custom_command,
             get_file_info,
             launch_app,
             save_app_data,
-            load_app_data,
             delete_app,
-            update_app_category
+            update_app_category,
+            greet
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

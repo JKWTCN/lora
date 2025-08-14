@@ -178,7 +178,6 @@
 import { ref, computed, onMounted, onUnmounted, Teleport } from 'vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { invoke } from '@tauri-apps/api/core'
-// const invoke = window.__TAURI__.core.invoke;
 
 // 定义数据接口
 interface AppData {
@@ -281,17 +280,20 @@ const loadAppData = async () => {
     const storage = await invoke('load_app_data') as any
     console.log('从后端加载的数据:', storage)
     apps.value = storage.apps || []
-    categories.value = storage.categories || [
-      { id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true },
-      { id: 'utilities', name: '实用工具', icon: 'icon-settings', isDefault: false }
-    ]
+
+    // 转换后端的 is_default 为前端使用的 isDefault
+    const categoriesFromBackend = storage.categories || []
+    categories.value = categoriesFromBackend.map((category: any) => ({
+      ...category,
+      isDefault: category.is_default,
+      is_default: undefined // 移除后端字段
+    })).map(({ is_default, ...rest }: any) => rest) // 完全移除 is_default 字段
+
     console.log('应用数据加载成功:', { apps: apps.value, categories: categories.value })
   } catch (error) {
     console.error('加载应用数据失败:', error)
     // 使用默认数据
     categories.value = [
-      { id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true },
-      { id: 'utilities', name: '实用工具', icon: 'icon-settings', isDefault: false }
     ]
     apps.value = []
     console.log('使用默认数据:', { apps: apps.value, categories: categories.value })
@@ -302,9 +304,16 @@ const loadAppData = async () => {
 const saveAppData = async () => {
   console.log('开始保存应用数据...', { apps: apps.value, categories: categories.value })
   try {
+    // 转换前端的 isDefault 为后端期望的 is_default
+    const categoriesForBackend = categories.value.map(category => ({
+      ...category,
+      is_default: category.isDefault,
+      isDefault: undefined // 移除前端字段
+    })).map(({ isDefault, ...rest }) => rest) // 完全移除 isDefault 字段
+
     await invoke('save_app_data', {
       apps: apps.value,
-      categories: categories.value
+      categories: categoriesForBackend
     })
     console.log('应用数据保存成功')
   } catch (error) {
