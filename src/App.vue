@@ -175,9 +175,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, Teleport } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, Teleport } from 'vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 
 // 定义数据接口
 interface AppData {
@@ -883,8 +884,10 @@ onMounted(async () => {
   // 全局禁用右键菜单
   document.addEventListener('contextmenu', disableContextMenu)
 
-  // 设置拖拽功能
-  setupDragAndDrop()
+  // 等待DOM完全渲染后设置拖拽功能
+  nextTick(async () => {
+    await setupDragAndDrop()
+  })
 })
 
 // 禁用右键菜单的函数
@@ -945,12 +948,14 @@ const closeApp = async () => {
 
 // 拖拽处理函数
 const handleDragEnter = (e: Event) => {
+  console.log('拖拽进入事件触发')
   e.preventDefault()
   dragCounter.value++
   isDragOver.value = true
 }
 
 const handleDragLeave = (e: Event) => {
+  console.log('拖拽离开事件触发')
   e.preventDefault()
   dragCounter.value--
   if (dragCounter.value === 0) {
@@ -959,6 +964,7 @@ const handleDragLeave = (e: Event) => {
 }
 
 const handleDragOver = (e: Event) => {
+  console.log('拖拽悬停事件触发')
   e.preventDefault()
 }
 
@@ -982,73 +988,141 @@ const handleDrop = async (e: Event) => {
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
     const filePath = (file as any).path || file.name
-
-    console.log('处理文件:', filePath)
-    console.log("调用自定义命令")
-    await invoke('my_custom_command');
-
-    try {
-      // 检查 invoke 函数是否可用
-      console.log('检查 invoke 函数可用性...')
-      if (typeof invoke !== 'function') {
-        throw new Error('invoke 函数不可用')
-      }
-
-      // 调用 Rust 后端获取文件信息
-      console.log('调用get_file_info API...')
-      const fileInfo = await invoke('get_file_info', { filePath: filePath }) as any
-      console.log('文件信息获取成功:', fileInfo)
-
-      // 创建新的应用项
-      const newApp: AppData = {
-        id: Date.now() + i, // 避免ID冲突
-        name: fileInfo.name,
-        category: selectedCategory.value === 'all' ? 'utilities' : selectedCategory.value,
-        icon: '', // 可以后续添加图标提取功能
-        path: fileInfo.path,
-        target_path: fileInfo.target_path,
-        is_shortcut: fileInfo.is_shortcut
-      }
-
-      console.log('创建新应用项:', newApp)
-      apps.value.push(newApp)
-      console.log('应用已添加到数组，当前应用数量:', apps.value.length)
-
-      // 自动保存数据
-      console.log('开始保存数据...')
-      await saveAppData()
-      console.log('数据保存完成')
-
-    } catch (error) {
-      console.error('处理文件失败:', error)
-      // 可以显示错误提示
-      alert(`无法添加文件 "${file.name}": ${error}`)
-    }
+    await handleFileDrop(filePath)
   }
 
   console.log('拖拽处理完成，当前应用总数:', apps.value.length)
 }
 
+// 处理单个文件拖拽的函数
+const handleFileDrop = async (filePath: string) => {
+  console.log('处理文件:', filePath)
+  console.log("调用自定义命令")
+  await invoke('my_custom_command');
+
+  try {
+    // 检查 invoke 函数是否可用
+    console.log('检查 invoke 函数可用性...')
+    if (typeof invoke !== 'function') {
+      throw new Error('invoke 函数不可用')
+    }
+
+    // 调用 Rust 后端获取文件信息
+    console.log('调用get_file_info API...')
+    const fileInfo = await invoke('get_file_info', { filePath: filePath }) as any
+    console.log('文件信息获取成功:', fileInfo)
+
+    // 创建新的应用项
+    const newApp: AppData = {
+      id: Date.now() + Math.random(), // 避免ID冲突
+      name: fileInfo.name,
+      category: selectedCategory.value === 'all' ? 'utilities' : selectedCategory.value,
+      icon: '', // 可以后续添加图标提取功能
+      path: fileInfo.path,
+      target_path: fileInfo.target_path,
+      is_shortcut: fileInfo.is_shortcut
+    }
+
+    console.log('创建新应用项:', newApp)
+    apps.value.push(newApp)
+    console.log('应用已添加到数组，当前应用数量:', apps.value.length)
+
+    // 自动保存数据
+    console.log('开始保存数据...')
+    await saveAppData()
+    console.log('数据保存完成')
+
+  } catch (error) {
+    console.error('处理文件失败:', error)
+    // 可以显示错误提示
+    alert(`无法添加文件 "${filePath}": ${error}`)
+  }
+}
+
 // 在 onMounted 中添加拖拽事件监听器
-const setupDragAndDrop = () => {
-  const container = document.querySelector('.launcher-container') as HTMLElement
-  if (container) {
-    container.addEventListener('dragenter', handleDragEnter)
-    container.addEventListener('dragleave', handleDragLeave)
-    container.addEventListener('dragover', handleDragOver)
-    container.addEventListener('drop', handleDrop)
+const setupDragAndDrop = async () => {
+  console.log('设置拖拽功能...')
+
+  // 监听 Tauri 拖拽事件
+  try {
+    console.log('设置 Tauri 拖拽事件监听...')
+    await listen('tauri://drag', (event) => {
+      console.log('Tauri 拖拽事件:', event)
+    })
+
+    await listen('tauri://drag-over', (event) => {
+      console.log('Tauri 拖拽悬停事件:', event)
+      isDragOver.value = true
+    })
+
+    await listen('tauri://drag-drop', async (event: any) => {
+      console.log('Tauri 拖拽释放事件:', event)
+      isDragOver.value = false
+
+      if (event.payload && event.payload.paths) {
+        const paths = event.payload.paths as string[]
+        console.log('拖拽的文件路径:', paths)
+
+        for (const filePath of paths) {
+          await handleFileDrop(filePath)
+        }
+      }
+    })
+
+    await listen('tauri://drag-leave', (event) => {
+      console.log('Tauri 拖拽离开事件:', event)
+      isDragOver.value = false
+    })
+
+    console.log('Tauri 拖拽事件监听设置完成')
+  } catch (error) {
+    console.error('设置 Tauri 拖拽事件失败:', error)
+  }
+
+  // 同时保留传统的DOM拖拽事件作为备用
+  const appContainer = document.querySelector('.app-container') as HTMLElement
+  const launcherContainer = document.querySelector('.launcher-container') as HTMLElement
+  const mainContent = document.querySelector('.main-content') as HTMLElement
+
+  console.log('DOM元素查找结果:', {
+    appContainer: !!appContainer,
+    launcherContainer: !!launcherContainer,
+    mainContent: !!mainContent
+  })
+
+  // 优先绑定到主内容区域，如果不存在则绑定到应用容器
+  const targetElement = mainContent || launcherContainer || appContainer
+
+  if (targetElement) {
+    console.log('绑定传统拖拽事件到:', targetElement.className)
+    targetElement.addEventListener('dragenter', handleDragEnter)
+    targetElement.addEventListener('dragleave', handleDragLeave)
+    targetElement.addEventListener('dragover', handleDragOver)
+    targetElement.addEventListener('drop', handleDrop)
+  } else {
+    console.error('未找到合适的DOM元素来绑定拖拽事件')
   }
 }
 
 // 在 onUnmounted 中清理拖拽事件监听器
 const cleanupDragAndDrop = () => {
-  const container = document.querySelector('.launcher-container') as HTMLElement
-  if (container) {
-    container.removeEventListener('dragenter', handleDragEnter)
-    container.removeEventListener('dragleave', handleDragLeave)
-    container.removeEventListener('dragover', handleDragOver)
-    container.removeEventListener('drop', handleDrop)
-  }
+  console.log('清理拖拽功能...')
+
+  const appContainer = document.querySelector('.app-container') as HTMLElement
+  const launcherContainer = document.querySelector('.launcher-container') as HTMLElement
+  const mainContent = document.querySelector('.main-content') as HTMLElement
+
+  // 从所有可能绑定过事件的元素上移除监听器
+  const elements = [mainContent, launcherContainer, appContainer].filter(Boolean)
+
+  elements.forEach(element => {
+    if (element) {
+      element.removeEventListener('dragenter', handleDragEnter)
+      element.removeEventListener('dragleave', handleDragLeave)
+      element.removeEventListener('dragover', handleDragOver)
+      element.removeEventListener('drop', handleDrop)
+    }
+  })
 }
 </script>
 
