@@ -219,7 +219,13 @@
           <!-- <h1>{{ getCurrentCategoryName() }}</h1> -->
           <div class="search-box">
             <input v-model="searchQuery" type="text" placeholder="搜索应用..." class="search-input" ref="searchInputRef"
-              @keyup.escape="hideSearchBox">
+              @keyup.escape="hideSearchBox" @keydown="handleSearchKeydown">
+            <div v-if="searchQuery" class="search-info">
+              找到 {{ filteredApps.length }} 个结果
+              <span v-if="filteredApps.length > 0" class="search-hint">
+                • 按 Enter 启动第一个 • 按 ESC 退出搜索
+              </span>
+            </div>
           </div>
         </div>
 
@@ -1326,6 +1332,9 @@ onMounted(async () => {
   }
   document.addEventListener('click', handleClickOutside)
 
+  // 添加全局键盘监听，实现直接输入搜索
+  document.addEventListener('keydown', handleGlobalKeydown)
+
   // 全局禁用右键菜单
   document.addEventListener('contextmenu', disableContextMenu)
 
@@ -1341,6 +1350,70 @@ const disableContextMenu = (e: Event) => {
   return false
 }
 
+// 全局键盘事件处理函数
+const handleGlobalKeydown = (event: KeyboardEvent) => {
+  // 检查是否正在编辑状态（对话框打开、输入框聚焦等）
+  const isEditing = document.activeElement?.tagName === 'INPUT' || 
+                   document.activeElement?.tagName === 'TEXTAREA' ||
+                   document.activeElement?.tagName === 'SELECT' ||
+                   document.querySelector('.dialog-overlay') ||
+                   contextMenu.value.visible ||
+                   appContextMenu.value.visible ||
+                   moveToSubmenu.value.visible ||
+                   gridContextMenu.value.visible
+
+  // 如果正在编辑，不处理
+  if (isEditing) {
+    return
+  }
+
+  // ESC键隐藏搜索框
+  if (event.key === 'Escape') {
+    if (showSearchBox.value) {
+      hideSearchBox()
+      event.preventDefault()
+    }
+    return
+  }
+
+  // Ctrl+F 或 F3 快捷键打开搜索
+  if ((event.ctrlKey && event.key === 'f') || event.key === 'F3') {
+    if (!showSearchBox.value) {
+      toggleSearch()
+    }
+    event.preventDefault()
+    return
+  }
+
+  // 检查是否是可打印字符（字母、数字、部分符号等）
+  const isPrintableChar = event.key.length === 1 && 
+                         !event.ctrlKey && 
+                         !event.altKey && 
+                         !event.metaKey &&
+                         // 排除一些特殊字符
+                         !/[\s\t\n\r]/.test(event.key)
+
+  if (isPrintableChar) {
+    // 如果搜索框未显示，显示它并添加字符
+    if (!showSearchBox.value) {
+      showSearchBox.value = true
+      searchQuery.value = event.key
+      
+      // 聚焦到搜索框
+      nextTick(() => {
+        if (searchInputRef.value) {
+          const input = searchInputRef.value as HTMLInputElement
+          input.focus()
+          // 将光标移到末尾
+          input.setSelectionRange(1, 1)
+        }
+      })
+      
+      event.preventDefault()
+    }
+  }
+}
+
 onUnmounted(() => {
   document.removeEventListener('mousemove', resize)
   document.removeEventListener('mouseup', stopResize)
@@ -1349,6 +1422,9 @@ onUnmounted(() => {
 
   // 清理拖拽功能
   cleanupDragAndDrop()
+  
+  // 清理全局键盘监听器
+  document.removeEventListener('keydown', handleGlobalKeydown)
 })
 
 // 标题栏相关方法
@@ -1372,6 +1448,21 @@ const toggleSearch = () => {
 const hideSearchBox = () => {
   showSearchBox.value = false
   searchQuery.value = ''
+}
+
+// 搜索框键盘事件处理
+const handleSearchKeydown = (event: KeyboardEvent) => {
+  // Enter键启动第一个搜索结果
+  if (event.key === 'Enter') {
+    const firstApp = filteredApps.value[0]
+    if (firstApp) {
+      launchApp(firstApp)
+      hideSearchBox()
+    }
+    event.preventDefault()
+  }
+  // 下箭头键可以考虑添加应用选择功能
+  // 这里暂时不实现，因为需要添加选中状态管理
 }
 
 const toggleMenu = () => {
@@ -1776,6 +1867,20 @@ const cleanupDragAndDrop = () => {
 
 .search-input:focus {
   border-color: #3498db;
+}
+
+/* 搜索信息样式 */
+.search-info {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #7f8c8d;
+  text-align: center;
+}
+
+.search-hint {
+  margin-left: 8px;
+  font-size: 11px;
+  opacity: 0.8;
 }
 
 /* 应用网格 */
