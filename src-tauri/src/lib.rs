@@ -614,6 +614,61 @@ fn save_app_settings(settings: AppSettings) -> Result<String, String> {
     Ok("设置保存成功".to_string())
 }
 
+// 更新阻止自动隐藏设置
+#[tauri::command]
+fn update_prevent_auto_hide(prevent_auto_hide: bool) -> Result<String, String> {
+    let mut settings = match load_app_settings() {
+        Ok(settings) => settings,
+        Err(_) => AppSettings {
+            prevent_auto_hide: false,
+            window_width: None,
+            window_height: None,
+        },
+    };
+
+    settings.prevent_auto_hide = prevent_auto_hide;
+    save_app_settings(settings)?;
+    Ok("阻止自动隐藏设置已更新".to_string())
+}
+
+// 更新托盘菜单项
+#[tauri::command]
+async fn update_tray_menu(
+    app: tauri::AppHandle,
+    prevent_auto_hide: bool,
+) -> Result<String, String> {
+    // 重新创建菜单项
+    let prevent_auto_hide_text = if prevent_auto_hide {
+        "✓ 阻止自动隐藏"
+    } else {
+        "○ 阻止自动隐藏"
+    };
+
+    let prevent_auto_hide_item =
+        MenuItemBuilder::with_id("prevent_auto_hide", prevent_auto_hide_text)
+            .build(&app)
+            .map_err(|e| format!("创建菜单项失败: {}", e))?;
+    let settings_item = MenuItemBuilder::with_id("settings", "设置")
+        .build(&app)
+        .map_err(|e| format!("创建菜单项失败: {}", e))?;
+    let quit_item = MenuItemBuilder::with_id("quit", "退出")
+        .build(&app)
+        .map_err(|e| format!("创建菜单项失败: {}", e))?;
+
+    let menu = MenuBuilder::new(&app)
+        .items(&[&prevent_auto_hide_item, &settings_item, &quit_item])
+        .build()
+        .map_err(|e| format!("创建菜单失败: {}", e))?;
+
+    // 更新托盘菜单
+    if let Some(tray) = app.tray_by_id("main_tray") {
+        tray.set_menu(Some(menu))
+            .map_err(|e| format!("更新托盘菜单失败: {}", e))?;
+    }
+
+    Ok("托盘菜单已更新".to_string())
+}
+
 // 加载应用设置
 #[tauri::command]
 fn load_app_settings() -> Result<AppSettings, String> {
@@ -845,14 +900,27 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            // 先加载设置以获取当前状态
+            let settings = load_app_settings().unwrap_or(AppSettings {
+                prevent_auto_hide: false,
+                window_width: None,
+                window_height: None,
+            });
+
             // 创建托盘菜单
+            let prevent_auto_hide_text = if settings.prevent_auto_hide {
+                "✓ 阻止自动隐藏"
+            } else {
+                "○ 阻止自动隐藏"
+            };
+
             let prevent_auto_hide =
-                MenuItemBuilder::with_id("prevent_auto_hide", "阻止自动隐藏").build(app)?;
-            let settings = MenuItemBuilder::with_id("settings", "设置").build(app)?;
+                MenuItemBuilder::with_id("prevent_auto_hide", prevent_auto_hide_text).build(app)?;
+            let settings_item = MenuItemBuilder::with_id("settings", "设置").build(app)?;
             let quit = MenuItemBuilder::with_id("quit", "退出").build(app)?;
 
             let menu = MenuBuilder::new(app)
-                .items(&[&prevent_auto_hide, &settings, &quit])
+                .items(&[&prevent_auto_hide, &settings_item, &quit])
                 .build()?;
 
             // 创建托盘图标
@@ -864,9 +932,62 @@ pub fn run() {
                 .on_menu_event(move |app, event| {
                     match event.id().as_ref() {
                         "prevent_auto_hide" => {
-                            // 通过事件通知前端切换阻止自动隐藏设置
+                            // 切换阻止自动隐藏设置
+                            let current_settings = load_app_settings().unwrap_or(AppSettings {
+                                prevent_auto_hide: false,
+                                window_width: None,
+                                window_height: None,
+                            });
+
+                            let new_value = !current_settings.prevent_auto_hide;
+
+                            // 更新设置
+                            let mut updated_settings = current_settings;
+                            updated_settings.prevent_auto_hide = new_value;
+
+                            if let Err(e) = save_app_settings(updated_settings) {
+                                eprintln!("保存设置失败: {}", e);
+                                return;
+                            }
+
+                            // 更新托盘菜单
+                            let prevent_auto_hide_text = if new_value {
+                                "✓ 阻止自动隐藏"
+                            } else {
+                                "○ 阻止自动隐藏"
+                            };
+
+                            if let Ok(prevent_auto_hide_item) = MenuItemBuilder::with_id(
+                                "prevent_auto_hide",
+                                prevent_auto_hide_text,
+                            )
+                            .build(app)
+                            {
+                                if let Ok(settings_item) =
+                                    MenuItemBuilder::with_id("settings", "设置").build(app)
+                                {
+                                    if let Ok(quit_item) =
+                                        MenuItemBuilder::with_id("quit", "退出").build(app)
+                                    {
+                                        if let Ok(menu) = MenuBuilder::new(app)
+                                            .items(&[
+                                                &prevent_auto_hide_item,
+                                                &settings_item,
+                                                &quit_item,
+                                            ])
+                                            .build()
+                                        {
+                                            if let Some(tray) = app.tray_by_id("main_tray") {
+                                                let _ = tray.set_menu(Some(menu));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 通知前端更新状态
                             if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.emit("toggle-prevent-auto-hide", ());
+                                let _ = window.emit("prevent-auto-hide-changed", new_value);
                             }
                         }
                         "settings" => {
@@ -909,6 +1030,8 @@ pub fn run() {
             save_app_settings,
             load_app_settings,
             save_window_size,
+            update_prevent_auto_hide,
+            update_tray_menu,
             toggle_window_visibility,
             quit_app,
             my_custom_command,

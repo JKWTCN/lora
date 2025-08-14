@@ -551,23 +551,6 @@ const saveAppData = async () => {
   }
 }
 
-// 保存应用设置
-const saveAppSettings = async () => {
-  console.log('开始保存应用设置...', appSettings.value)
-  try {
-    // 转换前端的 camelCase 为后端期望的 snake_case
-    const settingsForBackend = {
-      prevent_auto_hide: appSettings.value.preventAutoHide,
-      window_width: appSettings.value.windowWidth,
-      window_height: appSettings.value.windowHeight,
-    }
-    await invoke('save_app_settings', settingsForBackend)
-    console.log('应用设置保存成功')
-  } catch (error) {
-    console.error('保存应用设置失败:', error)
-  }
-}
-
 // 加载应用设置
 const loadAppSettings = async () => {
   console.log('开始加载应用设置...')
@@ -884,9 +867,35 @@ const hideMainMenu = () => {
   mainMenu.value.visible = false
 }
 
-const togglePreventAutoHide = () => {
-  appSettings.value.preventAutoHide = !appSettings.value.preventAutoHide
-  saveAppSettings()
+const togglePreventAutoHide = async () => {
+  const newValue = !appSettings.value.preventAutoHide
+
+  try {
+    // 使用专门的更新命令
+    await invoke('update_prevent_auto_hide', {
+      preventAutoHide: newValue
+    })
+
+    // 更新前端状态
+    appSettings.value.preventAutoHide = newValue
+
+    // 更新托盘菜单
+    await invoke('update_tray_menu', {
+      preventAutoHide: newValue
+    })
+
+    console.log('阻止自动隐藏设置已更新:', newValue)
+
+    // 显示状态反馈
+    const message = newValue
+      ? '已启用阻止自动隐藏'
+      : '已禁用阻止自动隐藏'
+    showToast(message, 'success')
+  } catch (error) {
+    console.error('更新阻止自动隐藏设置失败:', error)
+    showToast('设置更新失败', 'error')
+  }
+
   hideMainMenu()
 }
 
@@ -1444,6 +1453,16 @@ onMounted(async () => {
   // 加载应用设置
   await loadAppSettings()
 
+  // 在加载设置后，更新托盘菜单以反映当前设置
+  try {
+    await invoke('update_tray_menu', {
+      preventAutoHide: appSettings.value.preventAutoHide
+    })
+    console.log('托盘菜单已更新以反映当前设置')
+  } catch (error) {
+    console.error('更新托盘菜单失败:', error)
+  }
+
   // 恢复窗口大小
   if (appSettings.value.windowWidth && appSettings.value.windowHeight) {
     try {
@@ -1528,6 +1547,18 @@ onMounted(async () => {
   const { listen } = await import('@tauri-apps/api/event')
   await listen('toggle-prevent-auto-hide', () => {
     togglePreventAutoHide()
+  })
+
+  // 监听来自托盘的设置变化事件
+  await listen('prevent-auto-hide-changed', (event: any) => {
+    appSettings.value.preventAutoHide = event.payload
+    console.log('从托盘菜单接收到设置变化:', event.payload)
+
+    // 显示状态反馈
+    const message = event.payload
+      ? '已启用阻止自动隐藏'
+      : '已禁用阻止自动隐藏'
+    showToast(message, 'success')
   })
 
   // 等待DOM完全渲染后设置拖拽功能
