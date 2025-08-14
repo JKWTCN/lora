@@ -1,8 +1,8 @@
 <template>
-  <div class="app-container">
+  <div class="app-container" @mouseenter="isMouseInWindow = true" @mouseleave="isMouseInWindow = false">
     <!-- 自定义标题栏 -->
     <div class="titlebar">
-      <div class="titlebar-left" data-tauri-drag-region>
+      <div class="titlebar-left" data-tauri-drag-region @mousedown="handleDragStart" @mouseup="handleDragEnd">
         <span class="app-title" data-tauri-drag-region>Lora</span>
       </div>
       <div class="titlebar-right">
@@ -1543,6 +1543,13 @@ onMounted(async () => {
   // 添加窗口失焦监听，自动隐藏到托盘
   window.addEventListener('blur', handleWindowBlur)
 
+  // 添加鼠标移动和离开事件监听器
+  document.addEventListener('mousemove', handleMouseMove)
+  document.addEventListener('mouseleave', handleMouseLeave)
+
+  // 添加全局 mouseup 事件监听器，确保拖拽结束能被正确检测
+  document.addEventListener('mouseup', handleDragEnd)
+
   // 监听来自托盘菜单的事件
   const { listen } = await import('@tauri-apps/api/event')
   await listen('toggle-prevent-auto-hide', () => {
@@ -1637,18 +1644,57 @@ const handleGlobalKeydown = (event: KeyboardEvent) => {
   }
 }
 
+// 鼠标位置追踪
+const mousePosition = ref({ x: 0, y: 0 })
+const isMouseInWindow = ref(true)
+const isDraggingWindow = ref(false)
+
+// 追踪鼠标位置
+const handleMouseMove = (event: MouseEvent) => {
+  mousePosition.value = { x: event.clientX, y: event.clientY }
+  isMouseInWindow.value = true
+}
+
+// 鼠标离开窗口
+const handleMouseLeave = () => {
+  isMouseInWindow.value = false
+}
+
+// 处理窗口拖拽开始
+const handleDragStart = () => {
+  isDraggingWindow.value = true
+  console.log('开始拖拽窗口')
+}
+
+// 处理窗口拖拽结束
+const handleDragEnd = () => {
+  // 延迟重置拖拽状态，确保拖拽完全结束
+  setTimeout(() => {
+    isDraggingWindow.value = false
+    console.log('结束拖拽窗口')
+  }, 200)
+}
+
 // 窗口失焦处理函数
 const handleWindowBlur = async () => {
   // 只有在没有阻止自动隐藏的情况下才隐藏窗口
   if (!appSettings.value.preventAutoHide) {
-    try {
-      console.log('窗口失去焦点，隐藏到托盘')
-      const { getCurrentWindow } = await import('@tauri-apps/api/window')
-      const currentWindow = getCurrentWindow()
-      await currentWindow.hide()
-    } catch (error) {
-      console.error('隐藏窗口失败:', error)
-    }
+    // 延迟检查，给鼠标事件时间更新状态
+    setTimeout(async () => {
+      // 只有当鼠标不在窗口内且不在拖动窗口时才隐藏窗口
+      if (!isMouseInWindow.value && !isDraggingWindow.value) {
+        try {
+          console.log('窗口失去焦点且鼠标不在窗口内且未拖动窗口，隐藏到托盘')
+          const { getCurrentWindow } = await import('@tauri-apps/api/window')
+          const currentWindow = getCurrentWindow()
+          await currentWindow.hide()
+        } catch (error) {
+          console.error('隐藏窗口失败:', error)
+        }
+      } else {
+        console.log('窗口失去焦点但鼠标仍在窗口内或正在拖动窗口，不隐藏窗口')
+      }
+    }, 100) // 100ms 延迟
   }
 }
 
@@ -1666,6 +1712,11 @@ onUnmounted(() => {
 
   // 清理窗口失焦监听器
   window.removeEventListener('blur', handleWindowBlur)
+
+  // 清理鼠标事件监听器
+  document.removeEventListener('mousemove', handleMouseMove)
+  document.removeEventListener('mouseleave', handleMouseLeave)
+  document.removeEventListener('mouseup', handleDragEnd)
 })
 
 // 标题栏相关方法
