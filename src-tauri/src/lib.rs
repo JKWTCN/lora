@@ -123,6 +123,8 @@ fn resolve_windows_shortcut(shortcut_path: &str) -> Option<String> {
 
 // 提取文件图标并转换为 Base64 字符串或图标标识符
 fn extract_file_icon(file_path: &str) -> Option<String> {
+    // 简化实现：直接根据文件扩展名返回图标标识符
+    // 未来可以扩展为提取真实图标
     let path = Path::new(file_path);
     let extension = path
         .extension()
@@ -278,6 +280,56 @@ fn save_selected_category(category_id: String) -> Result<String, String> {
     save_app_data(storage.apps, storage.categories, storage.selected_category)?;
     Ok("选中分组保存成功".to_string())
 }
+
+// 获取应用图标的专用命令
+#[tauri::command]
+fn get_app_icon(file_path: String) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        // 使用系统关联的图标
+        let script = format!(
+            r#"
+            try {{
+                Add-Type -AssemblyName System.Drawing
+                $icon = [System.Drawing.Icon]::ExtractAssociatedIcon('{}')
+                if ($icon) {{
+                    $bitmap = $icon.ToBitmap()
+                    $stream = New-Object System.IO.MemoryStream
+                    $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
+                    $bytes = $stream.ToArray()
+                    $base64 = [System.Convert]::ToBase64String($bytes)
+                    $stream.Dispose()
+                    $bitmap.Dispose()
+                    $icon.Dispose()
+                    Write-Output "data:image/png;base64,$base64"
+                }} else {{
+                    Write-Output ""
+                }}
+            }} catch {{
+                Write-Output ""
+            }}
+            "#,
+            file_path.replace("'", "''")
+        );
+
+        let output = Command::new("powershell")
+            .args(["-ExecutionPolicy", "Bypass", "-Command", &script])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
+
+        let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !result.is_empty() && result.starts_with("data:image/png;base64,") {
+            Ok(result)
+        } else {
+            Err("无法提取图标".to_string())
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("当前平台不支持图标提取".to_string())
+    }
+}
 #[tauri::command]
 fn my_custom_command() {
     println!("I was invoked from JavaScript!");
@@ -295,6 +347,7 @@ pub fn run() {
             delete_app,
             update_app_category,
             save_selected_category,
+            get_app_icon,
             greet
         ])
         .run(tauri::generate_context!())

@@ -155,11 +155,15 @@
           <div v-for="app in filteredApps" :key="app.id" class="app-item" @click="launchApp(app)"
             @dblclick="launchApp(app)" @contextmenu.prevent="showAppContextMenu($event, app)">
             <div class="app-icon">
-              <img :src="app.icon" :alt="app.name" v-if="app.icon && app.icon.startsWith('http')" />
-              <div v-else-if="app.icon && !app.icon.startsWith('http')" class="file-type-icon"
-                :class="'file-type-' + app.icon">
+              <!-- 如果是 Base64 图标 (真实应用图标) -->
+              <img :src="app.icon" :alt="app.name"
+                v-if="app.icon && (app.icon.startsWith('data:image/') || app.icon.startsWith('http'))" />
+              <!-- 如果是文件类型图标标识符 -->
+              <div v-else-if="app.icon && !app.icon.startsWith('data:image/') && !app.icon.startsWith('http')"
+                class="file-type-icon" :class="'file-type-' + app.icon">
                 {{ getFileTypeIcon(app.icon) }}
               </div>
+              <!-- 默认图标 (应用名称首字母) -->
               <div v-else class="default-icon">{{ app.name.charAt(0) }}</div>
             </div>
             <div class="app-name">{{ app.name }}</div>
@@ -1103,6 +1107,22 @@ const handleFileDrop = async (filePath: string) => {
     console.log('创建新应用项:', newApp)
     apps.value.push(newApp)
     console.log('应用已添加到数组，当前应用数量:', apps.value.length)
+
+    // 尝试获取真实应用图标
+    try {
+      console.log('尝试获取应用真实图标...')
+      const realIcon = await invoke('get_app_icon', { filePath: filePath }) as string
+      if (realIcon && realIcon.startsWith('data:image/png;base64,')) {
+        // 更新应用图标
+        const appIndex = apps.value.findIndex(app => app.id === newApp.id)
+        if (appIndex !== -1) {
+          apps.value[appIndex].icon = realIcon
+          console.log('应用图标已更新为真实图标')
+        }
+      }
+    } catch (iconError) {
+      console.log('获取真实图标失败，使用默认图标:', iconError)
+    }
 
     // 自动保存数据
     console.log('开始保存数据...')
