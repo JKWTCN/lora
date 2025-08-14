@@ -76,9 +76,6 @@
           <div class="context-menu-item" @click="openFileLocation">
             <span>打开文件位置</span>
           </div>
-          <div class="context-menu-item" @click="showInExplorer">
-            <span>资源管理器菜单</span>
-          </div>
           <div class="context-menu-item" @click="copyFullPath">
             <span>复制完整路径</span>
           </div>
@@ -149,7 +146,7 @@
 
       <!-- 编辑应用对话框 -->
       <div v-if="editAppDialog.visible" class="dialog-overlay" @click="cancelEditApp">
-        <div class="dialog" @click.stop>
+        <div class="dialog large-dialog" @click.stop>
           <div class="dialog-header">
             <h3>编辑应用</h3>
           </div>
@@ -167,6 +164,43 @@
                   {{ category.name }}
                 </option>
               </select>
+            </div>
+            <div class="form-group">
+              <label>目标路径:</label>
+              <div class="input-group">
+                <input v-model="editAppDialog.editedTargetPath" type="text" class="dialog-input" 
+                  placeholder="请输入文件、文件夹路径或网址" @blur="detectTargetType">
+                <button class="browse-button" @click="browseTarget" type="button">
+                  浏览
+                </button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>启动参数 (可选):</label>
+              <input v-model="editAppDialog.editedLaunchArgs" type="text" class="dialog-input" 
+                placeholder="请输入启动参数 (如: --fullscreen --debug)">
+            </div>
+            <div class="form-group">
+              <label>图标 (可选):</label>
+              <div class="icon-section">
+                <div class="icon-preview">
+                  <img v-if="editAppDialog.editedIcon && (editAppDialog.editedIcon.startsWith('data:image/') || editAppDialog.editedIcon.startsWith('http'))" 
+                    :src="editAppDialog.editedIcon" :alt="editAppDialog.editedName" class="preview-icon" />
+                  <div v-else-if="editAppDialog.editedIcon && !editAppDialog.editedIcon.startsWith('data:image/') && !editAppDialog.editedIcon.startsWith('http')"
+                    class="file-type-icon preview-icon" :class="'file-type-' + editAppDialog.editedIcon">
+                    {{ getFileTypeIcon(editAppDialog.editedIcon) }}
+                  </div>
+                  <div v-else class="default-icon preview-icon">{{ editAppDialog.editedName.charAt(0) }}</div>
+                </div>
+                <div class="icon-actions">
+                  <button class="browse-button icon-button" @click="selectIcon" type="button">
+                    选择图标
+                  </button>
+                  <button v-if="editAppDialog.editedIcon" class="browse-button icon-button danger" @click="clearIcon" type="button">
+                    清除图标
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
           <div class="dialog-actions">
@@ -235,6 +269,8 @@ interface AppData {
   path: string
   target_path?: string
   is_shortcut?: boolean
+  launch_args?: string // 启动参数
+  target_type?: 'file' | 'folder' | 'url' // 目标类型
 }
 
 interface CategoryData {
@@ -322,7 +358,11 @@ const editAppDialog = ref({
   visible: false,
   app: null as AppData | null,
   editedName: '',
-  editedCategory: ''
+  editedCategory: '',
+  editedIcon: '',
+  editedTargetPath: '',
+  editedLaunchArgs: '',
+  editedTargetType: 'file' as 'file' | 'folder' | 'url'
 })
 
 const renameInput = ref(null)
@@ -524,15 +564,35 @@ const showToast = (message: string, type: string = 'info') => {
 const launchApp = async (app: any) => {
   console.log(`启动应用: ${app.name}`)
 
-  if (!app.path) {
+  const targetPath = app.target_path || app.path
+  if (!targetPath) {
     console.error('应用路径不存在')
     alert('应用路径不存在，无法启动')
     return
   }
 
   try {
-    const result = await invoke('launch_app', { appPath: app.path })
-    console.log('启动结果:', result)
+    // 根据目标类型选择不同的启动方式
+    if (app.target_type === 'url') {
+      // 打开网址
+      await invoke('open_url', { 
+        url: targetPath,
+        launchArgs: app.launch_args || ''
+      })
+    } else if (app.target_type === 'folder') {
+      // 打开文件夹
+      await invoke('open_folder', { 
+        folderPath: targetPath,
+        launchArgs: app.launch_args || ''
+      })
+    } else {
+      // 启动文件
+      await invoke('launch_app', { 
+        appPath: targetPath,
+        launchArgs: app.launch_args || ''
+      })
+    }
+    console.log('启动成功')
   } catch (error) {
     console.error('启动应用失败:', error)
     alert(`启动应用失败: ${error}`)
@@ -750,20 +810,6 @@ const openFileLocation = async () => {
   hideAppContextMenu()
 }
 
-const showInExplorer = async () => {
-  if (appContextMenu.value.app) {
-    try {
-      console.log(`在资源管理器中显示: ${appContextMenu.value.app.path}`)
-      const result = await invoke('show_in_explorer', { filePath: appContextMenu.value.app.path })
-      console.log('在资源管理器中显示结果:', result)
-    } catch (error) {
-      console.error('在资源管理器中显示失败:', error)
-      alert(`在资源管理器中显示失败: ${error}`)
-    }
-  }
-  hideAppContextMenu()
-}
-
 const copyFullPath = async () => {
   if (appContextMenu.value.app) {
     try {
@@ -833,14 +879,31 @@ const moveAppToCategory = async (categoryId: string) => {
   hideAppContextMenu()
 }
 
-const editApp = () => {
+const editApp = async () => {
   if (appContextMenu.value.app) {
     console.log(`编辑应用: ${appContextMenu.value.app.name}`)
     editAppDialog.value = {
       visible: true,
       app: appContextMenu.value.app,
       editedName: appContextMenu.value.app.name,
-      editedCategory: appContextMenu.value.app.category
+      editedCategory: appContextMenu.value.app.category,
+      editedIcon: appContextMenu.value.app.icon || '',
+      editedTargetPath: appContextMenu.value.app.target_path || appContextMenu.value.app.path,
+      editedLaunchArgs: appContextMenu.value.app.launch_args || '',
+      editedTargetType: appContextMenu.value.app.target_type || 'file'
+    }
+    
+    // 如果没有目标类型，自动检测
+    if (!appContextMenu.value.app.target_type && editAppDialog.value.editedTargetPath) {
+      try {
+        const targetType = await invoke('detect_target_type', { 
+          targetPath: editAppDialog.value.editedTargetPath 
+        }) as string
+        editAppDialog.value.editedTargetType = targetType as 'file' | 'folder' | 'url'
+      } catch (error) {
+        console.error('检测目标类型失败:', error)
+        editAppDialog.value.editedTargetType = 'file'
+      }
     }
   }
   hideAppContextMenu()
@@ -971,6 +1034,15 @@ const confirmEditApp = async () => {
     if (appIndex !== -1) {
       apps.value[appIndex].name = editAppDialog.value.editedName.trim()
       apps.value[appIndex].category = editAppDialog.value.editedCategory
+      apps.value[appIndex].icon = editAppDialog.value.editedIcon
+      apps.value[appIndex].target_path = editAppDialog.value.editedTargetPath
+      apps.value[appIndex].launch_args = editAppDialog.value.editedLaunchArgs
+      apps.value[appIndex].target_type = editAppDialog.value.editedTargetType
+      
+      // 如果目标路径改变，更新主路径
+      if (editAppDialog.value.editedTargetPath !== apps.value[appIndex].path) {
+        apps.value[appIndex].path = editAppDialog.value.editedTargetPath
+      }
 
       // 保存数据
       await saveAppData()
@@ -985,8 +1057,110 @@ const cancelEditApp = () => {
     visible: false,
     app: null,
     editedName: '',
-    editedCategory: ''
+    editedCategory: '',
+    editedIcon: '',
+    editedTargetPath: '',
+    editedLaunchArgs: '',
+    editedTargetType: 'file'
   }
+}
+
+// 浏览目标文件或文件夹
+const browseTarget = async () => {
+  try {
+    // 显示选择对话框让用户选择文件或文件夹
+    const choice = confirm('选择文件请点击"确定"，选择文件夹请点击"取消"')
+    
+    let selectedPath = ''
+    if (choice) {
+      // 选择文件
+      const filters = [
+        ['所有文件', ['*']],
+        ['可执行文件', ['exe', 'bat', 'cmd', 'msi']],
+        ['脚本文件', ['ps1', 'vbs', 'js', 'py']],
+        ['快捷方式', ['lnk', 'url']]
+      ]
+      selectedPath = await invoke('open_file_dialog', { 
+        title: '选择目标文件',
+        filters: filters
+      }) as string
+    } else {
+      // 选择文件夹
+      selectedPath = await invoke('open_folder_dialog', { 
+        title: '选择目标文件夹'
+      }) as string
+    }
+    
+    if (selectedPath) {
+      editAppDialog.value.editedTargetPath = selectedPath
+      // 自动检测目标类型
+      await detectTargetType()
+    }
+  } catch (error) {
+    console.error('浏览文件失败:', error)
+    if (error !== '用户取消了选择') {
+      showToast('浏览文件失败: ' + error, 'error')
+    }
+  }
+}
+
+// 自动检测目标类型
+const detectTargetType = async () => {
+  if (!editAppDialog.value.editedTargetPath.trim()) {
+    return
+  }
+  
+  try {
+    const targetType = await invoke('detect_target_type', { 
+      targetPath: editAppDialog.value.editedTargetPath 
+    }) as string
+    editAppDialog.value.editedTargetType = targetType as 'file' | 'folder' | 'url'
+  } catch (error) {
+    console.error('检测目标类型失败:', error)
+    // 默认设为文件类型
+    editAppDialog.value.editedTargetType = 'file'
+  }
+}
+
+// 选择图标
+const selectIcon = async () => {
+  try {
+    const filters = [
+      ['图片文件', ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'ico', 'svg']],
+      ['图标文件', ['ico', 'png']],
+      ['所有文件', ['*']]
+    ]
+    const selectedPath = await invoke('open_file_dialog', { 
+      title: '选择图标文件',
+      filters: filters
+    }) as string
+    
+    if (selectedPath) {
+      // 尝试将图片转换为base64
+      try {
+        const iconBase64 = await invoke('get_app_icon', { filePath: selectedPath }) as string
+        if (iconBase64 && iconBase64.startsWith('data:image/')) {
+          editAppDialog.value.editedIcon = iconBase64
+        } else {
+          // 如果无法转换为base64，直接使用文件路径
+          editAppDialog.value.editedIcon = selectedPath
+        }
+      } catch (iconError) {
+        // 如果获取图标失败，直接使用文件路径
+        editAppDialog.value.editedIcon = selectedPath
+      }
+    }
+  } catch (error) {
+    console.error('选择图标失败:', error)
+    if (error !== '用户取消了选择') {
+      showToast('选择图标失败: ' + error, 'error')
+    }
+  }
+}
+
+// 清除图标
+const clearIcon = () => {
+  editAppDialog.value.editedIcon = ''
 }
 
 const deleteCategory = async () => {
@@ -1292,7 +1466,9 @@ const handleFileDrop = async (filePath: string) => {
       icon: fileInfo.icon || '', // 使用后端返回的图标标识符
       path: fileInfo.path,
       target_path: fileInfo.target_path,
-      is_shortcut: fileInfo.is_shortcut
+      is_shortcut: fileInfo.is_shortcut,
+      launch_args: '', // 默认无启动参数
+      target_type: 'file' // 默认为文件类型
     }
 
     console.log('创建新应用项:', newApp)
@@ -1762,6 +1938,11 @@ const cleanupDragAndDrop = () => {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
+.large-dialog {
+  min-width: 480px;
+  max-width: 600px;
+}
+
 .dialog-header {
   padding: 20px 20px 0;
 }
@@ -1851,6 +2032,99 @@ const cleanupDragAndDrop = () => {
 
 .dialog-select:focus {
   border-color: #3498db;
+}
+
+/* 输入框组合样式 */
+.input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.input-group .dialog-input {
+  flex: 1;
+}
+
+.browse-button {
+  padding: 10px 16px;
+  border: 1px solid #3498db;
+  border-radius: 4px;
+  background: #3498db;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+  transition: background-color 0.2s ease;
+}
+
+.browse-button:hover {
+  background: #2980b9;
+}
+
+.browse-button.danger {
+  background: #e74c3c;
+  border-color: #e74c3c;
+}
+
+.browse-button.danger:hover {
+  background: #c0392b;
+}
+
+/* 图标选择样式 */
+.icon-section {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.icon-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.icon-button {
+  padding: 8px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 图标预览样式 */
+.icon-preview-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.icon-preview {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f8f9fa;
+}
+
+.preview-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.preview-icon.file-type-icon {
+  font-size: 16px;
+}
+
+.preview-icon.default-icon {
+  background: #3498db;
+  color: white;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.icon-input {
+  flex: 1;
 }
 </style>
 

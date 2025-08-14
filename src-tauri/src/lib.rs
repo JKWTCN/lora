@@ -13,6 +13,8 @@ pub struct AppData {
     pub path: String,
     pub target_path: Option<String>, // 用于快捷方式的实际目标路径
     pub is_shortcut: bool,
+    pub launch_args: Option<String>, // 启动参数
+    pub target_type: Option<String>, // 目标类型: file, folder, url
 }
 
 // 分类数据结构
@@ -159,7 +161,7 @@ fn extract_file_icon(file_path: &str) -> Option<String> {
 }
 
 #[tauri::command]
-fn launch_app(app_path: String) -> Result<String, String> {
+fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, String> {
     let path = Path::new(&app_path);
 
     if !path.exists() {
@@ -168,23 +170,351 @@ fn launch_app(app_path: String) -> Result<String, String> {
 
     #[cfg(target_os = "windows")]
     {
-        let result = Command::new("cmd")
-            .args(["/C", "start", "", &app_path])
-            .spawn();
+        if let Some(args_str) = launch_args {
+            if !args_str.trim().is_empty() {
+                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                let mut cmd_args = vec!["/C".to_string(), "start".to_string(), "".to_string(), app_path];
+                cmd_args.extend(split_args);
+                
+                let result = Command::new("cmd")
+                    .args(&cmd_args)
+                    .spawn();
+
+                match result {
+                    Ok(_) => Ok("应用启动成功".to_string()),
+                    Err(e) => Err(format!("启动应用失败: {}", e)),
+                }
+            } else {
+                let result = Command::new("cmd")
+                    .args(["/C", "start", "", &app_path])
+                    .spawn();
+
+                match result {
+                    Ok(_) => Ok("应用启动成功".to_string()),
+                    Err(e) => Err(format!("启动应用失败: {}", e)),
+                }
+            }
+        } else {
+            let result = Command::new("cmd")
+                .args(["/C", "start", "", &app_path])
+                .spawn();
+
+            match result {
+                Ok(_) => Ok("应用启动成功".to_string()),
+                Err(e) => Err(format!("启动应用失败: {}", e)),
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let mut cmd = Command::new(&app_path);
+        
+        if let Some(args_str) = launch_args {
+            if !args_str.trim().is_empty() {
+                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                cmd.args(&split_args);
+            }
+        }
+
+        let result = cmd.spawn();
 
         match result {
             Ok(_) => Ok("应用启动成功".to_string()),
             Err(e) => Err(format!("启动应用失败: {}", e)),
         }
     }
+}
+
+// 打开网址
+#[tauri::command]
+fn open_url(url: String, launch_args: Option<String>) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(args_str) = launch_args {
+            if !args_str.trim().is_empty() {
+                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                let mut cmd_args = vec!["/C".to_string(), "start".to_string(), "".to_string(), url];
+                cmd_args.extend(split_args);
+                
+                let result = Command::new("cmd")
+                    .args(&cmd_args)
+                    .spawn();
+
+                match result {
+                    Ok(_) => Ok("网址打开成功".to_string()),
+                    Err(e) => Err(format!("打开网址失败: {}", e)),
+                }
+            } else {
+                let result = Command::new("cmd")
+                    .args(["/C", "start", "", &url])
+                    .spawn();
+
+                match result {
+                    Ok(_) => Ok("网址打开成功".to_string()),
+                    Err(e) => Err(format!("打开网址失败: {}", e)),
+                }
+            }
+        } else {
+            let result = Command::new("cmd")
+                .args(["/C", "start", "", &url])
+                .spawn();
+
+            match result {
+                Ok(_) => Ok("网址打开成功".to_string()),
+                Err(e) => Err(format!("打开网址失败: {}", e)),
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let mut cmd = Command::new("open");
+        cmd.arg(&url);
+        
+        if let Some(args_str) = launch_args {
+            if !args_str.trim().is_empty() {
+                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                cmd.args(&split_args);
+            }
+        }
+
+        let result = cmd.spawn();
+
+        match result {
+            Ok(_) => Ok("网址打开成功".to_string()),
+            Err(e) => Err(format!("打开网址失败: {}", e)),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let mut cmd = Command::new("xdg-open");
+        cmd.arg(&url);
+        
+        if let Some(args_str) = launch_args {
+            if !args_str.trim().is_empty() {
+                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                cmd.args(&split_args);
+            }
+        }
+
+        let result = cmd.spawn();
+
+        match result {
+            Ok(_) => Ok("网址打开成功".to_string()),
+            Err(e) => Err(format!("打开网址失败: {}", e)),
+        }
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        Err("当前平台不支持打开网址".to_string())
+    }
+}
+
+// 打开文件夹
+#[tauri::command]
+fn open_folder(folder_path: String, launch_args: Option<String>) -> Result<String, String> {
+    let path = Path::new(&folder_path);
+
+    if !path.exists() {
+        return Err("文件夹不存在".to_string());
+    }
+
+    if !path.is_dir() {
+        return Err("路径不是文件夹".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let mut cmd = Command::new("explorer");
+        cmd.arg(&folder_path);
+        
+        if let Some(args_str) = launch_args {
+            if !args_str.trim().is_empty() {
+                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                cmd.args(&split_args);
+            }
+        }
+
+        let result = cmd.spawn();
+
+        match result {
+            Ok(_) => Ok("文件夹打开成功".to_string()),
+            Err(e) => Err(format!("打开文件夹失败: {}", e)),
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let mut cmd = Command::new("open");
+        cmd.arg(&folder_path);
+        
+        if let Some(args_str) = launch_args {
+            if !args_str.trim().is_empty() {
+                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                cmd.args(&split_args);
+            }
+        }
+
+        let result = cmd.spawn();
+
+        match result {
+            Ok(_) => Ok("文件夹打开成功".to_string()),
+            Err(e) => Err(format!("打开文件夹失败: {}", e)),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let file_managers = ["nautilus", "dolphin", "thunar", "pcmanfm"];
+
+        for manager in &file_managers {
+            if Command::new("which").arg(manager).output().is_ok() {
+                let mut cmd = Command::new(manager);
+                cmd.arg(&folder_path);
+                
+                if let Some(args_str) = launch_args {
+                    if !args_str.trim().is_empty() {
+                        let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                        cmd.args(&split_args);
+                    }
+                }
+
+                let result = cmd.spawn();
+
+                if result.is_ok() {
+                    return Ok("文件夹打开成功".to_string());
+                }
+            }
+        }
+
+        Err("未找到可用的文件管理器".to_string())
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        Err("当前平台不支持打开文件夹".to_string())
+    }
+}
+
+// 打开文件选择对话框
+#[tauri::command]
+fn open_file_dialog(title: String, filters: Vec<(String, Vec<String>)>) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        // 构建PowerShell脚本来显示文件选择对话框
+        let mut filter_string = String::new();
+        for (name, extensions) in filters {
+            if !filter_string.is_empty() {
+                filter_string.push('|');
+            }
+            let ext_string = extensions.join(";*.");
+            filter_string.push_str(&format!("{}|*.{}", name, ext_string));
+        }
+        
+        let script = format!(
+            r#"
+            Add-Type -AssemblyName System.Windows.Forms
+            $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+            $openFileDialog.Title = '{}'
+            $openFileDialog.Filter = '{}'
+            $openFileDialog.RestoreDirectory = $true
+            $result = $openFileDialog.ShowDialog()
+            if ($result -eq [System.Windows.Forms.DialogResult]::OK) {{
+                Write-Output $openFileDialog.FileName
+            }} else {{
+                Write-Output ""
+            }}
+            "#,
+            title.replace("'", "''"),
+            filter_string.replace("'", "''")
+        );
+
+        let output = Command::new("powershell")
+            .args(["-ExecutionPolicy", "Bypass", "-Command", &script])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
+
+        let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !result.is_empty() {
+            Ok(result)
+        } else {
+            Err("用户取消了选择".to_string())
+        }
+    }
 
     #[cfg(not(target_os = "windows"))]
     {
-        let result = Command::new(&app_path).spawn();
+        Err("当前平台不支持文件选择对话框".to_string())
+    }
+}
 
-        match result {
-            Ok(_) => Ok("应用启动成功".to_string()),
-            Err(e) => Err(format!("启动应用失败: {}", e)),
+// 打开文件夹选择对话框
+#[tauri::command]
+fn open_folder_dialog(title: String) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let script = format!(
+            r#"
+            Add-Type -AssemblyName System.Windows.Forms
+            $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+            $folderBrowser.Description = '{}'
+            $folderBrowser.ShowNewFolderButton = $true
+            $result = $folderBrowser.ShowDialog()
+            if ($result -eq [System.Windows.Forms.DialogResult]::OK) {{
+                Write-Output $folderBrowser.SelectedPath
+            }} else {{
+                Write-Output ""
+            }}
+            "#,
+            title.replace("'", "''")
+        );
+
+        let output = Command::new("powershell")
+            .args(["-ExecutionPolicy", "Bypass", "-Command", &script])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
+
+        let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !result.is_empty() {
+            Ok(result)
+        } else {
+            Err("用户取消了选择".to_string())
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("当前平台不支持文件夹选择对话框".to_string())
+    }
+}
+
+// 自动判断目标类型
+#[tauri::command]
+fn detect_target_type(target_path: String) -> Result<String, String> {
+    // 如果是URL
+    if target_path.starts_with("http://") || target_path.starts_with("https://") || 
+       target_path.starts_with("ftp://") || target_path.starts_with("file://") {
+        return Ok("url".to_string());
+    }
+
+    // 如果是文件系统路径
+    let path = Path::new(&target_path);
+    if path.exists() {
+        if path.is_dir() {
+            Ok("folder".to_string())
+        } else {
+            Ok("file".to_string())
+        }
+    } else {
+        // 如果路径不存在，根据扩展名判断
+        if path.extension().is_some() {
+            Ok("file".to_string())
+        } else {
+            // 没有扩展名，假设是文件夹
+            Ok("folder".to_string())
         }
     }
 }
@@ -358,56 +688,6 @@ fn run_as_admin(app_path: String) -> Result<String, String> {
     }
 }
 
-// 在文件资源管理器中显示文件
-#[tauri::command]
-fn show_in_explorer(file_path: String) -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    {
-        let result = Command::new("explorer")
-            .args(["/select,", &file_path])
-            .spawn();
-
-        match result {
-            Ok(_) => Ok("已在资源管理器中显示文件".to_string()),
-            Err(e) => Err(format!("在资源管理器中显示文件失败: {}", e)),
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let result = Command::new("open").args(["-R", &file_path]).spawn();
-
-        match result {
-            Ok(_) => Ok("已在Finder中显示文件".to_string()),
-            Err(e) => Err(format!("在Finder中显示文件失败: {}", e)),
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        // 在Linux上，尝试使用不同的文件管理器
-        let file_managers = ["nautilus", "dolphin", "thunar", "pcmanfm"];
-        let parent_dir = Path::new(&file_path).parent().ok_or("无法获取父目录")?;
-
-        for manager in &file_managers {
-            if Command::new("which").arg(manager).output().is_ok() {
-                let result = Command::new(manager).arg(parent_dir).spawn();
-
-                if result.is_ok() {
-                    return Ok("已在文件管理器中显示目录".to_string());
-                }
-            }
-        }
-
-        Err("未找到可用的文件管理器".to_string())
-    }
-
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-    {
-        Err("当前平台不支持在文件管理器中显示文件".to_string())
-    }
-}
-
 // 打开文件所在目录
 #[tauri::command]
 fn open_file_location(file_path: String) -> Result<String, String> {
@@ -473,13 +753,17 @@ pub fn run() {
             my_custom_command,
             get_file_info,
             launch_app,
+            open_url,
+            open_folder,
+            open_file_dialog,
+            open_folder_dialog,
+            detect_target_type,
             save_app_data,
             delete_app,
             update_app_category,
             save_selected_category,
             get_app_icon,
             run_as_admin,
-            show_in_explorer,
             open_file_location,
             greet
         ])
