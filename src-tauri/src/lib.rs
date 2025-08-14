@@ -2,6 +2,11 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use tauri::{
+    menu::{MenuBuilder, MenuItemBuilder},
+    tray::TrayIconBuilder,
+    Emitter, Manager,
+};
 
 // 应用数据结构
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -808,15 +813,104 @@ fn open_file_location(file_path: String) -> Result<String, String> {
 fn my_custom_command() {
     println!("I was invoked from JavaScript!");
 }
+
+// 显示/隐藏窗口
+#[tauri::command]
+async fn toggle_window_visibility(app: tauri::AppHandle) -> Result<String, String> {
+    if let Some(window) = app.get_webview_window("main") {
+        if window.is_visible().unwrap_or(false) {
+            window.hide().map_err(|e| format!("隐藏窗口失败: {}", e))?;
+            Ok("窗口已隐藏".to_string())
+        } else {
+            window.show().map_err(|e| format!("显示窗口失败: {}", e))?;
+            window
+                .set_focus()
+                .map_err(|e| format!("聚焦窗口失败: {}", e))?;
+            Ok("窗口已显示".to_string())
+        }
+    } else {
+        Err("找不到主窗口".to_string())
+    }
+}
+
+// 退出应用
+#[tauri::command]
+async fn quit_app(app: tauri::AppHandle) -> Result<String, String> {
+    app.exit(0);
+    Ok("应用已退出".to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            // 创建托盘菜单
+            let prevent_auto_hide =
+                MenuItemBuilder::with_id("prevent_auto_hide", "阻止自动隐藏").build(app)?;
+            let settings = MenuItemBuilder::with_id("settings", "设置").build(app)?;
+            let quit = MenuItemBuilder::with_id("quit", "退出").build(app)?;
+
+            let menu = MenuBuilder::new(app)
+                .items(&[&prevent_auto_hide, &settings, &quit])
+                .build()?;
+
+            // 创建托盘图标
+            let _tray = TrayIconBuilder::with_id("main_tray")
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .tooltip("Lora Launcher")
+                .on_menu_event(move |app, event| {
+                    match event.id().as_ref() {
+                        "prevent_auto_hide" => {
+                            // 通过事件通知前端切换阻止自动隐藏设置
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.emit("toggle-prevent-auto-hide", ());
+                            }
+                        }
+                        "settings" => {
+                            // 显示设置窗口（目前暂未实现，可以显示主窗口代替）
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    match event {
+                        tauri::tray::TrayIconEvent::Click { button, .. } => {
+                            if button == tauri::tray::MouseButton::Left {
+                                // 左键点击显示/隐藏窗口
+                                if let Some(app) = tray.app_handle().get_webview_window("main") {
+                                    if app.is_visible().unwrap_or(false) {
+                                        let _ = app.hide();
+                                    } else {
+                                        let _ = app.show();
+                                        let _ = app.set_focus();
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                })
+                .build(app)?;
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             load_app_data,
             save_app_settings,
             load_app_settings,
             save_window_size,
+            toggle_window_visibility,
+            quit_app,
             my_custom_command,
             get_file_info,
             launch_app,

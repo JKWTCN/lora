@@ -1521,6 +1521,15 @@ onMounted(async () => {
   // 全局禁用右键菜单
   document.addEventListener('contextmenu', disableContextMenu)
 
+  // 添加窗口失焦监听，自动隐藏到托盘
+  window.addEventListener('blur', handleWindowBlur)
+
+  // 监听来自托盘菜单的事件
+  const { listen } = await import('@tauri-apps/api/event')
+  await listen('toggle-prevent-auto-hide', () => {
+    togglePreventAutoHide()
+  })
+
   // 等待DOM完全渲染后设置拖拽功能
   nextTick(async () => {
     await setupDragAndDrop()
@@ -1597,6 +1606,21 @@ const handleGlobalKeydown = (event: KeyboardEvent) => {
   }
 }
 
+// 窗口失焦处理函数
+const handleWindowBlur = async () => {
+  // 只有在没有阻止自动隐藏的情况下才隐藏窗口
+  if (!appSettings.value.preventAutoHide) {
+    try {
+      console.log('窗口失去焦点，隐藏到托盘')
+      const { getCurrentWindow } = await import('@tauri-apps/api/window')
+      const currentWindow = getCurrentWindow()
+      await currentWindow.hide()
+    } catch (error) {
+      console.error('隐藏窗口失败:', error)
+    }
+  }
+}
+
 onUnmounted(() => {
   document.removeEventListener('mousemove', resize)
   document.removeEventListener('mouseup', stopResize)
@@ -1608,6 +1632,9 @@ onUnmounted(() => {
 
   // 清理全局键盘监听器
   document.removeEventListener('keydown', handleGlobalKeydown)
+
+  // 清理窗口失焦监听器
+  window.removeEventListener('blur', handleWindowBlur)
 })
 
 // 标题栏相关方法
