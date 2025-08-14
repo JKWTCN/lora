@@ -30,6 +30,8 @@ pub struct CategoryData {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AppSettings {
     pub prevent_auto_hide: bool,
+    pub window_width: Option<u32>,
+    pub window_height: Option<u32>,
 }
 
 // 应用数据存储结构
@@ -617,6 +619,8 @@ fn load_app_settings() -> Result<AppSettings, String> {
         // 如果文件不存在，返回默认设置
         return Ok(AppSettings {
             prevent_auto_hide: false,
+            window_width: None,
+            window_height: None,
         });
     }
 
@@ -627,6 +631,16 @@ fn load_app_settings() -> Result<AppSettings, String> {
         serde_json::from_str(&json_data).map_err(|e| format!("解析设置失败: {}", e))?;
 
     Ok(settings)
+}
+
+// 保存窗口大小
+#[tauri::command]
+fn save_window_size(width: u32, height: u32) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.window_width = Some(width);
+    settings.window_height = Some(height);
+    save_app_settings(settings)?;
+    Ok("窗口大小保存成功".to_string())
 }
 
 // 删除应用
@@ -802,6 +816,7 @@ pub fn run() {
             load_app_data,
             save_app_settings,
             load_app_settings,
+            save_window_size,
             my_custom_command,
             get_file_info,
             launch_app,

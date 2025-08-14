@@ -284,6 +284,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, Teleport } from 'vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { LogicalSize } from '@tauri-apps/api/dpi'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 
@@ -380,6 +381,8 @@ const mainMenu = ref<{
 // 应用设置
 const appSettings = ref({
   preventAutoHide: false, // 阻止自动隐藏
+  windowWidth: undefined as number | undefined, // 窗口宽度
+  windowHeight: undefined as number | undefined, // 窗口高度
 })
 
 // 重命名对话框相关
@@ -552,7 +555,13 @@ const saveAppData = async () => {
 const saveAppSettings = async () => {
   console.log('开始保存应用设置...', appSettings.value)
   try {
-    await invoke('save_app_settings', appSettings.value)
+    // 转换前端的 camelCase 为后端期望的 snake_case
+    const settingsForBackend = {
+      prevent_auto_hide: appSettings.value.preventAutoHide,
+      window_width: appSettings.value.windowWidth,
+      window_height: appSettings.value.windowHeight,
+    }
+    await invoke('save_app_settings', settingsForBackend)
     console.log('应用设置保存成功')
   } catch (error) {
     console.error('保存应用设置失败:', error)
@@ -565,8 +574,13 @@ const loadAppSettings = async () => {
   try {
     const settings = await invoke('load_app_settings') as any
     console.log('从后端加载的设置:', settings)
-    appSettings.value = settings
-    console.log('应用设置加载成功')
+    // 转换后端的 snake_case 为前端的 camelCase
+    appSettings.value = {
+      preventAutoHide: settings.prevent_auto_hide || false,
+      windowWidth: settings.window_width,
+      windowHeight: settings.window_height,
+    }
+    console.log('应用设置加载成功:', appSettings.value)
   } catch (error) {
     console.error('加载应用设置失败:', error)
   }
@@ -1429,6 +1443,41 @@ onMounted(async () => {
 
   // 加载应用设置
   await loadAppSettings()
+
+  // 恢复窗口大小
+  if (appSettings.value.windowWidth && appSettings.value.windowHeight) {
+    try {
+      const window = getCurrentWindow()
+      await window.setSize(new LogicalSize(
+        appSettings.value.windowWidth,
+        appSettings.value.windowHeight
+      ))
+      console.log(`恢复窗口大小: ${appSettings.value.windowWidth}x${appSettings.value.windowHeight}`)
+    } catch (error) {
+      console.error('恢复窗口大小失败:', error)
+    }
+  }
+
+  // 监听窗口大小变化
+  try {
+    const window = getCurrentWindow()
+    await window.listen('tauri://resize', async () => {
+      try {
+        const size = await window.innerSize()
+        // 保存新的窗口大小
+        await invoke('save_window_size', {
+          width: size.width,
+          height: size.height
+        })
+        console.log(`保存窗口大小: ${size.width}x${size.height}`)
+      } catch (error) {
+        console.error('保存窗口大小失败:', error)
+      }
+    })
+    console.log('窗口大小监听器设置成功')
+  } catch (error) {
+    console.error('设置窗口大小监听器失败:', error)
+  }
 
   // 计算侧栏的自然宽度
   const sidebar = document.querySelector('.sidebar') as HTMLElement
