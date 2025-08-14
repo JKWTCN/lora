@@ -118,6 +118,24 @@
         </div>
       </Teleport>
 
+      <!-- 主菜单 -->
+      <Teleport to="body">
+        <div v-if="mainMenu.visible" class="context-menu main-menu"
+          :style="{ left: mainMenu.x + 'px', top: mainMenu.y + 'px' }" @click.stop>
+          <div class="context-menu-item" @click="togglePreventAutoHide">
+            <span>{{ appSettings.preventAutoHide ? '✓' : '○' }} 阻止自动隐藏</span>
+          </div>
+          <div class="context-menu-divider"></div>
+          <div class="context-menu-item" @click="openSettings">
+            <span>设置</span>
+          </div>
+          <div class="context-menu-divider"></div>
+          <div class="context-menu-item context-menu-item-danger" @click="confirmExit">
+            <span>退出</span>
+          </div>
+        </div>
+      </Teleport>
+
       <!-- 重命名对话框 -->
       <div v-if="renameDialog.visible" class="dialog-overlay" @click="cancelRename">
         <div class="dialog" @click.stop>
@@ -168,7 +186,7 @@
             <div class="form-group">
               <label>目标路径:</label>
               <div class="input-group">
-                <input v-model="editAppDialog.editedTargetPath" type="text" class="dialog-input" 
+                <input v-model="editAppDialog.editedTargetPath" type="text" class="dialog-input"
                   placeholder="请输入文件、文件夹路径或网址" @blur="detectTargetType">
                 <button class="browse-button" @click="browseTarget" type="button">
                   浏览
@@ -177,16 +195,18 @@
             </div>
             <div class="form-group">
               <label>启动参数 (可选):</label>
-              <input v-model="editAppDialog.editedLaunchArgs" type="text" class="dialog-input" 
+              <input v-model="editAppDialog.editedLaunchArgs" type="text" class="dialog-input"
                 placeholder="请输入启动参数 (如: --fullscreen --debug)">
             </div>
             <div class="form-group">
               <label>图标 (可选):</label>
               <div class="icon-section">
                 <div class="icon-preview">
-                  <img v-if="editAppDialog.editedIcon && (editAppDialog.editedIcon.startsWith('data:image/') || editAppDialog.editedIcon.startsWith('http'))" 
+                  <img
+                    v-if="editAppDialog.editedIcon && (editAppDialog.editedIcon.startsWith('data:image/') || editAppDialog.editedIcon.startsWith('http'))"
                     :src="editAppDialog.editedIcon" :alt="editAppDialog.editedName" class="preview-icon" />
-                  <div v-else-if="editAppDialog.editedIcon && !editAppDialog.editedIcon.startsWith('data:image/') && !editAppDialog.editedIcon.startsWith('http')"
+                  <div
+                    v-else-if="editAppDialog.editedIcon && !editAppDialog.editedIcon.startsWith('data:image/') && !editAppDialog.editedIcon.startsWith('http')"
                     class="file-type-icon preview-icon" :class="'file-type-' + editAppDialog.editedIcon">
                     {{ getFileTypeIcon(editAppDialog.editedIcon) }}
                   </div>
@@ -196,7 +216,8 @@
                   <button class="browse-button icon-button" @click="selectIcon" type="button">
                     选择图标
                   </button>
-                  <button v-if="editAppDialog.editedIcon" class="browse-button icon-button danger" @click="clearIcon" type="button">
+                  <button v-if="editAppDialog.editedIcon" class="browse-button icon-button danger" @click="clearIcon"
+                    type="button">
                     清除图标
                   </button>
                 </div>
@@ -343,6 +364,22 @@ const gridContextMenu = ref<{
   visible: false,
   x: 0,
   y: 0
+})
+
+// 主菜单相关
+const mainMenu = ref<{
+  visible: boolean;
+  x: number;
+  y: number;
+}>({
+  visible: false,
+  x: 0,
+  y: 0
+})
+
+// 应用设置
+const appSettings = ref({
+  preventAutoHide: false, // 阻止自动隐藏
 })
 
 // 重命名对话框相关
@@ -511,6 +548,30 @@ const saveAppData = async () => {
   }
 }
 
+// 保存应用设置
+const saveAppSettings = async () => {
+  console.log('开始保存应用设置...', appSettings.value)
+  try {
+    await invoke('save_app_settings', appSettings.value)
+    console.log('应用设置保存成功')
+  } catch (error) {
+    console.error('保存应用设置失败:', error)
+  }
+}
+
+// 加载应用设置
+const loadAppSettings = async () => {
+  console.log('开始加载应用设置...')
+  try {
+    const settings = await invoke('load_app_settings') as any
+    console.log('从后端加载的设置:', settings)
+    appSettings.value = settings
+    console.log('应用设置加载成功')
+  } catch (error) {
+    console.error('加载应用设置失败:', error)
+  }
+}
+
 // 计算属性
 const filteredApps = computed(() => {
   console.log('计算filteredApps:', {
@@ -581,19 +642,19 @@ const launchApp = async (app: any) => {
     // 根据目标类型选择不同的启动方式
     if (app.target_type === 'url') {
       // 打开网址
-      await invoke('open_url', { 
+      await invoke('open_url', {
         url: targetPath,
         launchArgs: app.launch_args || ''
       })
     } else if (app.target_type === 'folder') {
       // 打开文件夹
-      await invoke('open_folder', { 
+      await invoke('open_folder', {
         folderPath: targetPath,
         launchArgs: app.launch_args || ''
       })
     } else {
       // 启动文件
-      await invoke('launch_app', { 
+      await invoke('launch_app', {
         appPath: targetPath,
         launchArgs: app.launch_args || ''
       })
@@ -759,6 +820,76 @@ const hideGridContextMenu = () => {
   gridContextMenu.value.visible = false
 }
 
+// 主菜单相关方法
+const showMainMenu = (e: MouseEvent) => {
+  // 隐藏其他所有菜单
+  hideContextMenu()
+  hideAppContextMenu()
+  hideMoveToSubmenu()
+  hideGridContextMenu()
+
+  // 获取按钮位置
+  const buttonRect = (e.target as HTMLElement).getBoundingClientRect()
+  const x = buttonRect.left
+  const y = buttonRect.bottom + 5 // 在按钮下方显示
+
+  // 智能定位：确保菜单不超出屏幕边界
+  const menuWidth = 150
+  const menuHeight = 120 // 估算菜单高度
+  const screenWidth = window.innerWidth
+  const screenHeight = window.innerHeight
+
+  let adjustedX = x
+  let adjustedY = y
+
+  // 如果菜单会超出右边界，则向左偏移
+  if (x + menuWidth > screenWidth) {
+    adjustedX = screenWidth - menuWidth - 10
+  }
+
+  // 如果菜单会超出下边界，则向上偏移到按钮上方
+  if (y + menuHeight > screenHeight) {
+    adjustedY = buttonRect.top - menuHeight - 5
+  }
+
+  mainMenu.value = {
+    visible: true,
+    x: adjustedX,
+    y: adjustedY
+  }
+
+  // 点击其他地方时隐藏菜单
+  document.addEventListener('click', hideMainMenu, { once: true })
+
+  // 阻止事件冒泡
+  e.preventDefault()
+  e.stopPropagation()
+}
+
+const hideMainMenu = () => {
+  mainMenu.value.visible = false
+}
+
+const togglePreventAutoHide = () => {
+  appSettings.value.preventAutoHide = !appSettings.value.preventAutoHide
+  saveAppSettings()
+  hideMainMenu()
+}
+
+const openSettings = () => {
+  console.log('打开设置')
+  // TODO: 实现设置界面
+  showToast('设置功能开发中...', 'info')
+  hideMainMenu()
+}
+
+const confirmExit = () => {
+  if (confirm('确定要退出应用吗？')) {
+    closeApp()
+  }
+  hideMainMenu()
+}
+
 const createNewProject = async () => {
   console.log('新建项目')
 
@@ -898,12 +1029,12 @@ const editApp = async () => {
       editedLaunchArgs: appContextMenu.value.app.launch_args || '',
       editedTargetType: appContextMenu.value.app.target_type || 'file'
     }
-    
+
     // 如果没有目标类型，自动检测
     if (!appContextMenu.value.app.target_type && editAppDialog.value.editedTargetPath) {
       try {
-        const targetType = await invoke('detect_target_type', { 
-          targetPath: editAppDialog.value.editedTargetPath 
+        const targetType = await invoke('detect_target_type', {
+          targetPath: editAppDialog.value.editedTargetPath
         }) as string
         editAppDialog.value.editedTargetType = targetType as 'file' | 'folder' | 'url'
       } catch (error) {
@@ -1044,7 +1175,7 @@ const confirmEditApp = async () => {
       apps.value[appIndex].target_path = editAppDialog.value.editedTargetPath
       apps.value[appIndex].launch_args = editAppDialog.value.editedLaunchArgs
       apps.value[appIndex].target_type = editAppDialog.value.editedTargetType
-      
+
       // 如果目标路径改变，更新主路径
       if (editAppDialog.value.editedTargetPath !== apps.value[appIndex].path) {
         apps.value[appIndex].path = editAppDialog.value.editedTargetPath
@@ -1076,7 +1207,7 @@ const browseTarget = async () => {
   try {
     // 显示选择对话框让用户选择文件或文件夹
     const choice = confirm('选择文件请点击"确定"，选择文件夹请点击"取消"')
-    
+
     let selectedPath = ''
     if (choice) {
       // 选择文件
@@ -1086,17 +1217,17 @@ const browseTarget = async () => {
         ['脚本文件', ['ps1', 'vbs', 'js', 'py']],
         ['快捷方式', ['lnk', 'url']]
       ]
-      selectedPath = await invoke('open_file_dialog', { 
+      selectedPath = await invoke('open_file_dialog', {
         title: '选择目标文件',
         filters: filters
       }) as string
     } else {
       // 选择文件夹
-      selectedPath = await invoke('open_folder_dialog', { 
+      selectedPath = await invoke('open_folder_dialog', {
         title: '选择目标文件夹'
       }) as string
     }
-    
+
     if (selectedPath) {
       editAppDialog.value.editedTargetPath = selectedPath
       // 自动检测目标类型
@@ -1115,10 +1246,10 @@ const detectTargetType = async () => {
   if (!editAppDialog.value.editedTargetPath.trim()) {
     return
   }
-  
+
   try {
-    const targetType = await invoke('detect_target_type', { 
-      targetPath: editAppDialog.value.editedTargetPath 
+    const targetType = await invoke('detect_target_type', {
+      targetPath: editAppDialog.value.editedTargetPath
     }) as string
     editAppDialog.value.editedTargetType = targetType as 'file' | 'folder' | 'url'
   } catch (error) {
@@ -1136,11 +1267,11 @@ const selectIcon = async () => {
       ['图标文件', ['ico', 'png']],
       ['所有文件', ['*']]
     ]
-    const selectedPath = await invoke('open_file_dialog', { 
+    const selectedPath = await invoke('open_file_dialog', {
       title: '选择图标文件',
       filters: filters
     }) as string
-    
+
     if (selectedPath) {
       // 尝试将图片转换为base64
       try {
@@ -1296,6 +1427,9 @@ onMounted(async () => {
   // 加载应用数据
   await loadAppData()
 
+  // 加载应用设置
+  await loadAppSettings()
+
   // 计算侧栏的自然宽度
   const sidebar = document.querySelector('.sidebar') as HTMLElement
   if (sidebar) {
@@ -1353,14 +1487,14 @@ const disableContextMenu = (e: Event) => {
 // 全局键盘事件处理函数
 const handleGlobalKeydown = (event: KeyboardEvent) => {
   // 检查是否正在编辑状态（对话框打开、输入框聚焦等）
-  const isEditing = document.activeElement?.tagName === 'INPUT' || 
-                   document.activeElement?.tagName === 'TEXTAREA' ||
-                   document.activeElement?.tagName === 'SELECT' ||
-                   document.querySelector('.dialog-overlay') ||
-                   contextMenu.value.visible ||
-                   appContextMenu.value.visible ||
-                   moveToSubmenu.value.visible ||
-                   gridContextMenu.value.visible
+  const isEditing = document.activeElement?.tagName === 'INPUT' ||
+    document.activeElement?.tagName === 'TEXTAREA' ||
+    document.activeElement?.tagName === 'SELECT' ||
+    document.querySelector('.dialog-overlay') ||
+    contextMenu.value.visible ||
+    appContextMenu.value.visible ||
+    moveToSubmenu.value.visible ||
+    gridContextMenu.value.visible
 
   // 如果正在编辑，不处理
   if (isEditing) {
@@ -1386,19 +1520,19 @@ const handleGlobalKeydown = (event: KeyboardEvent) => {
   }
 
   // 检查是否是可打印字符（字母、数字、部分符号等）
-  const isPrintableChar = event.key.length === 1 && 
-                         !event.ctrlKey && 
-                         !event.altKey && 
-                         !event.metaKey &&
-                         // 排除一些特殊字符
-                         !/[\s\t\n\r]/.test(event.key)
+  const isPrintableChar = event.key.length === 1 &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.metaKey &&
+    // 排除一些特殊字符
+    !/[\s\t\n\r]/.test(event.key)
 
   if (isPrintableChar) {
     // 如果搜索框未显示，显示它并添加字符
     if (!showSearchBox.value) {
       showSearchBox.value = true
       searchQuery.value = event.key
-      
+
       // 聚焦到搜索框
       nextTick(() => {
         if (searchInputRef.value) {
@@ -1408,7 +1542,7 @@ const handleGlobalKeydown = (event: KeyboardEvent) => {
           input.setSelectionRange(1, 1)
         }
       })
-      
+
       event.preventDefault()
     }
   }
@@ -1422,7 +1556,7 @@ onUnmounted(() => {
 
   // 清理拖拽功能
   cleanupDragAndDrop()
-  
+
   // 清理全局键盘监听器
   document.removeEventListener('keydown', handleGlobalKeydown)
 })
@@ -1465,9 +1599,9 @@ const handleSearchKeydown = (event: KeyboardEvent) => {
   // 这里暂时不实现，因为需要添加选中状态管理
 }
 
-const toggleMenu = () => {
-  // 显示应用菜单或设置
-  console.log('显示菜单')
+const toggleMenu = (e: MouseEvent) => {
+  // 显示主菜单
+  showMainMenu(e)
 }
 
 const closeApp = async () => {

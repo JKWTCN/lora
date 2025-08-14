@@ -26,6 +26,12 @@ pub struct CategoryData {
     pub is_default: bool,
 }
 
+// 应用设置结构
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AppSettings {
+    pub prevent_auto_hide: bool,
+}
+
 // 应用数据存储结构
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AppStorage {
@@ -172,13 +178,17 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
     {
         if let Some(args_str) = launch_args {
             if !args_str.trim().is_empty() {
-                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
-                let mut cmd_args = vec!["/C".to_string(), "start".to_string(), "".to_string(), app_path];
+                let split_args: Vec<String> =
+                    args_str.split_whitespace().map(|s| s.to_string()).collect();
+                let mut cmd_args = vec![
+                    "/C".to_string(),
+                    "start".to_string(),
+                    "".to_string(),
+                    app_path,
+                ];
                 cmd_args.extend(split_args);
-                
-                let result = Command::new("cmd")
-                    .args(&cmd_args)
-                    .spawn();
+
+                let result = Command::new("cmd").args(&cmd_args).spawn();
 
                 match result {
                     Ok(_) => Ok("应用启动成功".to_string()),
@@ -209,10 +219,11 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
     #[cfg(not(target_os = "windows"))]
     {
         let mut cmd = Command::new(&app_path);
-        
+
         if let Some(args_str) = launch_args {
             if !args_str.trim().is_empty() {
-                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                let split_args: Vec<String> =
+                    args_str.split_whitespace().map(|s| s.to_string()).collect();
                 cmd.args(&split_args);
             }
         }
@@ -233,22 +244,19 @@ fn open_url(url: String, launch_args: Option<String>) -> Result<String, String> 
     {
         if let Some(args_str) = launch_args {
             if !args_str.trim().is_empty() {
-                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                let split_args: Vec<String> =
+                    args_str.split_whitespace().map(|s| s.to_string()).collect();
                 let mut cmd_args = vec!["/C".to_string(), "start".to_string(), "".to_string(), url];
                 cmd_args.extend(split_args);
-                
-                let result = Command::new("cmd")
-                    .args(&cmd_args)
-                    .spawn();
+
+                let result = Command::new("cmd").args(&cmd_args).spawn();
 
                 match result {
                     Ok(_) => Ok("网址打开成功".to_string()),
                     Err(e) => Err(format!("打开网址失败: {}", e)),
                 }
             } else {
-                let result = Command::new("cmd")
-                    .args(["/C", "start", "", &url])
-                    .spawn();
+                let result = Command::new("cmd").args(["/C", "start", "", &url]).spawn();
 
                 match result {
                     Ok(_) => Ok("网址打开成功".to_string()),
@@ -256,9 +264,7 @@ fn open_url(url: String, launch_args: Option<String>) -> Result<String, String> 
                 }
             }
         } else {
-            let result = Command::new("cmd")
-                .args(["/C", "start", "", &url])
-                .spawn();
+            let result = Command::new("cmd").args(["/C", "start", "", &url]).spawn();
 
             match result {
                 Ok(_) => Ok("网址打开成功".to_string()),
@@ -271,10 +277,11 @@ fn open_url(url: String, launch_args: Option<String>) -> Result<String, String> 
     {
         let mut cmd = Command::new("open");
         cmd.arg(&url);
-        
+
         if let Some(args_str) = launch_args {
             if !args_str.trim().is_empty() {
-                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                let split_args: Vec<String> =
+                    args_str.split_whitespace().map(|s| s.to_string()).collect();
                 cmd.args(&split_args);
             }
         }
@@ -291,10 +298,11 @@ fn open_url(url: String, launch_args: Option<String>) -> Result<String, String> 
     {
         let mut cmd = Command::new("xdg-open");
         cmd.arg(&url);
-        
+
         if let Some(args_str) = launch_args {
             if !args_str.trim().is_empty() {
-                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                let split_args: Vec<String> =
+                    args_str.split_whitespace().map(|s| s.to_string()).collect();
                 cmd.args(&split_args);
             }
         }
@@ -330,10 +338,11 @@ fn open_folder(folder_path: String, launch_args: Option<String>) -> Result<Strin
     {
         let mut cmd = Command::new("explorer");
         cmd.arg(&folder_path);
-        
+
         if let Some(args_str) = launch_args {
             if !args_str.trim().is_empty() {
-                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                let split_args: Vec<String> =
+                    args_str.split_whitespace().map(|s| s.to_string()).collect();
                 cmd.args(&split_args);
             }
         }
@@ -350,10 +359,11 @@ fn open_folder(folder_path: String, launch_args: Option<String>) -> Result<Strin
     {
         let mut cmd = Command::new("open");
         cmd.arg(&folder_path);
-        
+
         if let Some(args_str) = launch_args {
             if !args_str.trim().is_empty() {
-                let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                let split_args: Vec<String> =
+                    args_str.split_whitespace().map(|s| s.to_string()).collect();
                 cmd.args(&split_args);
             }
         }
@@ -374,10 +384,11 @@ fn open_folder(folder_path: String, launch_args: Option<String>) -> Result<Strin
             if Command::new("which").arg(manager).output().is_ok() {
                 let mut cmd = Command::new(manager);
                 cmd.arg(&folder_path);
-                
+
                 if let Some(args_str) = launch_args {
                     if !args_str.trim().is_empty() {
-                        let split_args: Vec<String> = args_str.split_whitespace().map(|s| s.to_string()).collect();
+                        let split_args: Vec<String> =
+                            args_str.split_whitespace().map(|s| s.to_string()).collect();
                         cmd.args(&split_args);
                     }
                 }
@@ -413,7 +424,7 @@ fn open_file_dialog(title: String, filters: Vec<(String, Vec<String>)>) -> Resul
             let ext_string = extensions.join(";*.");
             filter_string.push_str(&format!("{}|*.{}", name, ext_string));
         }
-        
+
         let script = format!(
             r#"
             Add-Type -AssemblyName System.Windows.Forms
@@ -495,8 +506,11 @@ fn open_folder_dialog(title: String) -> Result<String, String> {
 #[tauri::command]
 fn detect_target_type(target_path: String) -> Result<String, String> {
     // 如果是URL
-    if target_path.starts_with("http://") || target_path.starts_with("https://") || 
-       target_path.starts_with("ftp://") || target_path.starts_with("file://") {
+    if target_path.starts_with("http://")
+        || target_path.starts_with("https://")
+        || target_path.starts_with("ftp://")
+        || target_path.starts_with("file://")
+    {
         return Ok("url".to_string());
     }
 
@@ -577,6 +591,42 @@ fn load_app_data() -> Result<AppStorage, String> {
         serde_json::from_str(&json_data).map_err(|e| format!("解析数据失败: {}", e))?;
 
     Ok(storage)
+}
+
+// 保存应用设置
+#[tauri::command]
+fn save_app_settings(settings: AppSettings) -> Result<String, String> {
+    let data_dir = get_app_data_dir()?;
+    let file_path = data_dir.join("settings.json");
+
+    let json_data =
+        serde_json::to_string_pretty(&settings).map_err(|e| format!("序列化设置失败: {}", e))?;
+
+    fs::write(&file_path, json_data).map_err(|e| format!("保存设置文件失败: {}", e))?;
+
+    Ok("设置保存成功".to_string())
+}
+
+// 加载应用设置
+#[tauri::command]
+fn load_app_settings() -> Result<AppSettings, String> {
+    let data_dir = get_app_data_dir()?;
+    let file_path = data_dir.join("settings.json");
+
+    if !file_path.exists() {
+        // 如果文件不存在，返回默认设置
+        return Ok(AppSettings {
+            prevent_auto_hide: false,
+        });
+    }
+
+    let json_data =
+        fs::read_to_string(&file_path).map_err(|e| format!("读取设置文件失败: {}", e))?;
+
+    let settings: AppSettings =
+        serde_json::from_str(&json_data).map_err(|e| format!("解析设置失败: {}", e))?;
+
+    Ok(settings)
 }
 
 // 删除应用
@@ -750,6 +800,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             load_app_data,
+            save_app_settings,
+            load_app_settings,
             my_custom_command,
             get_file_info,
             launch_app,
