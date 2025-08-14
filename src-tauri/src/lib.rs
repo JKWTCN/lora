@@ -75,6 +75,9 @@ fn get_file_info(file_path: String) -> Result<serde_json::Value, String> {
         target_path = resolve_shortcut_target(&file_path);
     }
 
+    // 提取文件图标
+    let icon_base64 = extract_file_icon(&file_path);
+
     Ok(serde_json::json!({
         "name": name,
         "path": file_path,
@@ -82,7 +85,8 @@ fn get_file_info(file_path: String) -> Result<serde_json::Value, String> {
         "size": size,
         "is_executable": is_executable,
         "is_shortcut": is_shortcut,
-        "target_path": target_path
+        "target_path": target_path,
+        "icon": icon_base64
     }))
 }
 
@@ -113,6 +117,41 @@ fn resolve_windows_shortcut(shortcut_path: &str) -> Option<String> {
         Some(shortcut_path.to_string())
     } else {
         Some(shortcut_path.to_string())
+    }
+}
+
+// 提取文件图标并转换为 Base64 字符串或图标标识符
+fn extract_file_icon(file_path: &str) -> Option<String> {
+    let path = Path::new(file_path);
+    let extension = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    // 根据文件扩展名返回不同的图标标识符
+    match extension.as_str() {
+        "exe" => Some("exe".to_string()),
+        "msi" => Some("installer".to_string()),
+        "lnk" => Some("shortcut".to_string()),
+        "txt" => Some("text".to_string()),
+        "pdf" => Some("pdf".to_string()),
+        "doc" | "docx" => Some("word".to_string()),
+        "xls" | "xlsx" => Some("excel".to_string()),
+        "ppt" | "pptx" => Some("powerpoint".to_string()),
+        "zip" | "rar" | "7z" => Some("archive".to_string()),
+        "jpg" | "jpeg" | "png" | "gif" | "bmp" => Some("image".to_string()),
+        "mp3" | "wav" | "flac" => Some("audio".to_string()),
+        "mp4" | "avi" | "mkv" => Some("video".to_string()),
+        "html" | "htm" => Some("web".to_string()),
+        "js" | "ts" => Some("javascript".to_string()),
+        "py" => Some("python".to_string()),
+        "java" => Some("java".to_string()),
+        "cpp" | "c" | "h" => Some("code".to_string()),
+        "json" => Some("json".to_string()),
+        "xml" => Some("xml".to_string()),
+        "css" => Some("css".to_string()),
+        _ => None, // 对于未知类型，返回 None，前端会显示默认图标
     }
 }
 

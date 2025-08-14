@@ -155,7 +155,11 @@
           <div v-for="app in filteredApps" :key="app.id" class="app-item" @click="launchApp(app)"
             @dblclick="launchApp(app)" @contextmenu.prevent="showAppContextMenu($event, app)">
             <div class="app-icon">
-              <img :src="app.icon" :alt="app.name" v-if="app.icon" />
+              <img :src="app.icon" :alt="app.name" v-if="app.icon && app.icon.startsWith('http')" />
+              <div v-else-if="app.icon && !app.icon.startsWith('http')" class="file-type-icon"
+                :class="'file-type-' + app.icon">
+                {{ getFileTypeIcon(app.icon) }}
+              </div>
               <div v-else class="default-icon">{{ app.name.charAt(0) }}</div>
             </div>
             <div class="app-name">{{ app.name }}</div>
@@ -274,6 +278,34 @@ const categories = ref<CategoryData[]>([
 
 // 应用数据
 const apps = ref<AppData[]>([])
+
+// 根据文件类型返回相应的图标字符
+const getFileTypeIcon = (fileType: string): string => {
+  const iconMap: { [key: string]: string } = {
+    'exe': '🖥️',
+    'installer': '📦',
+    'shortcut': '🔗',
+    'text': '📄',
+    'pdf': '📕',
+    'word': '📘',
+    'excel': '📗',
+    'powerpoint': '📙',
+    'archive': '🗜️',
+    'image': '🖼️',
+    'audio': '🎵',
+    'video': '🎬',
+    'web': '🌐',
+    'javascript': '📜',
+    'python': '🐍',
+    'java': '☕',
+    'code': '💻',
+    'json': '📋',
+    'xml': '📰',
+    'css': '🎨'
+  }
+  return iconMap[fileType] || '📁'
+}
+
 // 加载应用数据
 const loadAppData = async () => {
   console.log('开始加载应用数据...')
@@ -1017,7 +1049,7 @@ const handleFileDrop = async (filePath: string) => {
       id: Date.now() + Math.random(), // 避免ID冲突
       name: fileInfo.name,
       category: selectedCategory.value === 'all' ? 'utilities' : selectedCategory.value,
-      icon: '', // 可以后续添加图标提取功能
+      icon: fileInfo.icon || '', // 使用后端返回的图标标识符
       path: fileInfo.path,
       target_path: fileInfo.target_path,
       is_shortcut: fileInfo.is_shortcut
@@ -1369,6 +1401,17 @@ const cleanupDragAndDrop = () => {
   justify-content: center;
   font-size: 12px;
   font-weight: bold;
+}
+
+.file-type-icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 }
 
 .app-name {
