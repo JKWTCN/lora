@@ -1091,7 +1091,7 @@ const handleFileDrop = async (filePath: string) => {
 
     // 创建新的应用项
     const newApp: AppData = {
-      id: Date.now() + Math.random(), // 避免ID冲突
+      id: Date.now() + Math.floor(Math.random() * 1000), // 避免ID冲突，使用整数
       name: fileInfo.name,
       category: selectedCategory.value === 'all' ? 'utilities' : selectedCategory.value,
       icon: fileInfo.icon || '', // 使用后端返回的图标标识符
