@@ -138,6 +138,44 @@
         </div>
       </div>
 
+      <!-- Toast 提示 -->
+      <Teleport to="body">
+        <div v-if="toast.visible" class="toast" :class="'toast-' + toast.type">
+          <div class="toast-content">
+            <span class="toast-message">{{ toast.message }}</span>
+          </div>
+        </div>
+      </Teleport>
+
+      <!-- 编辑应用对话框 -->
+      <div v-if="editAppDialog.visible" class="dialog-overlay" @click="cancelEditApp">
+        <div class="dialog" @click.stop>
+          <div class="dialog-header">
+            <h3>编辑应用</h3>
+          </div>
+          <div class="dialog-content">
+            <div class="form-group">
+              <label>应用名称:</label>
+              <input v-model="editAppDialog.editedName" type="text" class="dialog-input" placeholder="请输入应用名称"
+                @keyup.enter="confirmEditApp" @keyup.escape="cancelEditApp">
+            </div>
+            <div class="form-group">
+              <label>所属分组:</label>
+              <select v-model="editAppDialog.editedCategory" class="dialog-select">
+                <option v-for="category in categories.filter(cat => cat.id !== 'all')" :key="category.id"
+                  :value="category.id">
+                  {{ category.name }}
+                </option>
+              </select>
+            </div>
+          </div>
+          <div class="dialog-actions">
+            <button class="dialog-button dialog-button-secondary" @click="cancelEditApp">取消</button>
+            <button class="dialog-button dialog-button-primary" @click="confirmEditApp">确认</button>
+          </div>
+        </div>
+      </div>
+
       <!-- 拖拽分隔线 -->
       <div class="resizer" @mousedown="startResize"></div>
 
@@ -272,6 +310,21 @@ const renameDialog = ref({
   categoryId: ''
 })
 
+// Toast 提示相关
+const toast = ref({
+  visible: false,
+  message: '',
+  type: 'info' // 'info', 'success', 'warning', 'error'
+})
+
+// 编辑应用对话框相关
+const editAppDialog = ref({
+  visible: false,
+  app: null as AppData | null,
+  editedName: '',
+  editedCategory: ''
+})
+
 const renameInput = ref(null)
 const searchInputRef = ref(null)
 
@@ -289,6 +342,23 @@ const ensureDefaultCategory = () => {
   if (!hasAllCategory) {
     categories.value.unshift({ id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true })
   }
+}
+
+// 获取合适的默认分组（用于新应用）
+const getDefaultCategoryForNewApp = () => {
+  // 如果当前选中的不是"全部应用"，则使用当前选中的分组
+  if (selectedCategory.value !== 'all') {
+    return selectedCategory.value
+  }
+
+  // 如果选中的是"全部应用"，则使用第一个非默认分组
+  const nonDefaultCategory = categories.value.find(cat => !cat.isDefault)
+  if (nonDefaultCategory) {
+    return nonDefaultCategory.id
+  }
+
+  // 如果没有其他分组，提示用户先创建分组
+  return null
 }
 const getFileTypeIcon = (fileType: string): string => {
   const iconMap: { [key: string]: string } = {
@@ -435,6 +505,20 @@ const selectCategory = async (categoryId: string) => {
   } catch (error) {
     console.error('保存选中分组失败:', error)
   }
+}
+
+// Toast 提示功能
+const showToast = (message: string, type: string = 'info') => {
+  toast.value = {
+    visible: true,
+    message,
+    type
+  }
+
+  // 3秒后自动隐藏
+  setTimeout(() => {
+    toast.value.visible = false
+  }, 3000)
 }
 
 const launchApp = async (app: any) => {
@@ -611,12 +695,19 @@ const hideGridContextMenu = () => {
 
 const createNewProject = async () => {
   console.log('新建项目')
+
+  const defaultCategory = getDefaultCategoryForNewApp()
+  if (!defaultCategory) {
+    showToast('请先创建一个分组', 'warning')
+    return
+  }
+
   // 这里可以添加新建项目的逻辑，比如打开文件选择对话框
   // 或者添加一个默认的新项目到当前分类
   const newApp: AppData = {
     id: Date.now(),
     name: '新项目',
-    category: selectedCategory.value === 'all' ? 'utilities' : selectedCategory.value,
+    category: defaultCategory,
     icon: '',
     path: ''
   }
@@ -631,34 +722,66 @@ const createNewProject = async () => {
 }
 
 // 应用右键菜单功能
-const runAsAdmin = () => {
+const runAsAdmin = async () => {
   if (appContextMenu.value.app) {
-    console.log(`以管理员权限运行: ${appContextMenu.value.app.name}`)
-    // 这里可以添加 Tauri API 调用以管理员权限启动应用
+    try {
+      console.log(`以管理员权限运行: ${appContextMenu.value.app.name}`)
+      const result = await invoke('run_as_admin', { appPath: appContextMenu.value.app.path })
+      console.log('管理员权限运行结果:', result)
+    } catch (error) {
+      console.error('以管理员权限运行失败:', error)
+      alert(`以管理员权限运行失败: ${error}`)
+    }
   }
   hideAppContextMenu()
 }
 
-const openFileLocation = () => {
+const openFileLocation = async () => {
   if (appContextMenu.value.app) {
-    console.log(`打开文件位置: ${appContextMenu.value.app.path}`)
-    // 这里可以添加 Tauri API 调用打开文件夹
+    try {
+      console.log(`打开文件位置: ${appContextMenu.value.app.path}`)
+      const result = await invoke('open_file_location', { filePath: appContextMenu.value.app.path })
+      console.log('打开文件位置结果:', result)
+    } catch (error) {
+      console.error('打开文件位置失败:', error)
+      alert(`打开文件位置失败: ${error}`)
+    }
   }
   hideAppContextMenu()
 }
 
-const showInExplorer = () => {
+const showInExplorer = async () => {
   if (appContextMenu.value.app) {
-    console.log(`在资源管理器中显示: ${appContextMenu.value.app.path}`)
-    // 这里可以添加 Tauri API 调用显示资源管理器菜单
+    try {
+      console.log(`在资源管理器中显示: ${appContextMenu.value.app.path}`)
+      const result = await invoke('show_in_explorer', { filePath: appContextMenu.value.app.path })
+      console.log('在资源管理器中显示结果:', result)
+    } catch (error) {
+      console.error('在资源管理器中显示失败:', error)
+      alert(`在资源管理器中显示失败: ${error}`)
+    }
   }
   hideAppContextMenu()
 }
 
-const copyFullPath = () => {
+const copyFullPath = async () => {
   if (appContextMenu.value.app) {
-    navigator.clipboard.writeText(appContextMenu.value.app.path || '')
-    console.log(`已复制路径: ${appContextMenu.value.app.path}`)
+    try {
+      await navigator.clipboard.writeText(appContextMenu.value.app.path || '')
+      console.log(`已复制路径: ${appContextMenu.value.app.path}`)
+      // 可以添加一个临时提示
+      showToast('路径已复制到剪贴板')
+    } catch (error) {
+      console.error('复制路径失败:', error)
+      // 备用方法：创建临时文本区域
+      const textArea = document.createElement('textarea')
+      textArea.value = appContextMenu.value.app.path || ''
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      showToast('路径已复制到剪贴板')
+    }
   }
   hideAppContextMenu()
 }
@@ -713,7 +836,12 @@ const moveAppToCategory = async (categoryId: string) => {
 const editApp = () => {
   if (appContextMenu.value.app) {
     console.log(`编辑应用: ${appContextMenu.value.app.name}`)
-    // 这里可以打开编辑对话框
+    editAppDialog.value = {
+      visible: true,
+      app: appContextMenu.value.app,
+      editedName: appContextMenu.value.app.name,
+      editedCategory: appContextMenu.value.app.category
+    }
   }
   hideAppContextMenu()
 }
@@ -836,9 +964,57 @@ const cancelRename = () => {
   }
 }
 
+// 编辑应用对话框相关函数
+const confirmEditApp = async () => {
+  if (editAppDialog.value.app && editAppDialog.value.editedName.trim()) {
+    const appIndex = apps.value.findIndex(app => app.id === editAppDialog.value.app!.id)
+    if (appIndex !== -1) {
+      apps.value[appIndex].name = editAppDialog.value.editedName.trim()
+      apps.value[appIndex].category = editAppDialog.value.editedCategory
+
+      // 保存数据
+      await saveAppData()
+      showToast('应用信息已更新', 'success')
+    }
+  }
+  cancelEditApp()
+}
+
+const cancelEditApp = () => {
+  editAppDialog.value = {
+    visible: false,
+    app: null,
+    editedName: '',
+    editedCategory: ''
+  }
+}
+
 const deleteCategory = async () => {
   if (contextMenu.value.category && !contextMenu.value.category.isDefault) {
     const categoryId = contextMenu.value.category.id
+
+    // 确认删除操作
+    const appsInCategory = apps.value.filter(app => app.category === categoryId)
+    const confirmMessage = appsInCategory.length > 0
+      ? `确定要删除分组 "${contextMenu.value.category.name}" 吗？这将同时删除该分组下的 ${appsInCategory.length} 个应用。`
+      : `确定要删除分组 "${contextMenu.value.category.name}" 吗？`
+
+    if (!confirm(confirmMessage)) {
+      hideContextMenu()
+      return
+    }
+
+    // 删除该分类下的所有应用
+    for (const app of appsInCategory) {
+      try {
+        await invoke('delete_app', { appId: app.id })
+      } catch (error) {
+        console.error('删除应用失败:', error)
+      }
+    }
+
+    // 从前端数组中移除该分类下的应用
+    apps.value = apps.value.filter(app => app.category !== categoryId)
 
     // 删除分类
     categories.value = categories.value.filter(cat => cat.id !== categoryId)
@@ -848,13 +1024,6 @@ const deleteCategory = async () => {
       await selectCategory('all')
     }
 
-    // 将该分类下的应用移动到"实用工具"分类
-    apps.value.forEach(app => {
-      if (app.category === categoryId) {
-        app.category = 'utilities'
-      }
-    })
-
     // 保存数据
     await saveAppData()
   }
@@ -862,25 +1031,46 @@ const deleteCategory = async () => {
 }
 
 const deleteAllCategories = async () => {
-  if (confirm('确定要删除所有自定义分组吗？这将把所有应用移动到"实用工具"分类中。')) {
-    const defaultCategories = categories.value.filter(cat => cat.isDefault)
-    const deletedCategoryIds = categories.value.filter(cat => !cat.isDefault).map(cat => cat.id)
-
-    categories.value = defaultCategories
-
-    // 将被删除分类下的应用移动到"实用工具"分类
-    apps.value.forEach(app => {
-      if (deletedCategoryIds.includes(app.category)) {
-        app.category = 'utilities'
-      }
-    })
-
-    // 切换到"全部应用"
-    await selectCategory('all')
-
-    // 保存数据
-    await saveAppData()
+  const customCategories = categories.value.filter(cat => !cat.isDefault)
+  if (customCategories.length === 0) {
+    alert('没有自定义分组可以删除。')
+    hideContextMenu()
+    return
   }
+
+  // 计算要删除的应用数量
+  const deletedCategoryIds = customCategories.map(cat => cat.id)
+  const appsToDelete = apps.value.filter(app => deletedCategoryIds.includes(app.category))
+
+  const confirmMessage = appsToDelete.length > 0
+    ? `确定要删除所有 ${customCategories.length} 个自定义分组吗？这将同时删除 ${appsToDelete.length} 个应用。`
+    : `确定要删除所有 ${customCategories.length} 个自定义分组吗？`
+
+  if (!confirm(confirmMessage)) {
+    hideContextMenu()
+    return
+  }
+
+  // 删除所有自定义分组下的应用
+  for (const app of appsToDelete) {
+    try {
+      await invoke('delete_app', { appId: app.id })
+    } catch (error) {
+      console.error('删除应用失败:', error)
+    }
+  }
+
+  // 从前端数组中移除被删除分组下的应用
+  apps.value = apps.value.filter(app => !deletedCategoryIds.includes(app.category))
+
+  // 只保留默认分组
+  categories.value = categories.value.filter(cat => cat.isDefault)
+
+  // 切换到"全部应用"
+  await selectCategory('all')
+
+  // 保存数据
+  await saveAppData()
   hideContextMenu()
 }
 
@@ -1094,10 +1284,11 @@ const handleFileDrop = async (filePath: string) => {
     console.log('文件信息获取成功:', fileInfo)
 
     // 创建新的应用项
+    const defaultCategory = getDefaultCategoryForNewApp()
     const newApp: AppData = {
       id: Date.now() + Math.floor(Math.random() * 1000), // 避免ID冲突，使用整数
       name: fileInfo.name,
-      category: selectedCategory.value === 'all' ? 'utilities' : selectedCategory.value,
+      category: selectedCategory.value === 'all' ? (defaultCategory || 'all') : selectedCategory.value,
       icon: fileInfo.icon || '', // 使用后端返回的图标标识符
       path: fileInfo.path,
       target_path: fileInfo.target_path,
@@ -1633,6 +1824,34 @@ const cleanupDragAndDrop = () => {
 .dialog-button-primary:hover {
   background: #2980b9;
 }
+
+/* 表单组样式 */
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.dialog-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  outline: none;
+  font-size: 14px;
+  background: white;
+  transition: border-color 0.2s ease;
+}
+
+.dialog-select:focus {
+  border-color: #3498db;
+}
 </style>
 
 <!-- 全局样式，用于Teleport到body的元素 -->
@@ -1789,5 +2008,60 @@ body {
 .main-content.drag-over .app-grid {
   opacity: 0.3;
   transition: opacity 0.2s ease;
+}
+
+/* Toast 提示样式 */
+.toast {
+  position: fixed !important;
+  top: 20px;
+  right: 20px;
+  min-width: 250px;
+  max-width: 400px;
+  padding: 12px 16px;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10000;
+  animation: slideInFromRight 0.3s ease-out;
+  border-left: 4px solid #3498db;
+}
+
+.toast-info {
+  border-left-color: #3498db;
+}
+
+.toast-success {
+  border-left-color: #27ae60;
+}
+
+.toast-warning {
+  border-left-color: #f39c12;
+}
+
+.toast-error {
+  border-left-color: #e74c3c;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+}
+
+.toast-message {
+  font-size: 14px;
+  color: #2c3e50;
+  line-height: 1.4;
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 </style>

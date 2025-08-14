@@ -330,6 +330,136 @@ fn get_app_icon(file_path: String) -> Result<String, String> {
         Err("当前平台不支持图标提取".to_string())
     }
 }
+
+// 以管理员权限运行应用
+#[tauri::command]
+fn run_as_admin(app_path: String) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let result = Command::new("powershell")
+            .args([
+                "-Command",
+                &format!(
+                    "Start-Process '{}' -Verb RunAs",
+                    app_path.replace("'", "''")
+                ),
+            ])
+            .spawn();
+
+        match result {
+            Ok(_) => Ok("应用以管理员权限启动成功".to_string()),
+            Err(e) => Err(format!("以管理员权限启动应用失败: {}", e)),
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("当前平台不支持管理员权限运行".to_string())
+    }
+}
+
+// 在文件资源管理器中显示文件
+#[tauri::command]
+fn show_in_explorer(file_path: String) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let result = Command::new("explorer")
+            .args(["/select,", &file_path])
+            .spawn();
+
+        match result {
+            Ok(_) => Ok("已在资源管理器中显示文件".to_string()),
+            Err(e) => Err(format!("在资源管理器中显示文件失败: {}", e)),
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let result = Command::new("open").args(["-R", &file_path]).spawn();
+
+        match result {
+            Ok(_) => Ok("已在Finder中显示文件".to_string()),
+            Err(e) => Err(format!("在Finder中显示文件失败: {}", e)),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // 在Linux上，尝试使用不同的文件管理器
+        let file_managers = ["nautilus", "dolphin", "thunar", "pcmanfm"];
+        let parent_dir = Path::new(&file_path).parent().ok_or("无法获取父目录")?;
+
+        for manager in &file_managers {
+            if Command::new("which").arg(manager).output().is_ok() {
+                let result = Command::new(manager).arg(parent_dir).spawn();
+
+                if result.is_ok() {
+                    return Ok("已在文件管理器中显示目录".to_string());
+                }
+            }
+        }
+
+        Err("未找到可用的文件管理器".to_string())
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        Err("当前平台不支持在文件管理器中显示文件".to_string())
+    }
+}
+
+// 打开文件所在目录
+#[tauri::command]
+fn open_file_location(file_path: String) -> Result<String, String> {
+    let path = Path::new(&file_path);
+    let dir_path = path
+        .parent()
+        .ok_or("无法获取文件目录")?
+        .to_str()
+        .ok_or("路径包含无效字符")?;
+
+    #[cfg(target_os = "windows")]
+    {
+        let result = Command::new("explorer").arg(dir_path).spawn();
+
+        match result {
+            Ok(_) => Ok("已打开文件所在目录".to_string()),
+            Err(e) => Err(format!("打开目录失败: {}", e)),
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let result = Command::new("open").arg(dir_path).spawn();
+
+        match result {
+            Ok(_) => Ok("已打开文件所在目录".to_string()),
+            Err(e) => Err(format!("打开目录失败: {}", e)),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let file_managers = ["nautilus", "dolphin", "thunar", "pcmanfm"];
+
+        for manager in &file_managers {
+            if Command::new("which").arg(manager).output().is_ok() {
+                let result = Command::new(manager).arg(dir_path).spawn();
+
+                if result.is_ok() {
+                    return Ok("已打开文件所在目录".to_string());
+                }
+            }
+        }
+
+        Err("未找到可用的文件管理器".to_string())
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        Err("当前平台不支持打开目录".to_string())
+    }
+}
 #[tauri::command]
 fn my_custom_command() {
     println!("I was invoked from JavaScript!");
@@ -348,6 +478,9 @@ pub fn run() {
             update_app_category,
             save_selected_category,
             get_app_icon,
+            run_as_admin,
+            show_in_explorer,
+            open_file_location,
             greet
         ])
         .run(tauri::generate_context!())
