@@ -279,7 +279,13 @@ const categories = ref<CategoryData[]>([
 // 应用数据
 const apps = ref<AppData[]>([])
 
-// 根据文件类型返回相应的图标字符
+// 确保"全部应用"分组始终存在
+const ensureDefaultCategory = () => {
+  const hasAllCategory = categories.value.some(cat => cat.id === 'all')
+  if (!hasAllCategory) {
+    categories.value.unshift({ id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true })
+  }
+}
 const getFileTypeIcon = (fileType: string): string => {
   const iconMap: { [key: string]: string } = {
     'exe': '🖥️',
@@ -322,20 +328,50 @@ const loadAppData = async () => {
       is_default: undefined // 移除后端字段
     })).map(({ is_default, ...rest }: any) => rest) // 完全移除 is_default 字段
 
-    console.log('应用数据加载成功:', { apps: apps.value, categories: categories.value })
+    // 确保"全部应用"分组始终存在
+    ensureDefaultCategory()
+
+    // 恢复选中的分组，如果没有则默认选择"全部应用"
+    if (storage.selected_category) {
+      // 检查选中的分组是否还存在
+      const categoryExists = categories.value.some(cat => cat.id === storage.selected_category)
+      if (categoryExists) {
+        selectedCategory.value = storage.selected_category
+      } else {
+        selectedCategory.value = 'all'
+      }
+    } else {
+      selectedCategory.value = 'all'
+    }
+
+    console.log('应用数据加载成功:', {
+      apps: apps.value,
+      categories: categories.value,
+      selectedCategory: selectedCategory.value
+    })
   } catch (error) {
     console.error('加载应用数据失败:', error)
     // 使用默认数据
     categories.value = [
+      { id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true }
     ]
     apps.value = []
-    console.log('使用默认数据:', { apps: apps.value, categories: categories.value })
+    selectedCategory.value = 'all'
+    console.log('使用默认数据:', {
+      apps: apps.value,
+      categories: categories.value,
+      selectedCategory: selectedCategory.value
+    })
   }
 }
 
 // 保存应用数据
 const saveAppData = async () => {
-  console.log('开始保存应用数据...', { apps: apps.value, categories: categories.value })
+  console.log('开始保存应用数据...', {
+    apps: apps.value,
+    categories: categories.value,
+    selectedCategory: selectedCategory.value
+  })
   try {
     // 转换前端的 isDefault 为后端期望的 is_default
     const categoriesForBackend = categories.value.map(category => ({
@@ -346,7 +382,8 @@ const saveAppData = async () => {
 
     await invoke('save_app_data', {
       apps: apps.value,
-      categories: categoriesForBackend
+      categories: categoriesForBackend,
+      selectedCategory: selectedCategory.value
     })
     console.log('应用数据保存成功')
   } catch (error) {
@@ -384,8 +421,16 @@ const filteredApps = computed(() => {
 })
 
 // 方法
-const selectCategory = (categoryId: string) => {
+const selectCategory = async (categoryId: string) => {
   selectedCategory.value = categoryId
+
+  // 自动保存选中的分组
+  try {
+    await invoke('save_selected_category', { categoryId: categoryId })
+    console.log('选中分组已保存:', categoryId)
+  } catch (error) {
+    console.error('保存选中分组失败:', error)
+  }
 }
 
 const launchApp = async (app: any) => {
@@ -796,7 +841,7 @@ const deleteCategory = async () => {
 
     // 如果当前选中的分类被删除，切换到"全部应用"
     if (selectedCategory.value === categoryId) {
-      selectedCategory.value = 'all'
+      await selectCategory('all')
     }
 
     // 将该分类下的应用移动到"实用工具"分类
@@ -827,7 +872,7 @@ const deleteAllCategories = async () => {
     })
 
     // 切换到"全部应用"
-    selectedCategory.value = 'all'
+    await selectCategory('all')
 
     // 保存数据
     await saveAppData()

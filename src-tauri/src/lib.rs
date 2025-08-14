@@ -29,6 +29,7 @@ pub struct CategoryData {
 pub struct AppStorage {
     pub apps: Vec<AppData>,
     pub categories: Vec<CategoryData>,
+    pub selected_category: Option<String>, // 记住当前选中的分组
 }
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -202,11 +203,19 @@ fn get_app_data_dir() -> Result<std::path::PathBuf, String> {
 
 // 保存应用数据
 #[tauri::command]
-fn save_app_data(apps: Vec<AppData>, categories: Vec<CategoryData>) -> Result<String, String> {
+fn save_app_data(
+    apps: Vec<AppData>,
+    categories: Vec<CategoryData>,
+    selected_category: Option<String>,
+) -> Result<String, String> {
     let data_dir = get_app_data_dir()?;
     let file_path = data_dir.join("apps.json");
 
-    let storage = AppStorage { apps, categories };
+    let storage = AppStorage {
+        apps,
+        categories,
+        selected_category,
+    };
     let json_data =
         serde_json::to_string_pretty(&storage).map_err(|e| format!("序列化数据失败: {}", e))?;
 
@@ -225,20 +234,8 @@ fn load_app_data() -> Result<AppStorage, String> {
         // 如果文件不存在，返回默认数据
         return Ok(AppStorage {
             apps: vec![],
-            categories: vec![
-                CategoryData {
-                    id: "all".to_string(),
-                    name: "全部应用".to_string(),
-                    icon: "icon-apps".to_string(),
-                    is_default: true,
-                },
-                CategoryData {
-                    id: "utilities".to_string(),
-                    name: "实用工具".to_string(),
-                    icon: "icon-settings".to_string(),
-                    is_default: false,
-                },
-            ],
+            categories: vec![],
+            selected_category: Some("all".to_string()), // 默认选中"全部应用"
         });
     }
 
@@ -255,7 +252,7 @@ fn load_app_data() -> Result<AppStorage, String> {
 fn delete_app(app_id: i64) -> Result<String, String> {
     let mut storage = load_app_data()?;
     storage.apps.retain(|app| app.id != app_id);
-    save_app_data(storage.apps, storage.categories)?;
+    save_app_data(storage.apps, storage.categories, storage.selected_category)?;
     Ok("应用删除成功".to_string())
 }
 
@@ -266,11 +263,20 @@ fn update_app_category(app_id: i64, new_category: String) -> Result<String, Stri
 
     if let Some(app) = storage.apps.iter_mut().find(|app| app.id == app_id) {
         app.category = new_category;
-        save_app_data(storage.apps, storage.categories)?;
+        save_app_data(storage.apps, storage.categories, storage.selected_category)?;
         Ok("应用分类更新成功".to_string())
     } else {
         Err("应用不存在".to_string())
     }
+}
+
+// 保存当前选中的分组
+#[tauri::command]
+fn save_selected_category(category_id: String) -> Result<String, String> {
+    let mut storage = load_app_data()?;
+    storage.selected_category = Some(category_id);
+    save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+    Ok("选中分组保存成功".to_string())
 }
 #[tauri::command]
 fn my_custom_command() {
@@ -288,6 +294,7 @@ pub fn run() {
             save_app_data,
             delete_app,
             update_app_category,
+            save_selected_category,
             greet
         ])
         .run(tauri::generate_context!())
