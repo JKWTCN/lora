@@ -1007,14 +1007,10 @@ pub fn run() {
                     match event {
                         tauri::tray::TrayIconEvent::Click { button, .. } => {
                             if button == tauri::tray::MouseButton::Left {
-                                // 左键点击显示/隐藏窗口
+                                // 左键点击只显示窗口，不隐藏（与设置菜单行为一致）
                                 if let Some(app) = tray.app_handle().get_webview_window("main") {
-                                    if app.is_visible().unwrap_or(false) {
-                                        let _ = app.hide();
-                                    } else {
-                                        let _ = app.show();
-                                        let _ = app.set_focus();
-                                    }
+                                    let _ = app.show();
+                                    let _ = app.set_focus();
                                 }
                             }
                         }

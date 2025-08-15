@@ -1543,6 +1543,9 @@ onMounted(async () => {
   // 添加窗口失焦监听，自动隐藏到托盘
   window.addEventListener('blur', handleWindowBlur)
 
+  // 添加窗口聚焦事件监听器
+  window.addEventListener('focus', handleWindowFocus)
+
   // 添加鼠标移动和离开事件监听器
   document.addEventListener('mousemove', handleMouseMove)
   document.addEventListener('mouseleave', handleMouseLeave)
@@ -1648,6 +1651,7 @@ const handleGlobalKeydown = (event: KeyboardEvent) => {
 const mousePosition = ref({ x: 0, y: 0 })
 const isMouseInWindow = ref(true)
 const isDraggingWindow = ref(false)
+const windowJustShown = ref(false) // 追踪窗口是否刚刚显示
 
 // 追踪鼠标位置
 const handleMouseMove = (event: MouseEvent) => {
@@ -1675,14 +1679,28 @@ const handleDragEnd = () => {
   }, 200)
 }
 
+// 窗口聚焦处理函数
+const handleWindowFocus = () => {
+  console.log('窗口获得焦点')
+  windowJustShown.value = true
+  // 1秒后重置状态
+  setTimeout(() => {
+    windowJustShown.value = false
+    console.log('窗口刚显示状态已重置')
+  }, 1000)
+}
+
 // 窗口失焦处理函数
 const handleWindowBlur = async () => {
   // 只有在没有阻止自动隐藏的情况下才隐藏窗口
   if (!appSettings.value.preventAutoHide) {
+    // 如果窗口刚刚显示，等待更长时间再检查
+    const delay = windowJustShown.value ? 1000 : 100
+
     // 延迟检查，给鼠标事件时间更新状态
     setTimeout(async () => {
-      // 只有当鼠标不在窗口内且不在拖动窗口时才隐藏窗口
-      if (!isMouseInWindow.value && !isDraggingWindow.value) {
+      // 只有当鼠标不在窗口内且不在拖动窗口且窗口不是刚显示时才隐藏窗口
+      if (!isMouseInWindow.value && !isDraggingWindow.value && !windowJustShown.value) {
         try {
           console.log('窗口失去焦点且鼠标不在窗口内且未拖动窗口，隐藏到托盘')
           const { getCurrentWindow } = await import('@tauri-apps/api/window')
@@ -1692,9 +1710,9 @@ const handleWindowBlur = async () => {
           console.error('隐藏窗口失败:', error)
         }
       } else {
-        console.log('窗口失去焦点但鼠标仍在窗口内或正在拖动窗口，不隐藏窗口')
+        console.log('窗口失去焦点但鼠标仍在窗口内或正在拖动窗口或窗口刚显示，不隐藏窗口')
       }
-    }, 100) // 100ms 延迟
+    }, delay)
   }
 }
 
@@ -1712,6 +1730,9 @@ onUnmounted(() => {
 
   // 清理窗口失焦监听器
   window.removeEventListener('blur', handleWindowBlur)
+
+  // 清理窗口聚焦监听器
+  window.removeEventListener('focus', handleWindowFocus)
 
   // 清理鼠标事件监听器
   document.removeEventListener('mousemove', handleMouseMove)
