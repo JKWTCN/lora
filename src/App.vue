@@ -284,7 +284,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, Teleport } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, Teleport, watch } from 'vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { LogicalSize } from '@tauri-apps/api/dpi'
 import { invoke } from '@tauri-apps/api/core'
@@ -386,6 +386,17 @@ const appSettings = ref({
   preventAutoHide: false, // 阻止自动隐藏
   windowWidth: undefined as number | undefined, // 窗口宽度
   windowHeight: undefined as number | undefined, // 窗口高度
+  theme: 'auto' as string, // 主题
+  iconSize: 64 as number, // 图标大小
+  sidebarWidth: 180 as number, // 侧栏宽度
+  enableAnimations: true as boolean, // 启用动画
+  animationSpeed: 'normal' as string, // 动画速度
+  gridViewEnabled: false as boolean, // 网格视图
+  sortOrder: 'name' as string, // 排序方式
+  showHiddenFiles: false as boolean, // 显示隐藏文件
+  fuzzySearch: true as boolean, // 模糊搜索
+  searchInPath: false as boolean, // 搜索路径
+  maxSearchResults: 20 as number, // 最大搜索结果
 })
 
 // 重命名对话框相关
@@ -565,12 +576,70 @@ const loadAppSettings = async () => {
       preventAutoHide: settings.prevent_auto_hide || false,
       windowWidth: settings.window_width,
       windowHeight: settings.window_height,
+      theme: settings.theme || 'auto',
+      iconSize: settings.icon_size || 64,
+      sidebarWidth: settings.sidebar_width || 180,
+      enableAnimations: settings.enable_animations !== false,
+      animationSpeed: settings.animation_speed || 'normal',
+      gridViewEnabled: settings.grid_view_enabled || false,
+      sortOrder: settings.sort_order || 'name',
+      showHiddenFiles: settings.show_hidden_files || false,
+      fuzzySearch: settings.fuzzy_search !== false,
+      searchInPath: settings.search_in_path || false,
+      maxSearchResults: settings.max_search_results || 20,
     }
+    
+    // 恢复界面状态
+    if (settings.last_selected_category) {
+      selectedCategory.value = settings.last_selected_category
+    }
+    if (settings.last_search_query) {
+      searchQuery.value = settings.last_search_query
+    }
+    
     console.log('应用设置加载成功:', appSettings.value)
   } catch (error) {
     console.error('加载应用设置失败:', error)
   }
 }
+
+// 保存界面状态
+const saveUIState = async () => {
+  try {
+    await invoke('save_ui_state', {
+      activeTab: null, // 主窗口没有标签页概念
+      lastSelectedCategory: selectedCategory.value,
+      windowPositionX: null,
+      windowPositionY: null,
+      lastSearchQuery: searchQuery.value,
+      gridViewEnabled: appSettings.value.gridViewEnabled,
+      sortOrder: appSettings.value.sortOrder,
+      showHiddenFiles: appSettings.value.showHiddenFiles,
+    })
+  } catch (error) {
+    console.error('保存界面状态失败:', error)
+  }
+}
+
+// 节流保存界面状态（避免频繁保存）
+let saveUIStateTimer: number | null = null
+const saveUIStateThrottled = () => {
+  if (saveUIStateTimer) {
+    clearTimeout(saveUIStateTimer)
+  }
+  saveUIStateTimer = setTimeout(() => {
+    saveUIState()
+  }, 1000) // 1秒后保存
+}
+
+// 监听状态变化并自动保存
+watch(selectedCategory, () => {
+  saveUIStateThrottled()
+})
+
+watch(searchQuery, () => {
+  saveUIStateThrottled()
+})
 
 // 计算属性
 const filteredApps = computed(() => {
@@ -1517,6 +1586,10 @@ onMounted(async () => {
   // 添加全局点击监听，点击搜索框外部时隐藏搜索框
   const handleClickOutside = (event: Event) => {
     const target = event.target as HTMLElement
+    
+    // 任何点击都算用户交互
+    handleFirstUserInteraction()
+    
     if (showSearchBox.value &&
       !target.closest('.content-header') &&
       !target.closest('.titlebar-button')) {
@@ -1592,6 +1665,9 @@ const disableContextMenu = (e: Event) => {
 
 // 全局键盘事件处理函数
 const handleGlobalKeydown = (event: KeyboardEvent) => {
+  // 任何键盘操作都算用户交互
+  handleFirstUserInteraction()
+  
   // 检查是否正在编辑状态（对话框打开、输入框聚焦等）
   const isEditing = document.activeElement?.tagName === 'INPUT' ||
     document.activeElement?.tagName === 'TEXTAREA' ||
@@ -1659,11 +1735,23 @@ const mousePosition = ref({ x: 0, y: 0 })
 const isMouseInWindow = ref(true)
 const isDraggingWindow = ref(false)
 const windowJustShown = ref(false) // 追踪窗口是否刚刚显示
+const userInteracted = ref(false) // 追踪用户是否已经与窗口交互过
+
+// 处理用户首次点击窗口
+const handleFirstUserInteraction = () => {
+  if (!userInteracted.value) {
+    userInteracted.value = true
+    windowJustShown.value = false // 用户交互后，立即允许自动隐藏
+    console.log('用户首次交互，开始监听失去焦点事件')
+  }
+}
 
 // 追踪鼠标位置
 const handleMouseMove = (event: MouseEvent) => {
   mousePosition.value = { x: event.clientX, y: event.clientY }
   isMouseInWindow.value = true
+  // 鼠标移动也算用户交互
+  handleFirstUserInteraction()
 }
 
 // 鼠标离开窗口
@@ -1689,12 +1777,10 @@ const handleDragEnd = () => {
 // 窗口聚焦处理函数
 const handleWindowFocus = () => {
   console.log('窗口获得焦点')
+  // 重置用户交互状态，需要等待新的用户交互
+  userInteracted.value = false
   windowJustShown.value = true
-  // 1秒后重置状态
-  setTimeout(() => {
-    windowJustShown.value = false
-    console.log('窗口刚显示状态已重置')
-  }, 1000)
+  console.log('窗口显示，等待用户交互')
 }
 
 // 窗口失焦处理函数
@@ -1713,15 +1799,14 @@ const handleWindowBlur = async () => {
     return
   }
 
-  // 只有在没有阻止自动隐藏的情况下才隐藏窗口
-  if (!appSettings.value.preventAutoHide) {
-    // 如果窗口刚刚显示，等待更长时间再检查
-    const delay = windowJustShown.value ? 1000 : 100
-
+  // 只有在用户已交互且没有阻止自动隐藏的情况下才隐藏窗口
+  if (!appSettings.value.preventAutoHide && userInteracted.value) {
     // 延迟检查，给鼠标事件时间更新状态
+    const delay = 100
+
     setTimeout(async () => {
-      // 只有当鼠标不在窗口内且不在拖动窗口且窗口不是刚显示时才隐藏窗口
-      if (!isMouseInWindow.value && !isDraggingWindow.value && !windowJustShown.value) {
+      // 只有当鼠标不在窗口内且不在拖动窗口时才隐藏窗口
+      if (!isMouseInWindow.value && !isDraggingWindow.value) {
         try {
           console.log('窗口失去焦点且鼠标不在窗口内且未拖动窗口，隐藏到托盘')
           const { getCurrentWindow } = await import('@tauri-apps/api/window')
@@ -1731,9 +1816,11 @@ const handleWindowBlur = async () => {
           console.error('隐藏窗口失败:', error)
         }
       } else {
-        console.log('窗口失去焦点但鼠标仍在窗口内或正在拖动窗口或窗口刚显示，不隐藏窗口')
+        console.log('窗口失去焦点但鼠标仍在窗口内或正在拖动窗口，不隐藏窗口')
       }
     }, delay)
+  } else if (!userInteracted.value) {
+    console.log('用户尚未交互，不执行自动隐藏')
   }
 }
 

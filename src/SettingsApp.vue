@@ -387,32 +387,67 @@ const updatePreventAutoHide = async () => {
     }
 }
 
-const updateTheme = () => {
-    // TODO: 实现主题切换
+const updateTheme = async () => {
+    try {
+        await invoke('update_theme', { theme: localSettings.theme })
+        console.log('主题设置已更新')
+    } catch (error) {
+        console.error('更新主题设置失败:', error)
+    }
 }
 
-const updateIconSize = () => {
-    // TODO: 实现图标大小更新
+const updateIconSize = async () => {
+    try {
+        await invoke('update_icon_size', { iconSize: localSettings.iconSize })
+        console.log('图标大小已更新')
+    } catch (error) {
+        console.error('更新图标大小失败:', error)
+    }
 }
 
-const updateSidebarWidth = () => {
-    // TODO: 实现侧栏宽度更新
+const updateSidebarWidth = async () => {
+    try {
+        await invoke('update_sidebar_width', { sidebarWidth: localSettings.sidebarWidth })
+        console.log('侧栏宽度已更新')
+    } catch (error) {
+        console.error('更新侧栏宽度失败:', error)
+    }
 }
 
-const updateAnimations = () => {
-    // TODO: 实现动画设置
+const updateAnimations = async () => {
+    try {
+        await invoke('update_animations', { enableAnimations: localSettings.enableAnimations })
+        console.log('动画设置已更新')
+    } catch (error) {
+        console.error('更新动画设置失败:', error)
+    }
 }
 
-const updateAnimationSpeed = () => {
-    // TODO: 实现动画速度设置
+const updateAnimationSpeed = async () => {
+    try {
+        await invoke('update_animation_speed', { animationSpeed: localSettings.animationSpeed })
+        console.log('动画速度已更新')
+    } catch (error) {
+        console.error('更新动画速度失败:', error)
+    }
 }
 
-const updateStartWithSystem = () => {
-    // TODO: 实现开机自启动设置
+const updateStartWithSystem = async () => {
+    try {
+        await invoke('update_start_with_system', { startWithSystem: localSettings.startWithSystem })
+        console.log('开机自启动设置已更新')
+    } catch (error) {
+        console.error('更新开机自启动设置失败:', error)
+    }
 }
 
-const updateStartMinimized = () => {
-    // TODO: 实现启动最小化设置
+const updateStartMinimized = async () => {
+    try {
+        await invoke('update_start_minimized', { startMinimized: localSettings.startMinimized })
+        console.log('启动最小化设置已更新')
+    } catch (error) {
+        console.error('更新启动最小化设置失败:', error)
+    }
 }
 
 const captureHotkey = (event) => {
@@ -430,62 +465,123 @@ const captureHotkey = (event) => {
 
     if (keys.length > 0) {
         localSettings.toggleHotkey = keys.join('+')
+        // 立即保存快捷键设置
+        updateToggleHotkey()
     }
 }
 
 const clearHotkey = () => {
     localSettings.toggleHotkey = ''
+    updateToggleHotkey()
 }
 
-const updateGlobalHotkey = () => {
-    // TODO: 实现全局快捷键设置
+const updateToggleHotkey = async () => {
+    try {
+        await invoke('update_toggle_hotkey', { toggleHotkey: localSettings.toggleHotkey })
+        console.log('快捷键设置已更新')
+    } catch (error) {
+        console.error('更新快捷键设置失败:', error)
+    }
 }
 
-const updateFuzzySearch = () => {
-    // TODO: 实现模糊搜索设置
+const updateGlobalHotkey = async () => {
+    try {
+        await invoke('update_global_hotkey', { globalHotkey: localSettings.globalHotkey })
+        console.log('全局快捷键设置已更新')
+    } catch (error) {
+        console.error('更新全局快捷键设置失败:', error)
+    }
 }
 
-const updateSearchInPath = () => {
-    // TODO: 实现路径搜索设置
+const updateFuzzySearch = async () => {
+    try {
+        await invoke('update_fuzzy_search', { fuzzySearch: localSettings.fuzzySearch })
+        console.log('模糊搜索设置已更新')
+    } catch (error) {
+        console.error('更新模糊搜索设置失败:', error)
+    }
 }
 
-const updateMaxSearchResults = () => {
-    // TODO: 实现最大搜索结果设置
+const updateSearchInPath = async () => {
+    try {
+        await invoke('update_search_in_path', { searchInPath: localSettings.searchInPath })
+        console.log('路径搜索设置已更新')
+    } catch (error) {
+        console.error('更新路径搜索设置失败:', error)
+    }
 }
 
-const updateAutoBackup = () => {
-    // TODO: 实现自动备份设置
+const updateMaxSearchResults = async () => {
+    try {
+        await invoke('update_max_search_results', { maxSearchResults: localSettings.maxSearchResults })
+        console.log('最大搜索结果设置已更新')
+    } catch (error) {
+        console.error('更新最大搜索结果设置失败:', error)
+    }
 }
 
-const updateBackupInterval = () => {
-    // TODO: 实现备份间隔设置
+const updateAutoBackup = async () => {
+    try {
+        await invoke('update_auto_backup', { autoBackup: localSettings.autoBackup })
+        console.log('自动备份设置已更新')
+    } catch (error) {
+        console.error('更新自动备份设置失败:', error)
+    }
+}
+
+const updateBackupInterval = async () => {
+    try {
+        await invoke('update_backup_interval', { backupInterval: localSettings.backupInterval })
+        console.log('备份间隔设置已更新')
+    } catch (error) {
+        console.error('更新备份间隔设置失败:', error)
+    }
 }
 
 const exportData = async () => {
     try {
-        // TODO: 实现数据导出功能
-        console.log('导出数据')
+        isSaving.value = true
+        const result = await invoke('export_data')
+        console.log('数据导出成功:', result)
+        alert('数据导出成功！')
     } catch (error) {
         console.error('导出数据失败:', error)
+        alert('导出数据失败: ' + error)
+    } finally {
+        isSaving.value = false
     }
 }
 
 const importData = async () => {
     try {
-        // TODO: 实现数据导入功能
-        console.log('导入数据')
+        isSaving.value = true
+        const result = await invoke('import_data')
+        console.log('数据导入成功:', result)
+        alert('数据导入成功！请重启应用以应用更改。')
+        // 重新加载设置
+        await loadSettings()
     } catch (error) {
         console.error('导入数据失败:', error)
+        alert('导入数据失败: ' + error)
+    } finally {
+        isSaving.value = false
     }
 }
 
 const resetData = async () => {
     if (confirm('确定要重置所有数据吗？此操作不可撤销！')) {
         try {
-            // TODO: 实现数据重置功能
-            console.log('重置数据')
+            isSaving.value = true
+            const result = await invoke('reset_data')
+            console.log('数据重置成功:', result)
+            alert('数据重置成功！请重启应用。')
+            // 重新加载设置
+            await loadSettings()
         } catch (error) {
             console.error('重置数据失败:', error)
+            alert('重置数据失败: ' + error)
+        } finally {
+            isSaving.value = false
         }
     }
 }
@@ -498,52 +594,111 @@ const openUrl = async (url) => {
     }
 }
 
-const resetToDefaults = () => {
+const resetToDefaults = async () => {
     if (confirm('确定要恢复所有设置到默认值吗？')) {
-        Object.assign(localSettings, {
-            windowWidth: 800,
-            windowHeight: 600,
-            preventAutoHide: false,
-            theme: 'auto',
-            iconSize: 64,
-            sidebarWidth: 180,
-            enableAnimations: true,
-            animationSpeed: 'normal',
-            startWithSystem: false,
-            startMinimized: false,
-            toggleHotkey: 'Ctrl+Space',
-            globalHotkey: true,
-            fuzzySearch: true,
-            searchInPath: false,
-            maxSearchResults: 20,
-            autoBackup: true,
-            backupInterval: 'weekly'
-        })
+        try {
+            isSaving.value = true
+            await invoke('reset_settings_to_default')
+            // 重新加载设置
+            await loadSettings()
+            alert('设置已恢复到默认值')
+        } catch (error) {
+            console.error('恢复默认设置失败:', error)
+            alert('恢复默认设置失败: ' + error)
+        } finally {
+            isSaving.value = false
+        }
     }
 }
 
 const saveSettings = async () => {
-    isSaving.value = true
-    try {
-        await invoke('save_app_settings', { settings: localSettings })
-        lastSaved.value = true
-        setTimeout(() => {
-            lastSaved.value = false
-        }, 2000)
-    } catch (error) {
-        console.error('保存设置失败:', error)
-    } finally {
-        isSaving.value = false
-    }
+    await saveAllSettings()
+    
+    // 延迟一秒后关闭设置窗口
+    setTimeout(async () => {
+        try {
+            await invoke('close_settings_window')
+        } catch (error) {
+            console.error('关闭设置窗口失败:', error)
+        }
+    }, 1000)
 }
 
 // 加载设置
 const loadSettings = async () => {
     try {
         const settings = await invoke('load_app_settings')
-        Object.assign(localSettings, settings)
+        
+        // 将后端设置映射到前端本地设置
+        localSettings.windowWidth = settings.window_width || 800
+        localSettings.windowHeight = settings.window_height || 600
+        localSettings.preventAutoHide = settings.prevent_auto_hide || false
+        localSettings.theme = settings.theme || 'auto'
+        localSettings.iconSize = settings.icon_size || 64
+        localSettings.sidebarWidth = settings.sidebar_width || 180
+        localSettings.enableAnimations = settings.enable_animations !== false
+        localSettings.animationSpeed = settings.animation_speed || 'normal'
+        localSettings.startMinimized = settings.start_minimized || false
+        localSettings.toggleHotkey = settings.toggle_hotkey || 'Ctrl+Space'
+        localSettings.globalHotkey = settings.global_hotkey !== false
+        localSettings.fuzzySearch = settings.fuzzy_search !== false
+        localSettings.searchInPath = settings.search_in_path || false
+        localSettings.maxSearchResults = settings.max_search_results || 20
+        localSettings.autoBackup = settings.auto_backup !== false
+        localSettings.backupInterval = settings.backup_interval || 'weekly'
+
+        // 检查实际的开机自启动状态
+        try {
+            const autoStartStatus = await invoke('check_auto_start_status')
+            localSettings.startWithSystem = autoStartStatus
+        } catch (error) {
+            console.warn('检查开机自启动状态失败:', error)
+            localSettings.startWithSystem = settings.start_with_system || false
+        }
+        
+        console.log('设置加载成功')
     } catch (error) {
         console.error('加载设置失败:', error)
+    }
+}
+
+// 批量保存所有设置
+const saveAllSettings = async () => {
+    isSaving.value = true
+    try {
+        // 构建设置对象（驼峰命名转换为下划线）
+        const settingsToSave = {
+            preventAutoHide: localSettings.preventAutoHide,
+            windowWidth: localSettings.windowWidth,
+            windowHeight: localSettings.windowHeight,
+            theme: localSettings.theme,
+            iconSize: localSettings.iconSize,
+            sidebarWidth: localSettings.sidebarWidth,
+            enableAnimations: localSettings.enableAnimations,
+            animationSpeed: localSettings.animationSpeed,
+            startWithSystem: localSettings.startWithSystem,
+            startMinimized: localSettings.startMinimized,
+            toggleHotkey: localSettings.toggleHotkey,
+            globalHotkey: localSettings.globalHotkey,
+            fuzzySearch: localSettings.fuzzySearch,
+            searchInPath: localSettings.searchInPath,
+            maxSearchResults: localSettings.maxSearchResults,
+            autoBackup: localSettings.autoBackup,
+            backupInterval: localSettings.backupInterval
+        }
+
+        await invoke('update_settings_batch', { settingsUpdate: settingsToSave })
+        
+        lastSaved.value = true
+        setTimeout(() => {
+            lastSaved.value = false
+        }, 2000)
+        
+        console.log('所有设置保存成功')
+    } catch (error) {
+        console.error('保存设置失败:', error)
+    } finally {
+        isSaving.value = false
     }
 }
 

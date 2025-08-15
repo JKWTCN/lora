@@ -8,6 +8,7 @@ use tauri::{
     tray::TrayIconBuilder,
     Emitter, Manager, State,
 };
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 #[cfg(target_os = "windows")]
 use lnk::ShellLink;
@@ -60,6 +61,15 @@ pub struct AppSettings {
     // 数据管理
     pub auto_backup: Option<bool>,
     pub backup_interval: Option<String>,
+    // 界面状态记录
+    pub active_tab: Option<String>,
+    pub last_selected_category: Option<String>,
+    pub window_position_x: Option<i32>,
+    pub window_position_y: Option<i32>,
+    pub last_search_query: Option<String>,
+    pub grid_view_enabled: Option<bool>,
+    pub sort_order: Option<String>,  // "name", "date_added", "date_modified", "frequency"
+    pub show_hidden_files: Option<bool>,
 }
 
 // 应用数据存储结构
@@ -798,6 +808,15 @@ fn get_default_settings() -> AppSettings {
         max_search_results: Some(20),
         auto_backup: Some(true),
         backup_interval: Some("weekly".to_string()),
+        // 界面状态记录默认值
+        active_tab: Some("about".to_string()),
+        last_selected_category: None,
+        window_position_x: None,
+        window_position_y: None,
+        last_search_query: None,
+        grid_view_enabled: Some(false),
+        sort_order: Some("name".to_string()),
+        show_hidden_files: Some(false),
     }
 }
 
@@ -822,6 +841,498 @@ fn reset_settings_to_default() -> Result<String, String> {
     let default_settings = get_default_settings();
     save_app_settings(default_settings)?;
     Ok("设置已重置为默认值".to_string())
+}
+
+// 更新主题设置
+#[tauri::command]
+fn update_theme(theme: String) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.theme = Some(theme);
+    save_app_settings(settings)?;
+    Ok("主题设置已更新".to_string())
+}
+
+// 更新图标大小设置
+#[tauri::command]
+fn update_icon_size(icon_size: u32) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.icon_size = Some(icon_size);
+    save_app_settings(settings)?;
+    Ok("图标大小设置已更新".to_string())
+}
+
+// 更新侧栏宽度设置
+#[tauri::command]
+fn update_sidebar_width(sidebar_width: u32) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.sidebar_width = Some(sidebar_width);
+    save_app_settings(settings)?;
+    Ok("侧栏宽度设置已更新".to_string())
+}
+
+// 更新动画设置
+#[tauri::command]
+fn update_animations(enable_animations: bool) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.enable_animations = Some(enable_animations);
+    save_app_settings(settings)?;
+    Ok("动画设置已更新".to_string())
+}
+
+// 更新动画速度设置
+#[tauri::command]
+fn update_animation_speed(animation_speed: String) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.animation_speed = Some(animation_speed);
+    save_app_settings(settings)?;
+    Ok("动画速度设置已更新".to_string())
+}
+
+// 更新开机自启动设置
+#[tauri::command]
+fn update_start_with_system(start_with_system: bool) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.start_with_system = Some(start_with_system);
+    save_app_settings(settings)?;
+
+    // 在 Windows 上实际设置开机自启动
+    #[cfg(target_os = "windows")]
+    {
+        if start_with_system {
+            set_auto_start_windows(true)?;
+        } else {
+            set_auto_start_windows(false)?;
+        }
+    }
+
+    Ok("开机自启动设置已更新".to_string())
+}
+
+// 更新启动最小化设置
+#[tauri::command]
+fn update_start_minimized(start_minimized: bool) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.start_minimized = Some(start_minimized);
+    save_app_settings(settings)?;
+    Ok("启动最小化设置已更新".to_string())
+}
+
+// 更新快捷键设置
+#[tauri::command]
+async fn update_toggle_hotkey(
+    app: tauri::AppHandle,
+    toggle_hotkey: String,
+) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+
+    // 先取消注册旧的快捷键
+    if let Some(old_hotkey) = &settings.toggle_hotkey {
+        if !old_hotkey.is_empty() {
+            if let Ok(shortcut) = old_hotkey.parse::<Shortcut>() {
+                let _ = app.global_shortcut().unregister(shortcut);
+            }
+        }
+    }
+
+    settings.toggle_hotkey = Some(toggle_hotkey.clone());
+    save_app_settings(settings.clone())?;
+
+    // 注册新的快捷键
+    if settings.global_hotkey.unwrap_or(true) && !toggle_hotkey.is_empty() {
+        if let Ok(shortcut) = toggle_hotkey.parse::<Shortcut>() {
+            if let Err(e) = app.global_shortcut().register(shortcut) {
+                return Err(format!("注册全局快捷键失败: {}", e));
+            }
+        } else {
+            return Err("快捷键格式无效".to_string());
+        }
+    }
+
+    Ok("快捷键设置已更新".to_string())
+}
+
+// 更新全局快捷键设置
+#[tauri::command]
+async fn update_global_hotkey(
+    app: tauri::AppHandle,
+    global_hotkey: bool,
+) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.global_hotkey = Some(global_hotkey);
+    save_app_settings(settings.clone())?;
+
+    if let Some(hotkey) = &settings.toggle_hotkey {
+        if !hotkey.is_empty() {
+            if global_hotkey {
+                // 启用全局快捷键
+                if let Ok(shortcut) = hotkey.parse::<Shortcut>() {
+                    if let Err(e) = app.global_shortcut().register(shortcut) {
+                        return Err(format!("注册全局快捷键失败: {}", e));
+                    }
+                } else {
+                    return Err("快捷键格式无效".to_string());
+                }
+            } else {
+                // 禁用全局快捷键
+                if let Ok(shortcut) = hotkey.parse::<Shortcut>() {
+                    let _ = app.global_shortcut().unregister(shortcut);
+                }
+            }
+        }
+    }
+
+    Ok("全局快捷键设置已更新".to_string())
+}
+
+// 更新模糊搜索设置
+#[tauri::command]
+fn update_fuzzy_search(fuzzy_search: bool) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.fuzzy_search = Some(fuzzy_search);
+    save_app_settings(settings)?;
+    Ok("模糊搜索设置已更新".to_string())
+}
+
+// 更新路径搜索设置
+#[tauri::command]
+fn update_search_in_path(search_in_path: bool) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.search_in_path = Some(search_in_path);
+    save_app_settings(settings)?;
+    Ok("路径搜索设置已更新".to_string())
+}
+
+// 更新最大搜索结果设置
+#[tauri::command]
+fn update_max_search_results(max_search_results: u32) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.max_search_results = Some(max_search_results);
+    save_app_settings(settings)?;
+    Ok("最大搜索结果设置已更新".to_string())
+}
+
+// 更新自动备份设置
+#[tauri::command]
+fn update_auto_backup(auto_backup: bool) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.auto_backup = Some(auto_backup);
+    save_app_settings(settings)?;
+    Ok("自动备份设置已更新".to_string())
+}
+
+// 更新备份间隔设置
+#[tauri::command]
+fn update_backup_interval(backup_interval: String) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.backup_interval = Some(backup_interval);
+    save_app_settings(settings)?;
+    Ok("备份间隔设置已更新".to_string())
+}
+
+// 保存界面状态
+#[tauri::command]
+fn save_ui_state(
+    active_tab: Option<String>,
+    last_selected_category: Option<String>,
+    window_position_x: Option<i32>,
+    window_position_y: Option<i32>,
+    last_search_query: Option<String>,
+    grid_view_enabled: Option<bool>,
+    sort_order: Option<String>,
+    show_hidden_files: Option<bool>,
+) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    
+    if let Some(tab) = active_tab {
+        settings.active_tab = Some(tab);
+    }
+    if let Some(category) = last_selected_category {
+        settings.last_selected_category = Some(category);
+    }
+    if let Some(x) = window_position_x {
+        settings.window_position_x = Some(x);
+    }
+    if let Some(y) = window_position_y {
+        settings.window_position_y = Some(y);
+    }
+    if let Some(query) = last_search_query {
+        settings.last_search_query = Some(query);
+    }
+    if let Some(grid_view) = grid_view_enabled {
+        settings.grid_view_enabled = Some(grid_view);
+    }
+    if let Some(sort) = sort_order {
+        settings.sort_order = Some(sort);
+    }
+    if let Some(hidden) = show_hidden_files {
+        settings.show_hidden_files = Some(hidden);
+    }
+    
+    save_app_settings(settings)?;
+    Ok("界面状态已保存".to_string())
+}
+
+// 批量更新设置
+#[tauri::command]
+fn update_settings_batch(settings_update: serde_json::Value) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    
+    // 从JSON中更新设置
+    if let Some(prevent_auto_hide) = settings_update.get("preventAutoHide").and_then(|v| v.as_bool()) {
+        settings.prevent_auto_hide = prevent_auto_hide;
+    }
+    if let Some(window_width) = settings_update.get("windowWidth").and_then(|v| v.as_u64()) {
+        settings.window_width = Some(window_width as u32);
+    }
+    if let Some(window_height) = settings_update.get("windowHeight").and_then(|v| v.as_u64()) {
+        settings.window_height = Some(window_height as u32);
+    }
+    if let Some(theme) = settings_update.get("theme").and_then(|v| v.as_str()) {
+        settings.theme = Some(theme.to_string());
+    }
+    if let Some(icon_size) = settings_update.get("iconSize").and_then(|v| v.as_u64()) {
+        settings.icon_size = Some(icon_size as u32);
+    }
+    if let Some(sidebar_width) = settings_update.get("sidebarWidth").and_then(|v| v.as_u64()) {
+        settings.sidebar_width = Some(sidebar_width as u32);
+    }
+    if let Some(enable_animations) = settings_update.get("enableAnimations").and_then(|v| v.as_bool()) {
+        settings.enable_animations = Some(enable_animations);
+    }
+    if let Some(animation_speed) = settings_update.get("animationSpeed").and_then(|v| v.as_str()) {
+        settings.animation_speed = Some(animation_speed.to_string());
+    }
+    if let Some(start_with_system) = settings_update.get("startWithSystem").and_then(|v| v.as_bool()) {
+        settings.start_with_system = Some(start_with_system);
+    }
+    if let Some(start_minimized) = settings_update.get("startMinimized").and_then(|v| v.as_bool()) {
+        settings.start_minimized = Some(start_minimized);
+    }
+    if let Some(toggle_hotkey) = settings_update.get("toggleHotkey").and_then(|v| v.as_str()) {
+        settings.toggle_hotkey = Some(toggle_hotkey.to_string());
+    }
+    if let Some(global_hotkey) = settings_update.get("globalHotkey").and_then(|v| v.as_bool()) {
+        settings.global_hotkey = Some(global_hotkey);
+    }
+    if let Some(fuzzy_search) = settings_update.get("fuzzySearch").and_then(|v| v.as_bool()) {
+        settings.fuzzy_search = Some(fuzzy_search);
+    }
+    if let Some(search_in_path) = settings_update.get("searchInPath").and_then(|v| v.as_bool()) {
+        settings.search_in_path = Some(search_in_path);
+    }
+    if let Some(max_search_results) = settings_update.get("maxSearchResults").and_then(|v| v.as_u64()) {
+        settings.max_search_results = Some(max_search_results as u32);
+    }
+    if let Some(auto_backup) = settings_update.get("autoBackup").and_then(|v| v.as_bool()) {
+        settings.auto_backup = Some(auto_backup);
+    }
+    if let Some(backup_interval) = settings_update.get("backupInterval").and_then(|v| v.as_str()) {
+        settings.backup_interval = Some(backup_interval.to_string());
+    }
+    
+    save_app_settings(settings)?;
+    Ok("设置已批量更新".to_string())
+}
+
+// Windows 开机自启动实现
+#[cfg(target_os = "windows")]
+fn set_auto_start_windows(enable: bool) -> Result<(), String> {
+    // 获取当前可执行文件路径
+    let exe_path = std::env::current_exe().map_err(|e| format!("获取可执行文件路径失败: {}", e))?;
+    let exe_path_str = exe_path.to_str().ok_or("可执行文件路径包含无效字符")?;
+
+    // 注册表键路径
+    let reg_key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+    let app_name = "Lora";
+
+    if enable {
+        // 添加到注册表
+        let script = format!(
+            r#"
+            try {{
+                New-ItemProperty -Path "HKCU:\{}" -Name "{}" -Value '"{}"' -PropertyType String -Force
+                Write-Output "SUCCESS"
+            }} catch {{
+                Write-Error $_.Exception.Message
+                exit 1
+            }}
+            "#,
+            reg_key,
+            app_name,
+            exe_path_str.replace("'", "''")
+        );
+
+        let output = Command::new("powershell")
+            .args(["-ExecutionPolicy", "Bypass", "-Command", &script])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("设置开机自启动失败: {}", stderr));
+        }
+    } else {
+        // 从注册表中删除
+        let script = format!(
+            r#"
+            try {{
+                Remove-ItemProperty -Path "HKCU:\{}" -Name "{}" -ErrorAction SilentlyContinue
+                Write-Output "SUCCESS"
+            }} catch {{
+                Write-Error $_.Exception.Message
+                exit 1
+            }}
+            "#,
+            reg_key, app_name
+        );
+
+        let output = Command::new("powershell")
+            .args(["-ExecutionPolicy", "Bypass", "-Command", &script])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("取消开机自启动失败: {}", stderr));
+        }
+    }
+
+    Ok(())
+}
+
+// 检查是否已设置开机自启动
+#[tauri::command]
+fn check_auto_start_status() -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let reg_key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+        let app_name = "Lora";
+
+        let script = format!(
+            r#"
+            try {{
+                $value = Get-ItemProperty -Path "HKCU:\{}" -Name "{}" -ErrorAction SilentlyContinue
+                if ($value) {{
+                    Write-Output "TRUE"
+                }} else {{
+                    Write-Output "FALSE"
+                }}
+            }} catch {{
+                Write-Output "FALSE"
+            }}
+            "#,
+            reg_key, app_name
+        );
+
+        let output = Command::new("powershell")
+            .args(["-ExecutionPolicy", "Bypass", "-Command", &script])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
+
+        let result_string = String::from_utf8_lossy(&output.stdout);
+        let result = result_string.trim();
+        Ok(result == "TRUE")
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(false) // 其他平台暂不支持
+    }
+}
+
+// 导出数据到用户选择的文件
+#[tauri::command]
+fn export_data() -> Result<String, String> {
+    // 打开文件保存对话框
+    #[cfg(target_os = "windows")]
+    {
+        let script = r#"
+            Add-Type -AssemblyName System.Windows.Forms
+            $saveFileDialog = New-Object System.Windows.Forms.SaveFileDialog
+            $saveFileDialog.Title = '导出数据'
+            $saveFileDialog.Filter = 'JSON文件|*.json|所有文件|*.*'
+            $saveFileDialog.DefaultExt = 'json'
+            $saveFileDialog.FileName = "lora_backup_$(Get-Date -Format 'yyyyMMdd_HHmmss').json"
+            $result = $saveFileDialog.ShowDialog()
+            if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+                Write-Output $saveFileDialog.FileName
+            } else {
+                Write-Output ""
+            }
+        "#;
+
+        let output = Command::new("powershell")
+            .args(["-ExecutionPolicy", "Bypass", "-Command", &script])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
+
+        let file_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if file_path.is_empty() {
+            return Err("用户取消了导出操作".to_string());
+        }
+
+        export_app_data_to_file(file_path)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // 其他平台使用默认路径
+        let data_dir = get_app_data_dir()?;
+        let file_path = data_dir.join(format!(
+            "lora_backup_{}.json",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+        ));
+
+        export_app_data_to_file(file_path.to_string_lossy().to_string())
+    }
+}
+
+// 从用户选择的文件导入数据
+#[tauri::command]
+fn import_data() -> Result<String, String> {
+    // 打开文件选择对话框
+    #[cfg(target_os = "windows")]
+    {
+        let script = r#"
+            Add-Type -AssemblyName System.Windows.Forms
+            $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+            $openFileDialog.Title = '选择要导入的数据文件'
+            $openFileDialog.Filter = 'JSON文件|*.json|所有文件|*.*'
+            $openFileDialog.RestoreDirectory = $true
+            $result = $openFileDialog.ShowDialog()
+            if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+                Write-Output $openFileDialog.FileName
+            } else {
+                Write-Output ""
+            }
+        "#;
+
+        let output = Command::new("powershell")
+            .args(["-ExecutionPolicy", "Bypass", "-Command", &script])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
+
+        let file_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if file_path.is_empty() {
+            return Err("用户取消了导入操作".to_string());
+        }
+
+        import_app_data_from_file(file_path)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("当前平台不支持文件导入对话框".to_string())
+    }
+}
+
+// 重置数据（包含确认）
+#[tauri::command]
+fn reset_data() -> Result<String, String> {
+    clear_all_data()
 }
 
 // 导出应用数据
@@ -1084,7 +1595,10 @@ async fn toggle_window_visibility(app: tauri::AppHandle) -> Result<String, Strin
 
 // 打开设置窗口
 #[tauri::command]
-async fn open_settings_window(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<String, String> {
+async fn open_settings_window(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
     // 检查设置窗口是否已经存在
     if let Some(settings_window) = app.get_webview_window("settings") {
         // 如果窗口已存在，则显示并聚焦
@@ -1094,12 +1608,12 @@ async fn open_settings_window(app: tauri::AppHandle, state: State<'_, AppState>)
         settings_window
             .set_focus()
             .map_err(|e| format!("聚焦设置窗口失败: {}", e))?;
-        
+
         // 更新状态
         if let Ok(mut settings_open) = state.settings_window_open.lock() {
             *settings_open = true;
         }
-        
+
         return Ok("设置窗口已打开".to_string());
     }
 
@@ -1149,6 +1663,28 @@ fn is_settings_window_open(state: State<'_, AppState>) -> bool {
     }
 }
 
+// 关闭设置窗口
+#[tauri::command]
+async fn close_settings_window(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    if let Some(settings_window) = app.get_webview_window("settings") {
+        settings_window
+            .close()
+            .map_err(|e| format!("关闭设置窗口失败: {}", e))?;
+
+        // 更新状态
+        if let Ok(mut settings_open) = state.settings_window_open.lock() {
+            *settings_open = false;
+        }
+
+        Ok("设置窗口已关闭".to_string())
+    } else {
+        Err("设置窗口不存在".to_string())
+    }
+}
+
 // 退出应用
 #[tauri::command]
 async fn quit_app(app: tauri::AppHandle) -> Result<String, String> {
@@ -1166,6 +1702,59 @@ pub fn run() {
     tauri::Builder::default()
         .manage(app_state)
         .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    println!("快捷键触发: {:?}, 事件: {:?}", shortcut, event);
+
+                    // 尝试多种方式获取主窗口
+                    let window = app.get_webview_window("main").or_else(|| {
+                        println!("主窗口'main'未找到，尝试查找其他窗口");
+                        // 获取所有窗口并打印
+                        let windows = app.webview_windows();
+                        for (label, _) in &windows {
+                            println!("发现窗口: {}", label);
+                        }
+                        // 尝试获取第一个窗口
+                        windows.into_iter().next().map(|(_, window)| window)
+                    });
+
+                    if let Some(window) = window {
+                        println!("找到窗口，当前状态检查...");
+                        match window.is_visible() {
+                            Ok(visible) => {
+                                println!("窗口可见状态: {}", visible);
+                                if visible {
+                                    println!("隐藏窗口...");
+                                    if let Err(e) = window.hide() {
+                                        eprintln!("隐藏窗口失败: {}", e);
+                                    } else {
+                                        println!("窗口已隐藏");
+                                    }
+                                } else {
+                                    println!("显示并聚焦窗口...");
+                                    if let Err(e) = window.show() {
+                                        eprintln!("显示窗口失败: {}", e);
+                                    } else {
+                                        println!("窗口已显示");
+                                        if let Err(e) = window.set_focus() {
+                                            eprintln!("聚焦窗口失败: {}", e);
+                                        } else {
+                                            println!("窗口已聚焦");
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("检查窗口可见状态失败: {}", e);
+                            }
+                        }
+                    } else {
+                        eprintln!("无法找到任何窗口");
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             // 先加载设置以获取当前状态
             let settings = load_app_settings().unwrap_or_else(|_| get_default_settings());
@@ -1185,6 +1774,40 @@ pub fn run() {
             let menu = MenuBuilder::new(app)
                 .items(&[&prevent_auto_hide, &settings_item, &quit])
                 .build()?;
+
+            // 注册全局快捷键和事件处理器
+            if settings.global_hotkey.unwrap_or(true) {
+                if let Some(hotkey) = &settings.toggle_hotkey {
+                    if !hotkey.is_empty() {
+                        if let Ok(shortcut) = hotkey.parse::<Shortcut>() {
+                            if let Err(e) = app.global_shortcut().register(shortcut.clone()) {
+                                eprintln!("注册全局快捷键失败: {}", e);
+                            } else {
+                                println!("已注册全局快捷键: {}", hotkey);
+                                
+                                // 获取 app handle 用于快捷键事件处理器
+                                let app_handle = app.handle().clone();
+                                if let Err(e) = app.global_shortcut().on_shortcut(shortcut, move |_app_handle, _event, _shortcut| {
+                                    println!("快捷键触发");
+                                    
+                                    // 异步执行切换窗口可见性
+                                    let app_for_toggle = app_handle.clone();
+                                    tauri::async_runtime::spawn(async move {
+                                        match toggle_window_visibility(app_for_toggle).await {
+                                            Ok(msg) => println!("窗口切换成功: {}", msg),
+                                            Err(err) => eprintln!("窗口切换失败: {}", err),
+                                        }
+                                    });
+                                }) {
+                                    eprintln!("注册快捷键事件处理器失败: {}", e);
+                                }
+                            }
+                        } else {
+                            eprintln!("快捷键格式无效: {}", hotkey);
+                        }
+                    }
+                }
+            }
 
             // 创建托盘图标
             let _tray = TrayIconBuilder::with_id("main_tray")
@@ -1279,6 +1902,23 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // 为主窗口添加事件处理
+            if let Some(main_window) = app.get_webview_window("main") {
+                let window_clone = main_window.clone();
+                main_window.on_window_event(move |event| {
+                    match event {
+                        tauri::WindowEvent::CloseRequested { api, .. } => {
+                            // 阻止默认的关闭行为
+                            api.prevent_close();
+
+                            // 隐藏窗口到托盘
+                            let _ = window_clone.hide();
+                        }
+                        _ => {}
+                    }
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1290,6 +1930,7 @@ pub fn run() {
             update_tray_menu,
             toggle_window_visibility,
             open_settings_window,
+            close_settings_window,
             is_settings_window_open,
             quit_app,
             my_custom_command,
@@ -1312,6 +1953,26 @@ pub fn run() {
             export_app_data_to_file,
             import_app_data_from_file,
             clear_all_data,
+            update_theme,
+            update_icon_size,
+            update_sidebar_width,
+            update_animations,
+            update_animation_speed,
+            update_start_with_system,
+            update_start_minimized,
+            update_toggle_hotkey,
+            update_global_hotkey,
+            update_fuzzy_search,
+            update_search_in_path,
+            update_max_search_results,
+            update_auto_backup,
+            update_backup_interval,
+            save_ui_state,
+            update_settings_batch,
+            check_auto_start_status,
+            export_data,
+            import_data,
+            reset_data,
             greet
         ])
         .run(tauri::generate_context!())
