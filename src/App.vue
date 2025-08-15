@@ -588,7 +588,7 @@ const loadAppSettings = async () => {
       searchInPath: settings.search_in_path || false,
       maxSearchResults: settings.max_search_results || 20,
     }
-    
+
     // 恢复界面状态
     if (settings.last_selected_category) {
       selectedCategory.value = settings.last_selected_category
@@ -596,7 +596,7 @@ const loadAppSettings = async () => {
     if (settings.last_search_query) {
       searchQuery.value = settings.last_search_query
     }
-    
+
     console.log('应用设置加载成功:', appSettings.value)
   } catch (error) {
     console.error('加载应用设置失败:', error)
@@ -1586,10 +1586,10 @@ onMounted(async () => {
   // 添加全局点击监听，点击搜索框外部时隐藏搜索框
   const handleClickOutside = (event: Event) => {
     const target = event.target as HTMLElement
-    
+
     // 任何点击都算用户交互
     handleFirstUserInteraction()
-    
+
     if (showSearchBox.value &&
       !target.closest('.content-header') &&
       !target.closest('.titlebar-button')) {
@@ -1667,7 +1667,7 @@ const disableContextMenu = (e: Event) => {
 const handleGlobalKeydown = (event: KeyboardEvent) => {
   // 任何键盘操作都算用户交互
   handleFirstUserInteraction()
-  
+
   // 检查是否正在编辑状态（对话框打开、输入框聚焦等）
   const isEditing = document.activeElement?.tagName === 'INPUT' ||
     document.activeElement?.tagName === 'TEXTAREA' ||

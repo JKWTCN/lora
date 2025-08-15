@@ -8,7 +8,7 @@ use tauri::{
     tray::TrayIconBuilder,
     Emitter, Manager, State,
 };
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 #[cfg(target_os = "windows")]
 use lnk::ShellLink;
@@ -68,7 +68,7 @@ pub struct AppSettings {
     pub window_position_y: Option<i32>,
     pub last_search_query: Option<String>,
     pub grid_view_enabled: Option<bool>,
-    pub sort_order: Option<String>,  // "name", "date_added", "date_modified", "frequency"
+    pub sort_order: Option<String>, // "name", "date_added", "date_modified", "frequency"
     pub show_hidden_files: Option<bool>,
 }
 
@@ -1042,7 +1042,7 @@ fn save_ui_state(
     show_hidden_files: Option<bool>,
 ) -> Result<String, String> {
     let mut settings = load_app_settings()?;
-    
+
     if let Some(tab) = active_tab {
         settings.active_tab = Some(tab);
     }
@@ -1067,7 +1067,7 @@ fn save_ui_state(
     if let Some(hidden) = show_hidden_files {
         settings.show_hidden_files = Some(hidden);
     }
-    
+
     save_app_settings(settings)?;
     Ok("界面状态已保存".to_string())
 }
@@ -1076,9 +1076,12 @@ fn save_ui_state(
 #[tauri::command]
 fn update_settings_batch(settings_update: serde_json::Value) -> Result<String, String> {
     let mut settings = load_app_settings()?;
-    
+
     // 从JSON中更新设置
-    if let Some(prevent_auto_hide) = settings_update.get("preventAutoHide").and_then(|v| v.as_bool()) {
+    if let Some(prevent_auto_hide) = settings_update
+        .get("preventAutoHide")
+        .and_then(|v| v.as_bool())
+    {
         settings.prevent_auto_hide = prevent_auto_hide;
     }
     if let Some(window_width) = settings_update.get("windowWidth").and_then(|v| v.as_u64()) {
@@ -1096,40 +1099,64 @@ fn update_settings_batch(settings_update: serde_json::Value) -> Result<String, S
     if let Some(sidebar_width) = settings_update.get("sidebarWidth").and_then(|v| v.as_u64()) {
         settings.sidebar_width = Some(sidebar_width as u32);
     }
-    if let Some(enable_animations) = settings_update.get("enableAnimations").and_then(|v| v.as_bool()) {
+    if let Some(enable_animations) = settings_update
+        .get("enableAnimations")
+        .and_then(|v| v.as_bool())
+    {
         settings.enable_animations = Some(enable_animations);
     }
-    if let Some(animation_speed) = settings_update.get("animationSpeed").and_then(|v| v.as_str()) {
+    if let Some(animation_speed) = settings_update
+        .get("animationSpeed")
+        .and_then(|v| v.as_str())
+    {
         settings.animation_speed = Some(animation_speed.to_string());
     }
-    if let Some(start_with_system) = settings_update.get("startWithSystem").and_then(|v| v.as_bool()) {
+    if let Some(start_with_system) = settings_update
+        .get("startWithSystem")
+        .and_then(|v| v.as_bool())
+    {
         settings.start_with_system = Some(start_with_system);
     }
-    if let Some(start_minimized) = settings_update.get("startMinimized").and_then(|v| v.as_bool()) {
+    if let Some(start_minimized) = settings_update
+        .get("startMinimized")
+        .and_then(|v| v.as_bool())
+    {
         settings.start_minimized = Some(start_minimized);
     }
     if let Some(toggle_hotkey) = settings_update.get("toggleHotkey").and_then(|v| v.as_str()) {
         settings.toggle_hotkey = Some(toggle_hotkey.to_string());
     }
-    if let Some(global_hotkey) = settings_update.get("globalHotkey").and_then(|v| v.as_bool()) {
+    if let Some(global_hotkey) = settings_update
+        .get("globalHotkey")
+        .and_then(|v| v.as_bool())
+    {
         settings.global_hotkey = Some(global_hotkey);
     }
     if let Some(fuzzy_search) = settings_update.get("fuzzySearch").and_then(|v| v.as_bool()) {
         settings.fuzzy_search = Some(fuzzy_search);
     }
-    if let Some(search_in_path) = settings_update.get("searchInPath").and_then(|v| v.as_bool()) {
+    if let Some(search_in_path) = settings_update
+        .get("searchInPath")
+        .and_then(|v| v.as_bool())
+    {
         settings.search_in_path = Some(search_in_path);
     }
-    if let Some(max_search_results) = settings_update.get("maxSearchResults").and_then(|v| v.as_u64()) {
+    if let Some(max_search_results) = settings_update
+        .get("maxSearchResults")
+        .and_then(|v| v.as_u64())
+    {
         settings.max_search_results = Some(max_search_results as u32);
     }
     if let Some(auto_backup) = settings_update.get("autoBackup").and_then(|v| v.as_bool()) {
         settings.auto_backup = Some(auto_backup);
     }
-    if let Some(backup_interval) = settings_update.get("backupInterval").and_then(|v| v.as_str()) {
+    if let Some(backup_interval) = settings_update
+        .get("backupInterval")
+        .and_then(|v| v.as_str())
+    {
         settings.backup_interval = Some(backup_interval.to_string());
     }
-    
+
     save_app_settings(settings)?;
     Ok("设置已批量更新".to_string())
 }
@@ -1705,7 +1732,12 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
-                    println!("快捷键触发: {:?}, 事件: {:?}", shortcut, event);
+                    // 只处理按键按下事件，忽略松开事件
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+
+                    println!("快捷键按下触发: {:?}, 事件: {:?}", shortcut, event);
 
                     // 尝试多种方式获取主窗口
                     let window = app.get_webview_window("main").or_else(|| {
@@ -1784,23 +1816,6 @@ pub fn run() {
                                 eprintln!("注册全局快捷键失败: {}", e);
                             } else {
                                 println!("已注册全局快捷键: {}", hotkey);
-                                
-                                // 获取 app handle 用于快捷键事件处理器
-                                let app_handle = app.handle().clone();
-                                if let Err(e) = app.global_shortcut().on_shortcut(shortcut, move |_app_handle, _event, _shortcut| {
-                                    println!("快捷键触发");
-                                    
-                                    // 异步执行切换窗口可见性
-                                    let app_for_toggle = app_handle.clone();
-                                    tauri::async_runtime::spawn(async move {
-                                        match toggle_window_visibility(app_for_toggle).await {
-                                            Ok(msg) => println!("窗口切换成功: {}", msg),
-                                            Err(err) => eprintln!("窗口切换失败: {}", err),
-                                        }
-                                    });
-                                }) {
-                                    eprintln!("注册快捷键事件处理器失败: {}", e);
-                                }
                             }
                         } else {
                             eprintln!("快捷键格式无效: {}", hotkey);

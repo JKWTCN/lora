@@ -613,7 +613,7 @@ const resetToDefaults = async () => {
 
 const saveSettings = async () => {
     await saveAllSettings()
-    
+
     // 延迟一秒后关闭设置窗口
     setTimeout(async () => {
         try {
@@ -628,7 +628,7 @@ const saveSettings = async () => {
 const loadSettings = async () => {
     try {
         const settings = await invoke('load_app_settings')
-        
+
         // 将后端设置映射到前端本地设置
         localSettings.windowWidth = settings.window_width || 800
         localSettings.windowHeight = settings.window_height || 600
@@ -655,7 +655,7 @@ const loadSettings = async () => {
             console.warn('检查开机自启动状态失败:', error)
             localSettings.startWithSystem = settings.start_with_system || false
         }
-        
+
         console.log('设置加载成功')
     } catch (error) {
         console.error('加载设置失败:', error)
@@ -688,12 +688,12 @@ const saveAllSettings = async () => {
         }
 
         await invoke('update_settings_batch', { settingsUpdate: settingsToSave })
-        
+
         lastSaved.value = true
         setTimeout(() => {
             lastSaved.value = false
         }, 2000)
-        
+
         console.log('所有设置保存成功')
     } catch (error) {
         console.error('保存设置失败:', error)
