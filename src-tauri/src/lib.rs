@@ -8,6 +8,9 @@ use tauri::{
     Emitter, Manager,
 };
 
+#[cfg(target_os = "windows")]
+use lnk::ShellLink;
+
 // 应用数据结构
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AppData {
@@ -62,15 +65,41 @@ fn get_file_info(file_path: String) -> Result<serde_json::Value, String> {
         return Err("文件不存在".to_string());
     }
 
+    // 获取文件扩展名
+    let extension = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    let is_shortcut = extension == "lnk" || extension == "url" || extension == "desktop";
+    let mut target_path = None;
+    let mut actual_path = file_path.clone();
+
+    // 如果是快捷方式，尝试解析目标路径
+    if is_shortcut {
+        if let Some(resolved_path) = resolve_shortcut_target(&file_path) {
+            target_path = Some(resolved_path.clone());
+            // 对于快捷方式，使用目标路径来获取文件信息
+            if Path::new(&resolved_path).exists() {
+                actual_path = resolved_path;
+                println!("使用快捷方式目标路径: {}", actual_path);
+            }
+        }
+    }
+
+    // 使用实际路径（对于快捷方式是目标路径，对于普通文件是原路径）来获取信息
+    let actual_path_obj = Path::new(&actual_path);
+
     // 获取文件名（不包含扩展名）
-    let name = path
+    let name = actual_path_obj
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("未知应用")
         .to_string();
 
-    // 获取文件扩展名
-    let extension = path
+    // 获取实际文件的扩展名（对于快捷方式，这将是目标文件的扩展名）
+    let actual_extension = actual_path_obj
         .extension()
         .and_then(|s| s.to_str())
         .unwrap_or("")
@@ -79,29 +108,25 @@ fn get_file_info(file_path: String) -> Result<serde_json::Value, String> {
     // 不再限制文件类型，所有文件都可以添加
     let is_executable = true; // 允许所有文件类型
 
-    // 获取文件大小
+    // 获取文件大小（使用原始文件的大小）
     let metadata = fs::metadata(&path).map_err(|e| format!("获取文件信息失败: {}", e))?;
     let size = metadata.len();
 
-    let mut target_path = None;
-    let is_shortcut = extension == "lnk" || extension == "url" || extension == "desktop";
-
-    // 如果是快捷方式，尝试解析目标路径
-    if is_shortcut {
-        target_path = resolve_shortcut_target(&file_path);
-    }
-
-    // 提取文件图标
-    let icon_base64 = extract_file_icon(&file_path);
+    // 提取文件图标（对于快捷方式，尝试使用目标文件的图标）
+    let icon_base64 = if is_shortcut && target_path.is_some() {
+        extract_file_icon(&actual_path)
+    } else {
+        extract_file_icon(&file_path)
+    };
 
     Ok(serde_json::json!({
         "name": name,
-        "path": file_path,
-        "extension": extension,
+        "path": file_path,  // 始终返回原始路径（快捷方式路径）
+        "extension": if is_shortcut { actual_extension } else { extension },  // 对于快捷方式返回目标文件的扩展名
         "size": size,
         "is_executable": is_executable,
         "is_shortcut": is_shortcut,
-        "target_path": target_path,
+        "target_path": target_path,  // 快捷方式的目标路径
         "icon": icon_base64
     }))
 }
@@ -123,17 +148,49 @@ fn resolve_shortcut_target(shortcut_path: &str) -> Option<String> {
 
 #[cfg(target_os = "windows")]
 fn resolve_windows_shortcut(shortcut_path: &str) -> Option<String> {
-    // 简单的.lnk文件解析（这是一个简化版本）
-    // 在实际项目中，您可能需要使用Windows API或第三方库
-    // 这里我们返回快捷方式本身的路径，实际应用中可以增强
     let path = Path::new(shortcut_path);
-    if path.extension().and_then(|s| s.to_str()) == Some("lnk") {
-        // 这里可以添加更复杂的快捷方式解析逻辑
-        // 暂时返回原路径
-        Some(shortcut_path.to_string())
-    } else {
-        Some(shortcut_path.to_string())
+
+    // 检查文件扩展名
+    if let Some(extension) = path.extension().and_then(|s| s.to_str()) {
+        match extension.to_lowercase().as_str() {
+            "lnk" => {
+                // 解析.lnk文件
+                match ShellLink::open(shortcut_path) {
+                    Ok(link) => {
+                        // 使用正确的API获取目标路径
+                        if let Some(link_info) = link.link_info() {
+                            if let Some(target) = link_info.local_base_path() {
+                                println!("快捷方式目标路径: {:?}", target);
+                                return Some(target.to_string());
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("解析.lnk文件失败: {:?}", e);
+                    }
+                }
+            }
+            "url" => {
+                // 解析.url文件（Internet快捷方式）
+                if let Ok(content) = fs::read_to_string(shortcut_path) {
+                    for line in content.lines() {
+                        if line.starts_with("URL=") {
+                            let url = line.trim_start_matches("URL=");
+                            println!("URL快捷方式目标: {}", url);
+                            return Some(url.to_string());
+                        }
+                    }
+                }
+            }
+            _ => {
+                // 其他文件类型直接返回原路径
+                return Some(shortcut_path.to_string());
+            }
+        }
     }
+
+    // 如果解析失败，返回原路径
+    Some(shortcut_path.to_string())
 }
 
 // 提取文件图标并转换为 Base64 字符串或图标标识符

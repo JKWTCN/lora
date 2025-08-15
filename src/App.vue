@@ -1882,7 +1882,11 @@ const handleFileDrop = async (filePath: string) => {
     // 尝试获取真实应用图标
     try {
       console.log('尝试获取应用真实图标...')
-      const realIcon = await invoke('get_app_icon', { filePath: filePath }) as string
+      // 对于快捷方式，使用目标路径获取图标；对于普通文件，使用原路径
+      const iconPath = fileInfo.is_shortcut && fileInfo.target_path ? fileInfo.target_path : filePath
+      console.log('获取图标的路径:', iconPath)
+
+      const realIcon = await invoke('get_app_icon', { filePath: iconPath }) as string
       if (realIcon && realIcon.startsWith('data:image/png;base64,')) {
         // 更新应用图标
         const appIndex = apps.value.findIndex(app => app.id === newApp.id)
