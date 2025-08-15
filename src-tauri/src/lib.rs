@@ -2,10 +2,11 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::sync::{Arc, Mutex};
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
-    Emitter, Manager,
+    Emitter, Manager, State,
 };
 
 #[cfg(target_os = "windows")]
@@ -40,6 +41,25 @@ pub struct AppSettings {
     pub prevent_auto_hide: bool,
     pub window_width: Option<u32>,
     pub window_height: Option<u32>,
+    // 外观设置
+    pub theme: Option<String>,
+    pub icon_size: Option<u32>,
+    pub sidebar_width: Option<u32>,
+    pub enable_animations: Option<bool>,
+    pub animation_speed: Option<String>,
+    // 启动设置
+    pub start_with_system: Option<bool>,
+    pub start_minimized: Option<bool>,
+    // 快捷键设置
+    pub toggle_hotkey: Option<String>,
+    pub global_hotkey: Option<bool>,
+    // 搜索设置
+    pub fuzzy_search: Option<bool>,
+    pub search_in_path: Option<bool>,
+    pub max_search_results: Option<u32>,
+    // 数据管理
+    pub auto_backup: Option<bool>,
+    pub backup_interval: Option<String>,
 }
 
 // 应用数据存储结构
@@ -48,6 +68,12 @@ pub struct AppStorage {
     pub apps: Vec<AppData>,
     pub categories: Vec<CategoryData>,
     pub selected_category: Option<String>, // 记住当前选中的分组
+}
+
+// 应用状态结构
+#[derive(Debug)]
+pub struct AppState {
+    pub settings_window_open: Arc<Mutex<bool>>,
 }
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -676,11 +702,7 @@ fn save_app_settings(settings: AppSettings) -> Result<String, String> {
 fn update_prevent_auto_hide(prevent_auto_hide: bool) -> Result<String, String> {
     let mut settings = match load_app_settings() {
         Ok(settings) => settings,
-        Err(_) => AppSettings {
-            prevent_auto_hide: false,
-            window_width: None,
-            window_height: None,
-        },
+        Err(_) => get_default_settings(),
     };
 
     settings.prevent_auto_hide = prevent_auto_hide;
@@ -734,11 +756,7 @@ fn load_app_settings() -> Result<AppSettings, String> {
 
     if !file_path.exists() {
         // 如果文件不存在，返回默认设置
-        return Ok(AppSettings {
-            prevent_auto_hide: false,
-            window_width: None,
-            window_height: None,
-        });
+        return Ok(get_default_settings());
     }
 
     let json_data =
@@ -758,6 +776,125 @@ fn save_window_size(width: u32, height: u32) -> Result<String, String> {
     settings.window_height = Some(height);
     save_app_settings(settings)?;
     Ok("窗口大小保存成功".to_string())
+}
+
+// 获取默认设置
+fn get_default_settings() -> AppSettings {
+    AppSettings {
+        prevent_auto_hide: false,
+        window_width: Some(800),
+        window_height: Some(600),
+        theme: Some("auto".to_string()),
+        icon_size: Some(64),
+        sidebar_width: Some(180),
+        enable_animations: Some(true),
+        animation_speed: Some("normal".to_string()),
+        start_with_system: Some(false),
+        start_minimized: Some(false),
+        toggle_hotkey: Some("Ctrl+Space".to_string()),
+        global_hotkey: Some(true),
+        fuzzy_search: Some(true),
+        search_in_path: Some(false),
+        max_search_results: Some(20),
+        auto_backup: Some(true),
+        backup_interval: Some("weekly".to_string()),
+    }
+}
+
+// 获取系统信息
+#[tauri::command]
+fn get_system_info() -> Result<serde_json::Value, String> {
+    let os_info = std::env::consts::OS;
+    let arch = std::env::consts::ARCH;
+
+    Ok(serde_json::json!({
+        "os": os_info,
+        "arch": arch,
+        "version": env!("CARGO_PKG_VERSION"),
+        "name": env!("CARGO_PKG_NAME"),
+        "description": env!("CARGO_PKG_DESCRIPTION")
+    }))
+}
+
+// 重置设置到默认值
+#[tauri::command]
+fn reset_settings_to_default() -> Result<String, String> {
+    let default_settings = get_default_settings();
+    save_app_settings(default_settings)?;
+    Ok("设置已重置为默认值".to_string())
+}
+
+// 导出应用数据
+#[tauri::command]
+fn export_app_data_to_file(file_path: String) -> Result<String, String> {
+    let storage = load_app_data()?;
+    let settings = load_app_settings()?;
+
+    let export_data = serde_json::json!({
+        "storage": storage,
+        "settings": settings,
+        "export_time": std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        "version": env!("CARGO_PKG_VERSION")
+    });
+
+    let json_data = serde_json::to_string_pretty(&export_data)
+        .map_err(|e| format!("序列化导出数据失败: {}", e))?;
+
+    fs::write(&file_path, json_data).map_err(|e| format!("写入导出文件失败: {}", e))?;
+
+    Ok("数据导出成功".to_string())
+}
+
+// 从文件导入应用数据
+#[tauri::command]
+fn import_app_data_from_file(file_path: String) -> Result<String, String> {
+    let json_data =
+        fs::read_to_string(&file_path).map_err(|e| format!("读取导入文件失败: {}", e))?;
+
+    let import_data: serde_json::Value =
+        serde_json::from_str(&json_data).map_err(|e| format!("解析导入数据失败: {}", e))?;
+
+    // 导入存储数据
+    if let Some(storage_data) = import_data.get("storage") {
+        let storage: AppStorage = serde_json::from_value(storage_data.clone())
+            .map_err(|e| format!("解析存储数据失败: {}", e))?;
+
+        save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+    }
+
+    // 导入设置数据
+    if let Some(settings_data) = import_data.get("settings") {
+        let settings: AppSettings = serde_json::from_value(settings_data.clone())
+            .map_err(|e| format!("解析设置数据失败: {}", e))?;
+
+        save_app_settings(settings)?;
+    }
+
+    Ok("数据导入成功".to_string())
+}
+
+// 清空所有数据
+#[tauri::command]
+fn clear_all_data() -> Result<String, String> {
+    // 清空应用数据
+    let empty_storage = AppStorage {
+        apps: vec![],
+        categories: vec![],
+        selected_category: Some("all".to_string()),
+    };
+    save_app_data(
+        empty_storage.apps,
+        empty_storage.categories,
+        empty_storage.selected_category,
+    )?;
+
+    // 重置设置到默认值
+    reset_settings_to_default()?;
+
+    Ok("所有数据已清空".to_string())
 }
 
 // 删除应用
@@ -945,6 +1082,73 @@ async fn toggle_window_visibility(app: tauri::AppHandle) -> Result<String, Strin
     }
 }
 
+// 打开设置窗口
+#[tauri::command]
+async fn open_settings_window(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<String, String> {
+    // 检查设置窗口是否已经存在
+    if let Some(settings_window) = app.get_webview_window("settings") {
+        // 如果窗口已存在，则显示并聚焦
+        settings_window
+            .show()
+            .map_err(|e| format!("显示设置窗口失败: {}", e))?;
+        settings_window
+            .set_focus()
+            .map_err(|e| format!("聚焦设置窗口失败: {}", e))?;
+        
+        // 更新状态
+        if let Ok(mut settings_open) = state.settings_window_open.lock() {
+            *settings_open = true;
+        }
+        
+        return Ok("设置窗口已打开".to_string());
+    }
+
+    // 克隆状态以便在闭包中使用
+    let state_clone = state.settings_window_open.clone();
+
+    // 创建新的设置窗口
+    let settings_window = tauri::WebviewWindowBuilder::new(
+        &app,
+        "settings",
+        tauri::WebviewUrl::App("settings.html".into()),
+    )
+    .title("设置")
+    .inner_size(800.0, 600.0)
+    .min_inner_size(600.0, 450.0)
+    .center()
+    .resizable(true)
+    .decorations(true)
+    .always_on_top(false)
+    .build()
+    .map_err(|e| format!("创建设置窗口失败: {}", e))?;
+
+    // 监听窗口关闭事件
+    settings_window.on_window_event(move |event| {
+        if let tauri::WindowEvent::CloseRequested { .. } = event {
+            // 窗口关闭时更新状态
+            if let Ok(mut settings_open) = state_clone.lock() {
+                *settings_open = false;
+            }
+        }
+    });
+
+    // 更新状态
+    if let Ok(mut settings_open) = state.settings_window_open.lock() {
+        *settings_open = true;
+    }
+
+    Ok("设置窗口已创建".to_string())
+}
+
+// 检查设置窗口是否打开
+#[tauri::command]
+fn is_settings_window_open(state: State<'_, AppState>) -> bool {
+    match state.settings_window_open.lock() {
+        Ok(settings_open) => *settings_open,
+        Err(_) => false, // 如果锁定失败，默认返回 false
+    }
+}
+
 // 退出应用
 #[tauri::command]
 async fn quit_app(app: tauri::AppHandle) -> Result<String, String> {
@@ -954,15 +1158,17 @@ async fn quit_app(app: tauri::AppHandle) -> Result<String, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 初始化应用状态
+    let app_state = AppState {
+        settings_window_open: Arc::new(Mutex::new(false)),
+    };
+
     tauri::Builder::default()
+        .manage(app_state)
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // 先加载设置以获取当前状态
-            let settings = load_app_settings().unwrap_or(AppSettings {
-                prevent_auto_hide: false,
-                window_width: None,
-                window_height: None,
-            });
+            let settings = load_app_settings().unwrap_or_else(|_| get_default_settings());
 
             // 创建托盘菜单
             let prevent_auto_hide_text = if settings.prevent_auto_hide {
@@ -990,11 +1196,8 @@ pub fn run() {
                     match event.id().as_ref() {
                         "prevent_auto_hide" => {
                             // 切换阻止自动隐藏设置
-                            let current_settings = load_app_settings().unwrap_or(AppSettings {
-                                prevent_auto_hide: false,
-                                window_width: None,
-                                window_height: None,
-                            });
+                            let current_settings =
+                                load_app_settings().unwrap_or_else(|_| get_default_settings());
 
                             let new_value = !current_settings.prevent_auto_hide;
 
@@ -1086,6 +1289,8 @@ pub fn run() {
             update_prevent_auto_hide,
             update_tray_menu,
             toggle_window_visibility,
+            open_settings_window,
+            is_settings_window_open,
             quit_app,
             my_custom_command,
             get_file_info,
@@ -1102,6 +1307,11 @@ pub fn run() {
             get_app_icon,
             run_as_admin,
             open_file_location,
+            get_system_info,
+            reset_settings_to_default,
+            export_app_data_to_file,
+            import_app_data_from_file,
+            clear_all_data,
             greet
         ])
         .run(tauri::generate_context!())

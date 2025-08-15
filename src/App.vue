@@ -278,6 +278,8 @@
         </div>
       </div>
     </div>
+
+    <!-- 设置模态框已移除，现在使用独立窗口 -->
   </div>
 </template>
 
@@ -314,6 +316,7 @@ const isResizing = ref(false)
 const selectedCategory = ref('all')
 const searchQuery = ref('')
 const showSearchBox = ref(false) // 控制搜索框显示状态
+// 设置相关状态已移除，现在使用独立设置窗口
 
 // 拖拽相关状态
 const isDragOver = ref(false)
@@ -899,10 +902,14 @@ const togglePreventAutoHide = async () => {
   hideMainMenu()
 }
 
-const openSettings = () => {
-  console.log('打开设置')
-  // TODO: 实现设置界面
-  showToast('设置功能开发中...', 'info')
+const openSettings = async () => {
+  console.log('打开设置窗口')
+  try {
+    await invoke('open_settings_window')
+  } catch (error) {
+    console.error('打开设置窗口失败:', error)
+    showToast('打开设置窗口失败', 'error')
+  }
   hideMainMenu()
 }
 
@@ -1692,6 +1699,20 @@ const handleWindowFocus = () => {
 
 // 窗口失焦处理函数
 const handleWindowBlur = async () => {
+  // 检查设置窗口是否打开
+  let isSettingsOpen = false
+  try {
+    isSettingsOpen = await invoke('is_settings_window_open')
+  } catch (error) {
+    console.error('检查设置窗口状态失败:', error)
+  }
+
+  // 如果设置窗口打开，则不执行自动隐藏
+  if (isSettingsOpen) {
+    console.log('设置窗口打开中，不执行自动隐藏')
+    return
+  }
+
   // 只有在没有阻止自动隐藏的情况下才隐藏窗口
   if (!appSettings.value.preventAutoHide) {
     // 如果窗口刚刚显示，等待更长时间再检查
@@ -1782,6 +1803,8 @@ const toggleMenu = (e: MouseEvent) => {
   // 显示主菜单
   showMainMenu(e)
 }
+
+// 设置相关方法已移除，现在使用独立设置窗口
 
 const closeApp = async () => {
   console.log('关闭应用被调用')

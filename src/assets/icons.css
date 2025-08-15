@@ -51,6 +51,38 @@
     content: "✕";
 }
 
+.icon-info:before {
+    content: "ℹ️";
+}
+
+.icon-display:before {
+    content: "🖥️";
+}
+
+.icon-github:before {
+    content: "🐙";
+}
+
+.icon-bug:before {
+    content: "🐛";
+}
+
+.icon-download:before {
+    content: "⬇️";
+}
+
+.icon-export:before {
+    content: "📤";
+}
+
+.icon-import:before {
+    content: "📥";
+}
+
+.icon-reset:before {
+    content: "🔄";
+}
+
 /* 基础图标样式 */
 [class^="icon-"],
 [class*=" icon-"] {
