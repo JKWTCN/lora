@@ -790,7 +790,7 @@ fn save_app_data(
     Ok("数据保存成功".to_string())
 }
 
-// 加载应用数据
+// 加载应用数据 - 优化版本
 #[tauri::command]
 fn load_app_data() -> Result<AppStorage, String> {
     let data_dir = get_app_data_dir()?;
@@ -805,10 +805,17 @@ fn load_app_data() -> Result<AppStorage, String> {
         });
     }
 
-    let json_data = fs::read_to_string(&file_path).map_err(|e| format!("读取文件失败: {}", e))?;
+    // 使用更高效的文件读取
+    let json_data = match std::fs::read(&file_path) {
+        Ok(data) => data,
+        Err(e) => return Err(format!("读取文件失败: {}", e)),
+    };
 
-    let storage: AppStorage =
-        serde_json::from_str(&json_data).map_err(|e| format!("解析数据失败: {}", e))?;
+    // 直接从字节解析 JSON，避免字符串转换
+    let storage: AppStorage = match serde_json::from_slice(&json_data) {
+        Ok(storage) => storage,
+        Err(e) => return Err(format!("解析数据失败: {}", e)),
+    };
 
     Ok(storage)
 }
@@ -878,7 +885,7 @@ async fn update_tray_menu(
     Ok("托盘菜单已更新".to_string())
 }
 
-// 加载应用设置
+// 加载应用设置 - 优化版本
 #[tauri::command]
 fn load_app_settings() -> Result<AppSettings, String> {
     let data_dir = get_app_data_dir()?;
@@ -889,11 +896,17 @@ fn load_app_settings() -> Result<AppSettings, String> {
         return Ok(get_default_settings());
     }
 
-    let json_data =
-        fs::read_to_string(&file_path).map_err(|e| format!("读取设置文件失败: {}", e))?;
+    // 使用更高效的文件读取
+    let json_data = match std::fs::read(&file_path) {
+        Ok(data) => data,
+        Err(e) => return Err(format!("读取设置文件失败: {}", e)),
+    };
 
-    let settings: AppSettings =
-        serde_json::from_str(&json_data).map_err(|e| format!("解析设置失败: {}", e))?;
+    // 直接从字节解析 JSON
+    let settings: AppSettings = match serde_json::from_slice(&json_data) {
+        Ok(settings) => settings,
+        Err(e) => return Err(format!("解析设置失败: {}", e)),
+    };
 
     Ok(settings)
 }

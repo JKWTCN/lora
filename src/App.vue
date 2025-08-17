@@ -1,5 +1,13 @@
 <template>
   <div class="app-container" @mouseenter="isMouseInWindow = true" @mouseleave="isMouseInWindow = false">
+    <!-- 加载指示器 -->
+    <div v-if="isLoading" class="loading-overlay">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在启动 Lora...</div>
+      </div>
+    </div>
+
     <!-- 自定义标题栏 -->
     <div class="titlebar">
       <div class="titlebar-left" data-tauri-drag-region @mousedown="handleDragStart" @mouseup="handleDragEnd">
@@ -316,6 +324,7 @@ const isResizing = ref(false)
 const selectedCategory = ref('all')
 const searchQuery = ref('')
 const showSearchBox = ref(false) // 控制搜索框显示状态
+const isLoading = ref(true) // 加载状态
 // 设置相关状态已移除，现在使用独立设置窗口
 
 // 拖拽相关状态
@@ -492,37 +501,33 @@ const loadAppData = async () => {
   try {
     const storage = await invoke('load_app_data') as any
     console.log('从后端加载的数据:', storage)
-    apps.value = storage.apps || []
+    
+    // 批量更新而不是逐个赋值
+    Object.assign(apps, { value: storage.apps || [] })
 
     // 转换后端的 is_default 为前端使用的 isDefault
     const categoriesFromBackend = storage.categories || []
-    categories.value = categoriesFromBackend.map((category: any) => ({
-      ...category,
-      isDefault: category.is_default,
-      is_default: undefined // 移除后端字段
-    })).map(({ is_default, ...rest }: any) => rest) // 完全移除 is_default 字段
+    const convertedCategories = categoriesFromBackend.map((category: any) => ({
+      id: category.id,
+      name: category.name,
+      icon: category.icon,
+      isDefault: category.is_default
+    }))
+    
+    Object.assign(categories, { value: convertedCategories })
 
     // 确保"全部应用"分组始终存在
     ensureDefaultCategory()
 
-    // 恢复选中的分组，如果没有则默认选择"全部应用"
-    if (storage.selected_category) {
-      // 检查选中的分组是否还存在
-      const categoryExists = categories.value.some(cat => cat.id === storage.selected_category)
-      if (categoryExists) {
-        selectedCategory.value = storage.selected_category
-      } else {
-        selectedCategory.value = 'all'
-      }
-    } else {
-      selectedCategory.value = 'all'
-    }
+    // 恢复选中的分组
+    const targetCategory = storage.selected_category && 
+      categories.value.some(cat => cat.id === storage.selected_category) 
+        ? storage.selected_category 
+        : 'all'
+    
+    selectedCategory.value = targetCategory
 
-    console.log('应用数据加载成功:', {
-      apps: apps.value,
-      categories: categories.value,
-      selectedCategory: selectedCategory.value
-    })
+    console.log('应用数据加载成功')
   } catch (error) {
     console.error('加载应用数据失败:', error)
     // 使用默认数据
@@ -531,11 +536,6 @@ const loadAppData = async () => {
     ]
     apps.value = []
     selectedCategory.value = 'all'
-    console.log('使用默认数据:', {
-      apps: apps.value,
-      categories: categories.value,
-      selectedCategory: selectedCategory.value
-    })
   }
 }
 
@@ -571,8 +571,9 @@ const loadAppSettings = async () => {
   try {
     const settings = await invoke('load_app_settings') as any
     console.log('从后端加载的设置:', settings)
-    // 转换后端的 snake_case 为前端的 camelCase
-    appSettings.value = {
+    
+    // 批量更新设置，减少响应式触发次数
+    const newSettings = {
       preventAutoHide: settings.prevent_auto_hide || false,
       windowWidth: settings.window_width,
       windowHeight: settings.window_height,
@@ -588,6 +589,9 @@ const loadAppSettings = async () => {
       searchInPath: settings.search_in_path || false,
       maxSearchResults: settings.max_search_results || 20,
     }
+    
+    // 一次性更新所有设置
+    Object.assign(appSettings.value, newSettings)
 
     // 恢复界面状态
     if (settings.last_selected_category) {
@@ -597,7 +601,7 @@ const loadAppSettings = async () => {
       searchQuery.value = settings.last_search_query
     }
 
-    console.log('应用设置加载成功:', appSettings.value)
+    console.log('应用设置加载成功')
   } catch (error) {
     console.error('加载应用设置失败:', error)
   }
@@ -1519,142 +1523,160 @@ const stopResize = () => {
 
 // 生命周期
 onMounted(async () => {
-  // 简单延迟等待 Tauri 完全初始化
-  await new Promise(resolve => setTimeout(resolve, 500))
-  console.log('开始加载应用数据...')
-
-  // 加载应用数据
-  await loadAppData()
-
-  // 加载应用设置
-  await loadAppSettings()
-
-  // 在加载设置后，更新托盘菜单以反映当前设置
-  try {
-    await invoke('update_tray_menu', {
-      preventAutoHide: appSettings.value.preventAutoHide
-    })
-    console.log('托盘菜单已更新以反映当前设置')
-  } catch (error) {
-    console.error('更新托盘菜单失败:', error)
+  console.log('开始初始化应用...')
+  
+  // 并行加载数据和设置，无需等待 500ms
+  const [appDataResult, settingsResult] = await Promise.allSettled([
+    loadAppData(),
+    loadAppSettings()
+  ])
+  
+  // 处理加载结果
+  if (appDataResult.status === 'rejected') {
+    console.error('加载应用数据失败:', appDataResult.reason)
+  }
+  if (settingsResult.status === 'rejected') {
+    console.error('加载应用设置失败:', settingsResult.reason)
   }
 
-  // 恢复窗口大小
-  if (appSettings.value.windowWidth && appSettings.value.windowHeight) {
+  // 数据加载完成，隐藏加载指示器
+  isLoading.value = false
+  console.log('应用初始化完成')
+
+  // 异步设置窗口大小和监听器，不阻塞主流程
+  setTimeout(async () => {
+    // 恢复窗口大小
+    if (appSettings.value.windowWidth && appSettings.value.windowHeight) {
+      try {
+        const window = getCurrentWindow()
+        await window.setSize(new LogicalSize(
+          appSettings.value.windowWidth,
+          appSettings.value.windowHeight
+        ))
+        console.log(`恢复窗口大小: ${appSettings.value.windowWidth}x${appSettings.value.windowHeight}`)
+      } catch (error) {
+        console.error('恢复窗口大小失败:', error)
+      }
+    }
+
+    // 监听窗口大小变化
     try {
       const window = getCurrentWindow()
-      await window.setSize(new LogicalSize(
-        appSettings.value.windowWidth,
-        appSettings.value.windowHeight
-      ))
-      console.log(`恢复窗口大小: ${appSettings.value.windowWidth}x${appSettings.value.windowHeight}`)
+      await window.listen('tauri://resize', async () => {
+        try {
+          const size = await window.innerSize()
+          // 保存新的窗口大小
+          await invoke('save_window_size', {
+            width: size.width,
+            height: size.height
+          })
+          console.log(`保存窗口大小: ${size.width}x${size.height}`)
+        } catch (error) {
+          console.error('保存窗口大小失败:', error)
+        }
+      })
+      console.log('窗口大小监听器设置成功')
     } catch (error) {
-      console.error('恢复窗口大小失败:', error)
+      console.error('设置窗口大小监听器失败:', error)
     }
-  }
 
-  // 监听窗口大小变化
-  try {
-    const window = getCurrentWindow()
-    await window.listen('tauri://resize', async () => {
-      try {
-        const size = await window.innerSize()
-        // 保存新的窗口大小
-        await invoke('save_window_size', {
-          width: size.width,
-          height: size.height
-        })
-        console.log(`保存窗口大小: ${size.width}x${size.height}`)
-      } catch (error) {
-        console.error('保存窗口大小失败:', error)
-      }
+    // 监听来自托盘菜单的事件
+    const { listen } = await import('@tauri-apps/api/event')
+    await listen('toggle-prevent-auto-hide', () => {
+      togglePreventAutoHide()
     })
-    console.log('窗口大小监听器设置成功')
-  } catch (error) {
-    console.error('设置窗口大小监听器失败:', error)
-  }
 
-  // 计算侧栏的自然宽度
-  const sidebar = document.querySelector('.sidebar') as HTMLElement
-  if (sidebar) {
-    // 先让侧栏自适应，然后获取其实际宽度
-    sidebar.style.width = 'auto'
-    const rect = sidebar.getBoundingClientRect()
-    sidebarWidth.value = Math.max(rect.width, 80) // 确保最小宽度为80px
-  }
+    // 监听来自托盘的设置变化事件
+    await listen('prevent-auto-hide-changed', (event: any) => {
+      appSettings.value.preventAutoHide = event.payload
+      console.log('从托盘菜单接收到设置变化:', event.payload)
 
-  // 添加全局点击监听，点击搜索框外部时隐藏搜索框
-  const handleClickOutside = (event: Event) => {
-    const target = event.target as HTMLElement
+      // 显示状态反馈
+      const message = event.payload
+        ? '已启用阻止自动隐藏'
+        : '已禁用阻止自动隐藏'
+      showToast(message, 'success')
+    })
+  }, 100) // 延迟100ms执行，让界面先渲染
 
-    // 任何点击都算用户交互
-    handleFirstUserInteraction()
-
-    if (showSearchBox.value &&
-      !target.closest('.content-header') &&
-      !target.closest('.titlebar-button')) {
-      hideSearchBox()
+  // 立即计算侧栏宽度和设置事件监听器
+  nextTick(() => {
+    // 计算侧栏的自然宽度
+    const sidebar = document.querySelector('.sidebar') as HTMLElement
+    if (sidebar) {
+      // 先让侧栏自适应，然后获取其实际宽度
+      sidebar.style.width = 'auto'
+      const rect = sidebar.getBoundingClientRect()
+      sidebarWidth.value = Math.max(rect.width, 80) // 确保最小宽度为80px
     }
 
-    // 隐藏右键菜单 - 统一处理所有菜单的隐藏
-    if (!target.closest('.context-menu')) {
-      if (contextMenu.value.visible) {
-        hideContextMenu()
+    // 添加全局点击监听，点击搜索框外部时隐藏搜索框
+    const handleClickOutside = (event: Event) => {
+      const target = event.target as HTMLElement
+
+      // 任何点击都算用户交互
+      handleFirstUserInteraction()
+
+      if (showSearchBox.value &&
+        !target.closest('.content-header') &&
+        !target.closest('.titlebar-button')) {
+        hideSearchBox()
       }
-      if (appContextMenu.value.visible) {
-        hideAppContextMenu()
-      }
-      if (moveToSubmenu.value.visible) {
-        hideMoveToSubmenu()
-      }
-      if (gridContextMenu.value.visible) {
-        hideGridContextMenu()
+
+      // 隐藏右键菜单 - 统一处理所有菜单的隐藏
+      if (!target.closest('.context-menu')) {
+        if (contextMenu.value.visible) {
+          hideContextMenu()
+        }
+        if (appContextMenu.value.visible) {
+          hideAppContextMenu()
+        }
+        if (moveToSubmenu.value.visible) {
+          hideMoveToSubmenu()
+        }
+        if (gridContextMenu.value.visible) {
+          hideGridContextMenu()
+        }
       }
     }
-  }
-  document.addEventListener('click', handleClickOutside)
+    document.addEventListener('click', handleClickOutside)
 
-  // 添加全局键盘监听，实现直接输入搜索
-  document.addEventListener('keydown', handleGlobalKeydown)
+    // 添加全局键盘监听，实现直接输入搜索
+    document.addEventListener('keydown', handleGlobalKeydown)
 
-  // 全局禁用右键菜单
-  document.addEventListener('contextmenu', disableContextMenu)
+    // 全局禁用右键菜单
+    document.addEventListener('contextmenu', disableContextMenu)
 
-  // 添加窗口失焦监听，自动隐藏到托盘
-  window.addEventListener('blur', handleWindowBlur)
+    // 添加窗口失焦监听，自动隐藏到托盘
+    window.addEventListener('blur', handleWindowBlur)
 
-  // 添加窗口聚焦事件监听器
-  window.addEventListener('focus', handleWindowFocus)
+    // 添加窗口聚焦事件监听器
+    window.addEventListener('focus', handleWindowFocus)
 
-  // 添加鼠标移动和离开事件监听器
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseleave', handleMouseLeave)
+    // 添加鼠标移动和离开事件监听器
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseleave', handleMouseLeave)
 
-  // 添加全局 mouseup 事件监听器，确保拖拽结束能被正确检测
-  document.addEventListener('mouseup', handleDragEnd)
+    // 添加全局 mouseup 事件监听器，确保拖拽结束能被正确检测
+    document.addEventListener('mouseup', handleDragEnd)
 
-  // 监听来自托盘菜单的事件
-  const { listen } = await import('@tauri-apps/api/event')
-  await listen('toggle-prevent-auto-hide', () => {
-    togglePreventAutoHide()
+    // 异步设置拖拽功能，不阻塞主流程
+    setTimeout(() => {
+      setupDragAndDrop()
+    }, 200)
   })
 
-  // 监听来自托盘的设置变化事件
-  await listen('prevent-auto-hide-changed', (event: any) => {
-    appSettings.value.preventAutoHide = event.payload
-    console.log('从托盘菜单接收到设置变化:', event.payload)
-
-    // 显示状态反馈
-    const message = event.payload
-      ? '已启用阻止自动隐藏'
-      : '已禁用阻止自动隐藏'
-    showToast(message, 'success')
-  })
-
-  // 等待DOM完全渲染后设置拖拽功能
-  nextTick(async () => {
-    await setupDragAndDrop()
-  })
+  // 异步更新托盘菜单，不阻塞主流程
+  setTimeout(async () => {
+    try {
+      await invoke('update_tray_menu', {
+        preventAutoHide: appSettings.value.preventAutoHide
+      })
+      console.log('托盘菜单已更新以反映当前设置')
+    } catch (error) {
+      console.error('更新托盘菜单失败:', error)
+    }
+  }, 300)
 })
 
 // 禁用右键菜单的函数
@@ -2114,6 +2136,8 @@ const cleanupDragAndDrop = () => {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  /* 减少重排 */
+  contain: layout;
 }
 
 /* 自定义标题栏样式 */
@@ -2129,6 +2153,8 @@ const cleanupDragAndDrop = () => {
   -webkit-user-select: none;
   position: relative;
   z-index: 1000;
+  /* 使用 transform 而不是改变位置 */
+  will-change: transform;
 }
 
 .titlebar-left {
@@ -2164,6 +2190,8 @@ const cleanupDragAndDrop = () => {
   position: relative;
   z-index: 1001;
   pointer-events: auto;
+  /* 优化动画性能 */
+  will-change: background-color;
 }
 
 .titlebar-button:hover {
@@ -2181,6 +2209,8 @@ const cleanupDragAndDrop = () => {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   position: relative;
   overflow: visible;
+  /* 减少重排 */
+  contain: layout;
 }
 
 /* 侧栏样式 */
@@ -2194,6 +2224,9 @@ const cleanupDragAndDrop = () => {
   flex-direction: column;
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
   flex-shrink: 0;
+  /* 优化性能 */
+  contain: layout;
+  will-change: width;
 }
 
 .sidebar-header {
@@ -2210,6 +2243,8 @@ const cleanupDragAndDrop = () => {
 .sidebar-content {
   flex: 1;
   padding: 10px 0;
+  /* 优化滚动性能 */
+  contain: layout style;
 }
 
 .category-item {
@@ -2219,6 +2254,8 @@ const cleanupDragAndDrop = () => {
   cursor: pointer;
   transition: background-color 0.2s ease;
   white-space: nowrap;
+  /* 优化悬停效果 */
+  will-change: background-color;
 }
 
 .category-item:hover {
@@ -2869,5 +2906,46 @@ body {
     opacity: 1;
     transform: translateX(0);
   }
+}
+
+/* 加载指示器样式 */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e0e0e0;
+  border-top: 3px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style>
