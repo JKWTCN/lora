@@ -541,100 +541,51 @@ fn open_folder(folder_path: String, launch_args: Option<String>) -> Result<Strin
 fn open_file_dialog(title: String, filters: Vec<(String, Vec<String>)>) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
-
-        // 使用Windows Native API替代PowerShell
-        #[link(name = "comdlg32")]
-        extern "system" {
-            fn GetOpenFileNameW(lpofn: *mut OPENFILENAMEW) -> i32;
-        }
-
-        #[repr(C)]
-        #[allow(non_snake_case)]
-        struct OPENFILENAMEW {
-            lStructSize: u32,
-            hwndOwner: *mut std::ffi::c_void,
-            hInstance: *mut std::ffi::c_void,
-            lpstrFilter: *const u16,
-            lpstrCustomFilter: *mut u16,
-            nMaxCustFilter: u32,
-            nFilterIndex: u32,
-            lpstrFile: *mut u16,
-            nMaxFile: u32,
-            lpstrFileTitle: *mut u16,
-            nMaxFileTitle: u32,
-            lpstrInitialDir: *const u16,
-            lpstrTitle: *const u16,
-            Flags: u32,
-            nFileOffset: u16,
-            nFileExtension: u16,
-            lpstrDefExt: *const u16,
-            lCustData: isize,
-            lpfnHook: *mut std::ffi::c_void,
-            lpTemplateName: *const u16,
-        }
-
-        // 构建过滤器字符串
+        // 构建PowerShell脚本来显示文件选择对话框
         let mut filter_string = String::new();
         for (name, extensions) in filters {
             if !filter_string.is_empty() {
-                filter_string.push('\0');
+                filter_string.push('|');
             }
-            filter_string.push_str(&name);
-            filter_string.push('\0');
-            let ext_string = extensions
-                .iter()
-                .map(|ext| format!("*.{}", ext))
-                .collect::<Vec<_>>()
-                .join(";");
-            filter_string.push_str(&ext_string);
-            filter_string.push('\0');
+            let ext_string = extensions.join(";*.");
+            filter_string.push_str(&format!("{}|*.{}", name, ext_string));
         }
-        filter_string.push('\0'); // 双null终止
 
-        let filter_wide: Vec<u16> = OsStr::new(&filter_string).encode_wide().collect();
-        let title_wide: Vec<u16> = OsStr::new(&title)
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
+        let script = format!(
+            r#"
+            Add-Type -AssemblyName System.Windows.Forms
+            $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+            $openFileDialog.Title = '{}'
+            $openFileDialog.Filter = '{}'
+            $openFileDialog.RestoreDirectory = $true
+            $result = $openFileDialog.ShowDialog()
+            if ($result -eq [System.Windows.Forms.DialogResult]::OK) {{
+                Write-Output $openFileDialog.FileName
+            }} else {{
+                Write-Output ""
+            }}
+            "#,
+            title.replace("'", "''"),
+            filter_string.replace("'", "''")
+        );
 
-        let mut file_buffer = vec![0u16; 260]; // MAX_PATH
+        let output = Command::new("powershell")
+            .args([
+                "-WindowStyle",
+                "Hidden",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                &script,
+            ])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
-        let mut ofn = OPENFILENAMEW {
-            lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
-            hwndOwner: std::ptr::null_mut(),
-            hInstance: std::ptr::null_mut(),
-            lpstrFilter: filter_wide.as_ptr(),
-            lpstrCustomFilter: std::ptr::null_mut(),
-            nMaxCustFilter: 0,
-            nFilterIndex: 1,
-            lpstrFile: file_buffer.as_mut_ptr(),
-            nMaxFile: file_buffer.len() as u32,
-            lpstrFileTitle: std::ptr::null_mut(),
-            nMaxFileTitle: 0,
-            lpstrInitialDir: std::ptr::null(),
-            lpstrTitle: title_wide.as_ptr(),
-            Flags: 0x00000004 | 0x00000800, // OFN_HIDEREADONLY | OFN_NOCHANGEDIR
-            nFileOffset: 0,
-            nFileExtension: 0,
-            lpstrDefExt: std::ptr::null(),
-            lCustData: 0,
-            lpfnHook: std::ptr::null_mut(),
-            lpTemplateName: std::ptr::null(),
-        };
-
-        unsafe {
-            if GetOpenFileNameW(&mut ofn) != 0 {
-                let end = file_buffer
-                    .iter()
-                    .position(|&c| c == 0)
-                    .unwrap_or(file_buffer.len());
-                let result = String::from_utf16_lossy(&file_buffer[..end]);
-                Ok(result)
-            } else {
-                Err("用户取消了选择".to_string())
-            }
+        let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !result.is_empty() {
+            Ok(result)
+        } else {
+            Err("用户取消了选择".to_string())
         }
     }
 
@@ -649,70 +600,39 @@ fn open_file_dialog(title: String, filters: Vec<(String, Vec<String>)>) -> Resul
 fn open_folder_dialog(title: String) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
+        let script = format!(
+            r#"
+            Add-Type -AssemblyName System.Windows.Forms
+            $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+            $folderBrowser.Description = '{}'
+            $folderBrowser.ShowNewFolderButton = $true
+            $result = $folderBrowser.ShowDialog()
+            if ($result -eq [System.Windows.Forms.DialogResult]::OK) {{
+                Write-Output $folderBrowser.SelectedPath
+            }} else {{
+                Write-Output ""
+            }}
+            "#,
+            title.replace("'", "''")
+        );
 
-        // 使用COM接口替代PowerShell
-        #[link(name = "shell32")]
-        #[link(name = "ole32")]
-        extern "system" {
-            fn SHBrowseForFolderW(lpbi: *const BROWSEINFOW) -> *mut std::ffi::c_void;
-            fn SHGetPathFromIDListW(pidl: *mut std::ffi::c_void, pszPath: *mut u16) -> i32;
-            fn CoTaskMemFree(pv: *mut std::ffi::c_void);
-            fn CoInitialize(pvReserved: *mut std::ffi::c_void) -> i32;
-        }
+        let output = Command::new("powershell")
+            .args([
+                "-WindowStyle",
+                "Hidden",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                &script,
+            ])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
-        #[repr(C)]
-        #[allow(non_snake_case)]
-        struct BROWSEINFOW {
-            hwndOwner: *mut std::ffi::c_void,
-            pidlRoot: *mut std::ffi::c_void,
-            pszDisplayName: *mut u16,
-            lpszTitle: *const u16,
-            ulFlags: u32,
-            lpfn: *mut std::ffi::c_void,
-            lParam: isize,
-            iImage: i32,
-        }
-
-        unsafe {
-            CoInitialize(std::ptr::null_mut());
-
-            let title_wide: Vec<u16> = OsStr::new(&title)
-                .encode_wide()
-                .chain(std::iter::once(0))
-                .collect();
-            let mut display_name = vec![0u16; 260]; // MAX_PATH
-
-            let bi = BROWSEINFOW {
-                hwndOwner: std::ptr::null_mut(),
-                pidlRoot: std::ptr::null_mut(),
-                pszDisplayName: display_name.as_mut_ptr(),
-                lpszTitle: title_wide.as_ptr(),
-                ulFlags: 0x00000040, // BIF_NEWDIALOGSTYLE
-                lpfn: std::ptr::null_mut(),
-                lParam: 0,
-                iImage: 0,
-            };
-
-            let pidl = SHBrowseForFolderW(&bi);
-            if !pidl.is_null() {
-                let mut path_buffer = vec![0u16; 260];
-                if SHGetPathFromIDListW(pidl, path_buffer.as_mut_ptr()) != 0 {
-                    CoTaskMemFree(pidl);
-                    let end = path_buffer
-                        .iter()
-                        .position(|&c| c == 0)
-                        .unwrap_or(path_buffer.len());
-                    let result = String::from_utf16_lossy(&path_buffer[..end]);
-                    Ok(result)
-                } else {
-                    CoTaskMemFree(pidl);
-                    Err("获取文件夹路径失败".to_string())
-                }
-            } else {
-                Err("用户取消了选择".to_string())
-            }
+        let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !result.is_empty() {
+            Ok(result)
+        } else {
+            Err("用户取消了选择".to_string())
         }
     }
 
@@ -1313,178 +1233,121 @@ fn update_settings_batch(settings_update: serde_json::Value) -> Result<String, S
 // Windows 开机自启动实现
 #[cfg(target_os = "windows")]
 fn set_auto_start_windows(enable: bool) -> Result<(), String> {
-    use std::ffi::OsStr;
-    use std::os::windows::ffi::OsStrExt;
-
-    // 使用Windows Registry API替代PowerShell
-    #[link(name = "advapi32")]
-    extern "system" {
-        fn RegOpenKeyExW(
-            hKey: *mut std::ffi::c_void,
-            lpSubKey: *const u16,
-            ulOptions: u32,
-            samDesired: u32,
-            phkResult: *mut *mut std::ffi::c_void,
-        ) -> i32;
-        fn RegSetValueExW(
-            hKey: *mut std::ffi::c_void,
-            lpValueName: *const u16,
-            Reserved: u32,
-            dwType: u32,
-            lpData: *const u8,
-            cbData: u32,
-        ) -> i32;
-        fn RegDeleteValueW(hKey: *mut std::ffi::c_void, lpValueName: *const u16) -> i32;
-        fn RegCloseKey(hKey: *mut std::ffi::c_void) -> i32;
-    }
-
-    const HKEY_CURRENT_USER: *mut std::ffi::c_void = 0x80000001isize as *mut std::ffi::c_void;
-    const KEY_SET_VALUE: u32 = 0x00000002;
-    const REG_SZ: u32 = 1;
-
-    let reg_key_str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
-    let app_name = "Lora";
-
     // 获取当前可执行文件路径
     let exe_path = std::env::current_exe().map_err(|e| format!("获取可执行文件路径失败: {}", e))?;
     let exe_path_str = exe_path.to_str().ok_or("可执行文件路径包含无效字符")?;
 
-    unsafe {
-        // 转换为UTF-16
-        let reg_key_wide: Vec<u16> = OsStr::new(reg_key_str)
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
-        let app_name_wide: Vec<u16> = OsStr::new(app_name)
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
+    // 注册表键路径
+    let reg_key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+    let app_name = "Lora";
 
-        // 打开注册表键
-        let mut hkey: *mut std::ffi::c_void = std::ptr::null_mut();
-        let result = RegOpenKeyExW(
-            HKEY_CURRENT_USER,
-            reg_key_wide.as_ptr(),
-            0,
-            KEY_SET_VALUE,
-            &mut hkey,
+    if enable {
+        // 添加到注册表
+        let script = format!(
+            r#"
+            try {{
+                New-ItemProperty -Path "HKCU:\{}" -Name "{}" -Value '"{}"' -PropertyType String -Force
+                Write-Output "SUCCESS"
+            }} catch {{
+                Write-Error $_.Exception.Message
+                exit 1
+            }}
+            "#,
+            reg_key,
+            app_name,
+            exe_path_str.replace("'", "''")
         );
 
-        if result != 0 {
-            return Err("打开注册表键失败".to_string());
+        let output = Command::new("powershell")
+            .args([
+                "-WindowStyle",
+                "Hidden",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                &script,
+            ])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("设置开机自启动失败: {}", stderr));
         }
+    } else {
+        // 从注册表中删除
+        let script = format!(
+            r#"
+            try {{
+                Remove-ItemProperty -Path "HKCU:\{}" -Name "{}" -ErrorAction SilentlyContinue
+                Write-Output "SUCCESS"
+            }} catch {{
+                Write-Error $_.Exception.Message
+                exit 1
+            }}
+            "#,
+            reg_key, app_name
+        );
 
-        let reg_result = if enable {
-            // 设置值
-            let exe_path_wide: Vec<u16> = OsStr::new(&format!("\"{}\"", exe_path_str))
-                .encode_wide()
-                .chain(std::iter::once(0))
-                .collect();
+        let output = Command::new("powershell")
+            .args([
+                "-WindowStyle",
+                "Hidden",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                &script,
+            ])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
-            RegSetValueExW(
-                hkey,
-                app_name_wide.as_ptr(),
-                0,
-                REG_SZ,
-                exe_path_wide.as_ptr() as *const u8,
-                (exe_path_wide.len() * 2) as u32,
-            )
-        } else {
-            // 删除值
-            RegDeleteValueW(hkey, app_name_wide.as_ptr())
-        };
-
-        RegCloseKey(hkey);
-
-        if reg_result == 0 {
-            Ok(())
-        } else if enable {
-            Err("设置开机自启动失败".to_string())
-        } else {
-            // 对于删除操作，如果值不存在也算成功
-            Ok(())
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("取消开机自启动失败: {}", stderr));
         }
     }
-}
 
+    Ok(())
+}
 // 检查是否已设置开机自启动
 #[tauri::command]
 fn check_auto_start_status() -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
-
-        // 使用Windows Registry API替代PowerShell
-        #[link(name = "advapi32")]
-        extern "system" {
-            fn RegOpenKeyExW(
-                hKey: *mut std::ffi::c_void,
-                lpSubKey: *const u16,
-                ulOptions: u32,
-                samDesired: u32,
-                phkResult: *mut *mut std::ffi::c_void,
-            ) -> i32;
-            fn RegQueryValueExW(
-                hKey: *mut std::ffi::c_void,
-                lpValueName: *const u16,
-                lpReserved: *mut u32,
-                lpType: *mut u32,
-                lpData: *mut u8,
-                lpcbData: *mut u32,
-            ) -> i32;
-            fn RegCloseKey(hKey: *mut std::ffi::c_void) -> i32;
-        }
-
-        const HKEY_CURRENT_USER: *mut std::ffi::c_void = 0x80000001isize as *mut std::ffi::c_void;
-        const KEY_QUERY_VALUE: u32 = 0x00000001;
-
-        let reg_key_str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+        let reg_key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
         let app_name = "Lora";
 
-        unsafe {
-            // 转换为UTF-16
-            let reg_key_wide: Vec<u16> = OsStr::new(reg_key_str)
-                .encode_wide()
-                .chain(std::iter::once(0))
-                .collect();
-            let app_name_wide: Vec<u16> = OsStr::new(app_name)
-                .encode_wide()
-                .chain(std::iter::once(0))
-                .collect();
+        let script = format!(
+            r#"
+            try {{
+                $value = Get-ItemProperty -Path "HKCU:\{}" -Name "{}" -ErrorAction SilentlyContinue
+                if ($value) {{
+                    Write-Output "TRUE"
+                }} else {{
+                    Write-Output "FALSE"
+                }}
+            }} catch {{
+                Write-Output "FALSE"
+            }}
+            "#,
+            reg_key, app_name
+        );
 
-            // 打开注册表键
-            let mut hkey: *mut std::ffi::c_void = std::ptr::null_mut();
-            let result = RegOpenKeyExW(
-                HKEY_CURRENT_USER,
-                reg_key_wide.as_ptr(),
-                0,
-                KEY_QUERY_VALUE,
-                &mut hkey,
-            );
+        let output = Command::new("powershell")
+            .args([
+                "-WindowStyle",
+                "Hidden",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                &script,
+            ])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
-            if result != 0 {
-                return Ok(false); // 如果无法打开键，说明不存在
-            }
-
-            // 查询值
-            let mut data_type: u32 = 0;
-            let mut data_size: u32 = 0;
-
-            // 先查询数据大小
-            let query_result = RegQueryValueExW(
-                hkey,
-                app_name_wide.as_ptr(),
-                std::ptr::null_mut(),
-                &mut data_type,
-                std::ptr::null_mut(),
-                &mut data_size,
-            );
-
-            let exists = query_result == 0 && data_size > 0;
-            RegCloseKey(hkey);
-            Ok(exists)
-        }
+        let result_string = String::from_utf8_lossy(&output.stdout);
+        let result = result_string.trim();
+        Ok(result == "TRUE")
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -1499,102 +1362,39 @@ fn export_data() -> Result<String, String> {
     // 打开文件保存对话框
     #[cfg(target_os = "windows")]
     {
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
-
-        // 使用Windows Native API替代PowerShell
-        #[link(name = "comdlg32")]
-        extern "system" {
-            fn GetSaveFileNameW(lpsofn: *mut OPENFILENAMEW) -> i32;
-        }
-
-        #[repr(C)]
-        #[allow(non_snake_case)]
-        struct OPENFILENAMEW {
-            lStructSize: u32,
-            hwndOwner: *mut std::ffi::c_void,
-            hInstance: *mut std::ffi::c_void,
-            lpstrFilter: *const u16,
-            lpstrCustomFilter: *mut u16,
-            nMaxCustFilter: u32,
-            nFilterIndex: u32,
-            lpstrFile: *mut u16,
-            nMaxFile: u32,
-            lpstrFileTitle: *mut u16,
-            nMaxFileTitle: u32,
-            lpstrInitialDir: *const u16,
-            lpstrTitle: *const u16,
-            Flags: u32,
-            nFileOffset: u16,
-            nFileExtension: u16,
-            lpstrDefExt: *const u16,
-            lCustData: isize,
-            lpfnHook: *mut std::ffi::c_void,
-            lpTemplateName: *const u16,
-        }
-
-        // 构建过滤器字符串
-        let filter_string = "JSON文件\0*.json\0所有文件\0*.*\0\0";
-        let filter_wide: Vec<u16> = OsStr::new(filter_string).encode_wide().collect();
-        let title_wide: Vec<u16> = OsStr::new("导出数据")
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
-
-        let mut file_buffer = vec![0u16; 260]; // MAX_PATH
-
-        // 设置默认文件名
-        let default_filename = format!(
-            "lora_backup_{}.json",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs()
-        );
-        let default_filename_wide: Vec<u16> = OsStr::new(&default_filename)
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
-
-        // 复制默认文件名到缓冲区
-        let copy_len = std::cmp::min(default_filename_wide.len(), file_buffer.len() - 1);
-        file_buffer[..copy_len].copy_from_slice(&default_filename_wide[..copy_len]);
-
-        let mut ofn = OPENFILENAMEW {
-            lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
-            hwndOwner: std::ptr::null_mut(),
-            hInstance: std::ptr::null_mut(),
-            lpstrFilter: filter_wide.as_ptr(),
-            lpstrCustomFilter: std::ptr::null_mut(),
-            nMaxCustFilter: 0,
-            nFilterIndex: 1,
-            lpstrFile: file_buffer.as_mut_ptr(),
-            nMaxFile: file_buffer.len() as u32,
-            lpstrFileTitle: std::ptr::null_mut(),
-            nMaxFileTitle: 0,
-            lpstrInitialDir: std::ptr::null(),
-            lpstrTitle: title_wide.as_ptr(),
-            Flags: 0x00000004 | 0x00000800, // OFN_HIDEREADONLY | OFN_NOCHANGEDIR
-            nFileOffset: 0,
-            nFileExtension: 0,
-            lpstrDefExt: std::ptr::null(),
-            lCustData: 0,
-            lpfnHook: std::ptr::null_mut(),
-            lpTemplateName: std::ptr::null(),
-        };
-
-        unsafe {
-            if GetSaveFileNameW(&mut ofn) != 0 {
-                let end = file_buffer
-                    .iter()
-                    .position(|&c| c == 0)
-                    .unwrap_or(file_buffer.len());
-                let file_path = String::from_utf16_lossy(&file_buffer[..end]);
-                export_app_data_to_file(file_path)
+        let script = r#"
+            Add-Type -AssemblyName System.Windows.Forms
+            $saveFileDialog = New-Object System.Windows.Forms.SaveFileDialog
+            $saveFileDialog.Title = '导出数据'
+            $saveFileDialog.Filter = 'JSON文件|*.json|所有文件|*.*'
+            $saveFileDialog.DefaultExt = 'json'
+            $saveFileDialog.FileName = "lora_backup_$(Get-Date -Format 'yyyyMMdd_HHmmss').json"
+            $result = $saveFileDialog.ShowDialog()
+            if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+                Write-Output $saveFileDialog.FileName
             } else {
-                Err("用户取消了导出操作".to_string())
+                Write-Output ""
             }
+        "#;
+
+        let output = Command::new("powershell")
+            .args([
+                "-WindowStyle",
+                "Hidden",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                &script,
+            ])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
+
+        let file_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if file_path.is_empty() {
+            return Err("用户取消了导出操作".to_string());
         }
+
+        export_app_data_to_file(file_path)
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -1751,36 +1551,49 @@ fn save_selected_category(category_id: String) -> Result<String, String> {
 fn get_app_icon(file_path: String) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
+        // 使用系统关联的图标
+        let script = format!(
+            r#"
+            try {{
+                Add-Type -AssemblyName System.Drawing
+                $icon = [System.Drawing.Icon]::ExtractAssociatedIcon('{}')
+                if ($icon) {{
+                    $bitmap = $icon.ToBitmap()
+                    $stream = New-Object System.IO.MemoryStream
+                    $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
+                    $bytes = $stream.ToArray()
+                    $base64 = [System.Convert]::ToBase64String($bytes)
+                    $stream.Dispose()
+                    $bitmap.Dispose()
+                    $icon.Dispose()
+                    Write-Output "data:image/png;base64,$base64"
+                }} else {{
+                    Write-Output ""
+                }}
+            }} catch {{
+                Write-Output ""
+            }}
+            "#,
+            file_path.replace("'", "''")
+        );
 
-        // 使用Windows Shell API替代PowerShell
-        #[link(name = "shell32")]
-        extern "system" {
-            fn ExtractIconW(
-                hInst: *mut std::ffi::c_void,
-                lpszExeFileName: *const u16,
-                nIconIndex: i32,
-            ) -> *mut std::ffi::c_void;
-            fn DestroyIcon(hIcon: *mut std::ffi::c_void) -> i32;
-        }
+        let output = Command::new("powershell")
+            .args([
+                "-WindowStyle",
+                "Hidden",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                &script,
+            ])
+            .output()
+            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
-        let file_path_wide: Vec<u16> = OsStr::new(&file_path)
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
-
-        unsafe {
-            let hicon = ExtractIconW(std::ptr::null_mut(), file_path_wide.as_ptr(), 0);
-
-            if hicon.is_null() || hicon as isize <= 1 {
-                return Err("无法提取图标".to_string());
-            }
-
-            // 这里简化实现，直接返回成功标志
-            // 实际图标转换为Base64需要更多的GDI+ API调用
-            DestroyIcon(hicon);
-            Ok("icon_extracted".to_string()) // 返回一个标识符
+        let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !result.is_empty() && result.starts_with("data:image/png;base64,") {
+            Ok(result)
+        } else {
+            Err("无法提取图标".to_string())
         }
     }
 
@@ -1795,48 +1608,21 @@ fn get_app_icon(file_path: String) -> Result<String, String> {
 fn run_as_admin(app_path: String) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
+        let result = Command::new("powershell")
+            .args([
+                "-WindowStyle",
+                "Hidden",
+                "-Command",
+                &format!(
+                    "Start-Process '{}' -Verb RunAs",
+                    app_path.replace("'", "''")
+                ),
+            ])
+            .spawn();
 
-        // 使用Windows Shell API替代PowerShell
-        #[link(name = "shell32")]
-        extern "system" {
-            fn ShellExecuteW(
-                hwnd: *mut std::ffi::c_void,
-                lpOperation: *const u16,
-                lpFile: *const u16,
-                lpParameters: *const u16,
-                lpDirectory: *const u16,
-                nShowCmd: i32,
-            ) -> isize;
-        }
-
-        let operation_wide: Vec<u16> = OsStr::new("runas")
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
-
-        let file_path_wide: Vec<u16> = OsStr::new(&app_path)
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
-
-        unsafe {
-            let result = ShellExecuteW(
-                std::ptr::null_mut(),
-                operation_wide.as_ptr(),
-                file_path_wide.as_ptr(),
-                std::ptr::null(),
-                std::ptr::null(),
-                1, // SW_SHOWNORMAL
-            );
-
-            // ShellExecute 返回值大于32表示成功
-            if result > 32 {
-                Ok("应用以管理员权限启动成功".to_string())
-            } else {
-                Err(format!("以管理员权限启动应用失败: 错误代码 {}", result))
-            }
+        match result {
+            Ok(_) => Ok("应用以管理员权限启动成功".to_string()),
+            Err(e) => Err(format!("以管理员权限启动应用失败: {}", e)),
         }
     }
 
