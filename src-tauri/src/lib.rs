@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
@@ -51,6 +52,7 @@ pub struct AppSettings {
     // 启动设置
     pub start_with_system: Option<bool>,
     pub start_minimized: Option<bool>,
+    pub auto_hide_after_launch: Option<bool>,
     // 快捷键设置
     pub toggle_hotkey: Option<String>,
     pub global_hotkey: Option<bool>,
@@ -335,6 +337,30 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
             Err(e) => Err(format!("启动应用失败: {}", e)),
         }
     }
+}
+
+// 启动应用并检查是否需要自动隐藏窗口
+#[tauri::command]
+async fn launch_app_with_auto_hide(
+    app: tauri::AppHandle,
+    app_path: String,
+    launch_args: Option<String>,
+) -> Result<String, String> {
+    // 先启动应用
+    let launch_result = launch_app(app_path, launch_args)?;
+
+    // 检查是否启用了自动隐藏功能
+    let settings = load_app_settings().unwrap_or_else(|_| get_default_settings());
+    if settings.auto_hide_after_launch.unwrap_or(false) {
+        // 延迟一段时间后隐藏窗口，让用户能看到应用已启动
+        if let Some(window) = app.get_webview_window("main") {
+            // 使用 tokio 的延迟功能
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            let _ = window.hide();
+        }
+    }
+
+    Ok(launch_result)
 }
 
 // 打开网址
@@ -895,6 +921,7 @@ fn get_default_settings() -> AppSettings {
         animation_speed: Some("normal".to_string()),
         start_with_system: Some(false),
         start_minimized: Some(false),
+        auto_hide_after_launch: Some(false),
         toggle_hotkey: Some("Ctrl+Space".to_string()),
         global_hotkey: Some(true),
         fuzzy_search: Some(true),
@@ -1009,6 +1036,15 @@ fn update_start_minimized(start_minimized: bool) -> Result<String, String> {
     settings.start_minimized = Some(start_minimized);
     save_app_settings(settings)?;
     Ok("启动最小化设置已更新".to_string())
+}
+
+// 更新运行应用后自动隐藏设置
+#[tauri::command]
+fn update_auto_hide_after_launch(auto_hide_after_launch: bool) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.auto_hide_after_launch = Some(auto_hide_after_launch);
+    save_app_settings(settings)?;
+    Ok("运行应用后自动隐藏设置已更新".to_string())
 }
 
 // 更新快捷键设置
@@ -1216,6 +1252,12 @@ fn update_settings_batch(settings_update: serde_json::Value) -> Result<String, S
         .and_then(|v| v.as_bool())
     {
         settings.start_minimized = Some(start_minimized);
+    }
+    if let Some(auto_hide_after_launch) = settings_update
+        .get("autoHideAfterLaunch")
+        .and_then(|v| v.as_bool())
+    {
+        settings.auto_hide_after_launch = Some(auto_hide_after_launch);
     }
     if let Some(toggle_hotkey) = settings_update.get("toggleHotkey").and_then(|v| v.as_str()) {
         settings.toggle_hotkey = Some(toggle_hotkey.to_string());
@@ -2198,6 +2240,7 @@ pub fn run() {
             my_custom_command,
             get_file_info,
             launch_app,
+            launch_app_with_auto_hide,
             open_url,
             open_folder,
             open_file_dialog,
@@ -2222,6 +2265,7 @@ pub fn run() {
             update_animation_speed,
             update_start_with_system,
             update_start_minimized,
+            update_auto_hide_after_launch,
             update_toggle_hotkey,
             update_global_hotkey,
             update_fuzzy_search,

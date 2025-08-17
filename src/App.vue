@@ -722,8 +722,8 @@ const launchApp = async (app: any) => {
         launchArgs: app.launch_args || ''
       })
     } else {
-      // 启动文件
-      await invoke('launch_app', {
+      // 启动文件，使用支持自动隐藏的函数
+      await invoke('launch_app_with_auto_hide', {
         appPath: targetPath,
         launchArgs: app.launch_args || ''
       })

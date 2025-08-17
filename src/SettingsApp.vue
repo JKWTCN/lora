@@ -44,7 +44,7 @@
                             </div>
                             <div class="info-item">
                                 <label>更新日期：</label>
-                                <span>2025-01-15</span>
+                                <span>2025-08-17</span>
                             </div>
                         </div>
 
@@ -180,6 +180,17 @@
                             </label>
                             <p class="setting-description">
                                 程序启动时直接最小化到系统托盘，不显示主窗口
+                            </p>
+                        </div>
+
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" v-model="localSettings.autoHideAfterLaunch"
+                                    @change="updateAutoHideAfterLaunch" />
+                                运行应用后自动隐藏
+                            </label>
+                            <p class="setting-description">
+                                启动应用后自动隐藏启动器窗口，避免占用屏幕空间
                             </p>
                         </div>
                     </div>
@@ -338,6 +349,7 @@ const localSettings = reactive({
     // 启动设置
     startWithSystem: false,
     startMinimized: false,
+    autoHideAfterLaunch: false,
 
     // 快捷键设置
     toggleHotkey: 'Ctrl+Space',
@@ -447,6 +459,15 @@ const updateStartMinimized = async () => {
         console.log('启动最小化设置已更新')
     } catch (error) {
         console.error('更新启动最小化设置失败:', error)
+    }
+}
+
+const updateAutoHideAfterLaunch = async () => {
+    try {
+        await invoke('update_auto_hide_after_launch', { autoHideAfterLaunch: localSettings.autoHideAfterLaunch })
+        console.log('运行应用后自动隐藏设置已更新')
+    } catch (error) {
+        console.error('更新运行应用后自动隐藏设置失败:', error)
     }
 }
 
@@ -639,6 +660,7 @@ const loadSettings = async () => {
         localSettings.enableAnimations = settings.enable_animations !== false
         localSettings.animationSpeed = settings.animation_speed || 'normal'
         localSettings.startMinimized = settings.start_minimized || false
+        localSettings.autoHideAfterLaunch = settings.auto_hide_after_launch || false
         localSettings.toggleHotkey = settings.toggle_hotkey || 'Ctrl+Space'
         localSettings.globalHotkey = settings.global_hotkey !== false
         localSettings.fuzzySearch = settings.fuzzy_search !== false
@@ -678,6 +700,7 @@ const saveAllSettings = async () => {
             animationSpeed: localSettings.animationSpeed,
             startWithSystem: localSettings.startWithSystem,
             startMinimized: localSettings.startMinimized,
+            autoHideAfterLaunch: localSettings.autoHideAfterLaunch,
             toggleHotkey: localSettings.toggleHotkey,
             globalHotkey: localSettings.globalHotkey,
             fuzzySearch: localSettings.fuzzySearch,

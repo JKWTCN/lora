@@ -53,7 +53,7 @@
                                 </div>
                                 <div class="info-item">
                                     <label>更新日期：</label>
-                                    <span>2025-01-15</span>
+                                    <span>2025-08-17</span>
                                 </div>
                             </div>
 
