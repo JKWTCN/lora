@@ -501,7 +501,7 @@ const loadAppData = async () => {
   try {
     const storage = await invoke('load_app_data') as any
     console.log('从后端加载的数据:', storage)
-    
+
     // 批量更新而不是逐个赋值
     Object.assign(apps, { value: storage.apps || [] })
 
@@ -513,18 +513,18 @@ const loadAppData = async () => {
       icon: category.icon,
       isDefault: category.is_default
     }))
-    
+
     Object.assign(categories, { value: convertedCategories })
 
     // 确保"全部应用"分组始终存在
     ensureDefaultCategory()
 
     // 恢复选中的分组
-    const targetCategory = storage.selected_category && 
-      categories.value.some(cat => cat.id === storage.selected_category) 
-        ? storage.selected_category 
-        : 'all'
-    
+    const targetCategory = storage.selected_category &&
+      categories.value.some(cat => cat.id === storage.selected_category)
+      ? storage.selected_category
+      : 'all'
+
     selectedCategory.value = targetCategory
 
     console.log('应用数据加载成功')
@@ -571,7 +571,7 @@ const loadAppSettings = async () => {
   try {
     const settings = await invoke('load_app_settings') as any
     console.log('从后端加载的设置:', settings)
-    
+
     // 批量更新设置，减少响应式触发次数
     const newSettings = {
       preventAutoHide: settings.prevent_auto_hide || false,
@@ -589,7 +589,7 @@ const loadAppSettings = async () => {
       searchInPath: settings.search_in_path || false,
       maxSearchResults: settings.max_search_results || 20,
     }
-    
+
     // 一次性更新所有设置
     Object.assign(appSettings.value, newSettings)
 
@@ -1524,13 +1524,13 @@ const stopResize = () => {
 // 生命周期
 onMounted(async () => {
   console.log('开始初始化应用...')
-  
+
   // 并行加载数据和设置，无需等待 500ms
   const [appDataResult, settingsResult] = await Promise.allSettled([
     loadAppData(),
     loadAppSettings()
   ])
-  
+
   // 处理加载结果
   if (appDataResult.status === 'rejected') {
     console.error('加载应用数据失败:', appDataResult.reason)
@@ -2945,7 +2945,12 @@ body {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 </style>
