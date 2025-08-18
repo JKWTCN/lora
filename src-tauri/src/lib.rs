@@ -1,5 +1,8 @@
+#[cfg(target_os = "windows")]
+use lnk::ShellLink;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -10,9 +13,6 @@ use tauri::{
     Emitter, Manager, State,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
-
-#[cfg(target_os = "windows")]
-use lnk::ShellLink;
 
 // 应用数据结构
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -280,6 +280,8 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
     {
         if let Some(args_str) = launch_args {
             if !args_str.trim().is_empty() {
+                use std::os::windows::process::CommandExt;
+
                 let split_args: Vec<String> =
                     args_str.split_whitespace().map(|s| s.to_string()).collect();
                 let mut cmd_args = vec![
@@ -290,15 +292,21 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
                 ];
                 cmd_args.extend(split_args);
 
-                let result = Command::new("cmd").args(&cmd_args).spawn();
+                let result = Command::new("cmd")
+                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                    .args(&cmd_args)
+                    .spawn();
 
                 match result {
                     Ok(_) => Ok("应用启动成功".to_string()),
                     Err(e) => Err(format!("启动应用失败: {}", e)),
                 }
             } else {
+                use std::os::windows::process::CommandExt;
+
                 let result = Command::new("cmd")
                     .args(["/C", "start", "", &app_path])
+                    .creation_flags(0x08000000)
                     .spawn();
 
                 match result {
@@ -308,6 +316,7 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
             }
         } else {
             let result = Command::new("cmd")
+                .creation_flags(0x08000000)
                 .args(["/C", "start", "", &app_path])
                 .spawn();
 
@@ -320,7 +329,7 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
 
     #[cfg(not(target_os = "windows"))]
     {
-        let mut cmd = Command::new(&app_path);
+        let mut cmd = Command::new(&app_path).creation_flags(0x08000000);
 
         if let Some(args_str) = launch_args {
             if !args_str.trim().is_empty() {
@@ -375,14 +384,20 @@ fn open_url(url: String, launch_args: Option<String>) -> Result<String, String> 
                 let mut cmd_args = vec!["/C".to_string(), "start".to_string(), "".to_string(), url];
                 cmd_args.extend(split_args);
 
-                let result = Command::new("cmd").args(&cmd_args).spawn();
+                let result = Command::new("cmd")
+                    .args(&cmd_args)
+                    .creation_flags(0x08000000)
+                    .spawn();
 
                 match result {
                     Ok(_) => Ok("网址打开成功".to_string()),
                     Err(e) => Err(format!("打开网址失败: {}", e)),
                 }
             } else {
-                let result = Command::new("cmd").args(["/C", "start", "", &url]).spawn();
+                let result = Command::new("cmd")
+                    .creation_flags(0x08000000)
+                    .args(["/C", "start", "", &url])
+                    .spawn();
 
                 match result {
                     Ok(_) => Ok("网址打开成功".to_string()),
@@ -390,7 +405,10 @@ fn open_url(url: String, launch_args: Option<String>) -> Result<String, String> 
                 }
             }
         } else {
-            let result = Command::new("cmd").args(["/C", "start", "", &url]).spawn();
+            let result = Command::new("cmd")
+                .creation_flags(0x08000000)
+                .args(["/C", "start", "", &url])
+                .spawn();
 
             match result {
                 Ok(_) => Ok("网址打开成功".to_string()),
@@ -401,7 +419,7 @@ fn open_url(url: String, launch_args: Option<String>) -> Result<String, String> 
 
     #[cfg(target_os = "macos")]
     {
-        let mut cmd = Command::new("open");
+        let mut cmd = Command::new("open").creation_flags(0x08000000);
         cmd.arg(&url);
 
         if let Some(args_str) = launch_args {
@@ -422,7 +440,7 @@ fn open_url(url: String, launch_args: Option<String>) -> Result<String, String> 
 
     #[cfg(target_os = "linux")]
     {
-        let mut cmd = Command::new("xdg-open");
+        let mut cmd = Command::new("xdg-open").creation_flags(0x08000000);
         cmd.arg(&url);
 
         if let Some(args_str) = launch_args {
@@ -463,8 +481,9 @@ fn open_folder(folder_path: String, launch_args: Option<String>) -> Result<Strin
     #[cfg(target_os = "windows")]
     {
         let mut cmd = Command::new("explorer");
+        cmd.creation_flags(0x08000000);
         cmd.arg(&folder_path);
-
+        cmd.creation_flags(0x08000000);
         if let Some(args_str) = launch_args {
             if !args_str.trim().is_empty() {
                 let split_args: Vec<String> =
@@ -483,7 +502,7 @@ fn open_folder(folder_path: String, launch_args: Option<String>) -> Result<Strin
 
     #[cfg(target_os = "macos")]
     {
-        let mut cmd = Command::new("open");
+        let mut cmd = Command::new("open").creation_flags(0x08000000);
         cmd.arg(&folder_path);
 
         if let Some(args_str) = launch_args {
@@ -507,8 +526,13 @@ fn open_folder(folder_path: String, launch_args: Option<String>) -> Result<Strin
         let file_managers = ["nautilus", "dolphin", "thunar", "pcmanfm"];
 
         for manager in &file_managers {
-            if Command::new("which").arg(manager).output().is_ok() {
-                let mut cmd = Command::new(manager);
+            if Command::new("which")
+                .creation_flags(0x08000000)
+                .arg(manager)
+                .output()
+                .is_ok()
+            {
+                let mut cmd = Command::new(manager).creation_flags(0x08000000);
                 cmd.arg(&folder_path);
 
                 if let Some(args_str) = launch_args {
@@ -578,6 +602,7 @@ fn open_file_dialog(title: String, filters: Vec<(String, Vec<String>)>) -> Resul
                 "-Command",
                 &script,
             ])
+            .creation_flags(0x08000000)
             .output()
             .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
@@ -625,6 +650,7 @@ fn open_folder_dialog(title: String) -> Result<String, String> {
                 "-Command",
                 &script,
             ])
+            .creation_flags(0x08000000)
             .output()
             .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
@@ -1267,6 +1293,7 @@ fn set_auto_start_windows(enable: bool) -> Result<(), String> {
                 "-Command",
                 &script,
             ])
+            .creation_flags(0x08000000)
             .output()
             .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
@@ -1298,6 +1325,7 @@ fn set_auto_start_windows(enable: bool) -> Result<(), String> {
                 "-Command",
                 &script,
             ])
+            .creation_flags(0x08000000)
             .output()
             .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
@@ -1342,6 +1370,7 @@ fn check_auto_start_status() -> Result<bool, String> {
                 "-Command",
                 &script,
             ])
+            .creation_flags(0x08000000)
             .output()
             .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
@@ -1386,6 +1415,7 @@ fn export_data() -> Result<String, String> {
                 "-Command",
                 &script,
             ])
+            .creation_flags(0x08000000)
             .output()
             .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
@@ -1586,6 +1616,7 @@ fn get_app_icon(file_path: String) -> Result<String, String> {
                 "-Command",
                 &script,
             ])
+            .creation_flags(0x08000000)
             .output()
             .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
@@ -1618,6 +1649,7 @@ fn run_as_admin(app_path: String) -> Result<String, String> {
                     app_path.replace("'", "''")
                 ),
             ])
+            .creation_flags(0x08000000)
             .spawn();
 
         match result {
@@ -1644,7 +1676,10 @@ fn open_file_location(file_path: String) -> Result<String, String> {
 
     #[cfg(target_os = "windows")]
     {
-        let result = Command::new("explorer").arg(dir_path).spawn();
+        let result = Command::new("explorer")
+            .creation_flags(0x08000000)
+            .arg(dir_path)
+            .spawn();
 
         match result {
             Ok(_) => Ok("已打开文件所在目录".to_string()),
@@ -1654,7 +1689,10 @@ fn open_file_location(file_path: String) -> Result<String, String> {
 
     #[cfg(target_os = "macos")]
     {
-        let result = Command::new("open").arg(dir_path).spawn();
+        let result = Command::new("open")
+            .creation_flags(0x08000000)
+            .arg(dir_path)
+            .spawn();
 
         match result {
             Ok(_) => Ok("已打开文件所在目录".to_string()),
@@ -1667,8 +1705,18 @@ fn open_file_location(file_path: String) -> Result<String, String> {
         let file_managers = ["nautilus", "dolphin", "thunar", "pcmanfm"];
 
         for manager in &file_managers {
-            if Command::new("which").arg(manager).output().is_ok() {
-                let result = Command::new(manager).arg(dir_path).spawn();
+            if Command::new("which")
+                .creation_flags(0x08000000)
+                .creation_flags(0x08000000)
+                .arg(manager)
+                .output()
+                .is_ok()
+            {
+                let result = Command::new(manager)
+                    .creation_flags(0x08000000)
+                    .creation_flags(0x08000000)
+                    .arg(dir_path)
+                    .spawn();
 
                 if result.is_ok() {
                     return Ok("已打开文件所在目录".to_string());
