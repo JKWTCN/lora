@@ -1,8 +1,8 @@
 [package]
 name = "lora"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "0.1.1"
+description = "一个基于 Tauri + Vue 3 的现代化应用启动器，支持分类管理和快速启动。"
+authors = ["icloudwar"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
