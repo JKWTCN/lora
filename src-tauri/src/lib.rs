@@ -288,13 +288,14 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
                     "/C".to_string(),
                     "start".to_string(),
                     "".to_string(),
-                    app_path,
+                    app_path.clone(),
                 ];
                 cmd_args.extend(split_args);
 
                 let result = Command::new("cmd")
                     .creation_flags(0x08000000) // CREATE_NO_WINDOW
                     .args(&cmd_args)
+                    .current_dir(path.parent().unwrap_or(Path::new("."))) // 使用 app_path 的父目录作为工作目录
                     .spawn();
 
                 match result {
@@ -307,6 +308,7 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
                 let result = Command::new("cmd")
                     .args(["/C", "start", "", &app_path])
                     .creation_flags(0x08000000)
+                    .current_dir(path.parent().unwrap_or(Path::new("."))) // 使用 app_path 的父目录作为工作目录
                     .spawn();
 
                 match result {
@@ -318,6 +320,7 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
             let result = Command::new("cmd")
                 .creation_flags(0x08000000)
                 .args(["/C", "start", "", &app_path])
+                .current_dir(path.parent().unwrap_or(Path::new("."))) // 使用 app_path 的父目录作为工作目录
                 .spawn();
 
             match result {
