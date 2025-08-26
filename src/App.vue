@@ -2067,25 +2067,8 @@ const handleFileDrop = async (filePath: string) => {
     await saveAppData()
     console.log('数据保存完成')
 
-    // 新建后立即打开编辑对话框以便用户完善信息
-    editAppDialog.value = {
-      visible: true,
-      app: newApp,
-      editedName: newApp.name,
-      editedCategory: newApp.category,
-      editedIcon: newApp.icon || '',
-      editedTargetPath: newApp.target_path || newApp.path || '',
-      editedLaunchArgs: newApp.launch_args || '',
-      editedTargetType: newApp.target_type || 'file'
-    }
-
-    nextTick(() => {
-      const input = document.querySelector('.dialog.large-dialog .dialog-input') as HTMLInputElement | null
-      if (input) {
-        input.focus()
-        input.select()
-      }
-    })
+    // 拖入行为仅添加到列表并保存，不自动打开编辑对话框。
+    // 只有通过右键新建或在应用上选择编辑时才会打开编辑对话框。
 
   } catch (error) {
     console.error('处理文件失败:', error)
