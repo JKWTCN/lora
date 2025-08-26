@@ -2259,7 +2259,9 @@ const cleanupDragAndDrop = () => {
   background: #f5f5f5;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   position: relative;
-  overflow: visible;
+  /* Ensure children with overflow can scroll inside this flex container */
+  overflow: hidden;
+  min-height: 0;
   /* 减少重排 */
   contain: layout;
 }
@@ -2341,6 +2343,8 @@ const cleanupDragAndDrop = () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* Allow flex child (.app-grid) to shrink and produce its own scroll */
+  min-height: 0;
 }
 
 .content-header {
