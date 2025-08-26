@@ -1028,6 +1028,27 @@ const createNewProject = async () => {
   // 保存数据
   await saveAppData()
 
+  // 打开编辑对话框，允许用户立即编辑新建的项目
+  editAppDialog.value = {
+    visible: true,
+    app: newApp,
+    editedName: newApp.name,
+    editedCategory: newApp.category,
+    editedIcon: newApp.icon || '',
+    editedTargetPath: newApp.target_path || newApp.path || '',
+    editedLaunchArgs: newApp.launch_args || '',
+    editedTargetType: newApp.target_type || 'file'
+  }
+
+  // 聚焦到编辑对话框的名称输入框
+  nextTick(() => {
+    const input = document.querySelector('.dialog.large-dialog .dialog-input') as HTMLInputElement | null
+    if (input) {
+      input.focus()
+      input.select()
+    }
+  })
+
   hideGridContextMenu()
 }
 
@@ -2045,6 +2066,26 @@ const handleFileDrop = async (filePath: string) => {
     console.log('开始保存数据...')
     await saveAppData()
     console.log('数据保存完成')
+
+    // 新建后立即打开编辑对话框以便用户完善信息
+    editAppDialog.value = {
+      visible: true,
+      app: newApp,
+      editedName: newApp.name,
+      editedCategory: newApp.category,
+      editedIcon: newApp.icon || '',
+      editedTargetPath: newApp.target_path || newApp.path || '',
+      editedLaunchArgs: newApp.launch_args || '',
+      editedTargetType: newApp.target_type || 'file'
+    }
+
+    nextTick(() => {
+      const input = document.querySelector('.dialog.large-dialog .dialog-input') as HTMLInputElement | null
+      if (input) {
+        input.focus()
+        input.select()
+      }
+    })
 
   } catch (error) {
     console.error('处理文件失败:', error)
