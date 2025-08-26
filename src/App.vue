@@ -306,7 +306,7 @@ interface AppData {
   icon: string
   path: string
   target_path?: string
-  is_shortcut?: boolean
+  is_shortcut?: false
   launch_args?: string // 启动参数
   target_type?: 'file' | 'folder' | 'url' // 目标类型
 }
@@ -554,8 +554,14 @@ const saveAppData = async () => {
       isDefault: undefined // 移除前端字段
     })).map(({ isDefault, ...rest }) => rest) // 完全移除 isDefault 字段
 
+    // 确保每个 app 包含后端期望的字段，避免缺少 is_shortcut 导致错误
+    const appsForBackend = apps.value.map(a => ({
+      ...a,
+      is_shortcut: a.is_shortcut ?? false
+    }))
+
     await invoke('save_app_data', {
-      apps: apps.value,
+      apps: appsForBackend,
       categories: categoriesForBackend,
       selectedCategory: selectedCategory.value
     })
@@ -1009,7 +1015,11 @@ const createNewProject = async () => {
     name: '新项目',
     category: defaultCategory,
     icon: '',
-    path: ''
+    path: '',
+    target_path: '',
+    is_shortcut: false,
+    launch_args: '',
+    target_type: 'file'
   }
 
   apps.value.push(newApp)
