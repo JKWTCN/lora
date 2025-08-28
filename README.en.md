@@ -1,16 +1,14 @@
 # LORA Organizes & Runs Apps
 
-> [English](./README.en.md) | [简体中文](./README.zh-CN.md)
-
 > A modern app launcher based on **Tauri + Vue 3**, supporting categorized management and quick launch for efficient desktop workflows.
 
 ## 🖼️ Overview
 
-LORA lets you manage, search, and launch Windows programs as easily as mobile apps. Clean UI, smooth operations, and drag-and-drop batch management are supported.
+LORA lets you manage, search, and launch Windows programs as easily as mobile apps. Clean UI, smooth operations, drag-and-drop and batch management supported.
 
 ## 🚀 Features
 
-- **Drag & Drop Apps**: Supports multiple executable types, batch drag, and automatic validation.
+- **Drag & Drop Apps**: Supports multiple executable types, batch drag, auto validation.
 - **Category Management**: Custom groups, quick move via right-click, rename and delete supported.
 - **Quick Launch**: Single/double click, run as admin, more options via right-click.
 - **Smart Search**: Real-time search, keyboard shortcut focus.
@@ -18,7 +16,7 @@ LORA lets you manage, search, and launch Windows programs as easily as mobile ap
 
 ## 🖥️ Screenshots
 
-![Screenshot](image/README/1756392629877.png)
+> (Insert screenshots or demo GIFs here)
 
 ## 🛠️ Tech Stack
 
@@ -49,8 +47,8 @@ pnpm tauri build
 
 ## 🎯 Usage
 
-- **Add Apps**: Drag files or right-click to create a new project
-- **Manage Categories**: Right-click the sidebar to create/rename/delete groups
+- **Add Apps**: Drag files or right-click to create new project
+- **Manage Categories**: Right-click sidebar to create/rename/delete groups
 - **Launch Apps**: Single/double click or right-click for options
 
 ## 🔧 Shortcuts
@@ -82,17 +80,14 @@ Feel free to submit Issues and Pull Requests!
 
 ## ❓ FAQ
 
-Q: Error on launch or unable to add apps?
+> Q: Error on launch or unable to add apps?
+> A: Make sure Node.js, Rust are up-to-date and run as admin.
 
-A: Make sure Node.js and Rust are up-to-date and run as admin.
+> Q: How to batch add apps?
+> A: Drag multiple files to the main window.
 
-Q: How to batch add apps?
-
-A: Drag multiple files to the main window.
-
-Q: Default group can't be deleted?
-
-A: Default group is protected from deletion to avoid accidental data loss.
+> Q: Default group can't be deleted?
+> A: Default group is protected from deletion.
 
 ## 📄 License
 

@@ -14,6 +14,14 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
+// 版本信息结构
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VersionInfo {
+    pub version: String,
+    pub update_date: String,
+    pub last_sync: String,
+}
+
 // 应用数据结构
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AppData {
@@ -157,7 +165,14 @@ fn get_file_info(file_path: String) -> Result<serde_json::Value, String> {
         extract_file_icon(&file_path)
     };
 
+    // 生成唯一ID（使用时间戳）
+    let id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+
     Ok(serde_json::json!({
+        "id": id,
         "name": name,
         "path": file_path,  // 始终返回原始路径（快捷方式路径）
         "extension": if is_shortcut { actual_extension } else { extension },  // 对于快捷方式返回目标文件的扩展名
@@ -903,19 +918,28 @@ fn get_default_settings() -> AppSettings {
     }
 }
 
-// 获取系统信息
+// 获取应用版本号
 #[tauri::command]
-fn get_system_info() -> Result<serde_json::Value, String> {
-    let os_info = std::env::consts::OS;
-    let arch = std::env::consts::ARCH;
+fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
 
-    Ok(serde_json::json!({
-        "os": os_info,
-        "arch": arch,
-        "version": env!("CARGO_PKG_VERSION"),
-        "name": env!("CARGO_PKG_NAME"),
-        "description": env!("CARGO_PKG_DESCRIPTION")
-    }))
+// 获取应用更新日期
+#[tauri::command]
+fn get_app_update_date() -> String {
+    // 尝试从 version-info.json 文件读取更新日期
+    let version_info_path = Path::new("version-info.json");
+
+    if let Ok(json_data) = fs::read_to_string(version_info_path) {
+        if let Ok(version_info) = serde_json::from_str::<VersionInfo>(&json_data) {
+            return version_info.update_date;
+        }
+    }
+
+    // 如果读取失败，返回当前UTC日期作为后备
+    use chrono::Utc;
+    let now = Utc::now();
+    now.format("%Y-%m-%d").to_string()
 }
 
 // 重置设置到默认值
@@ -2238,7 +2262,8 @@ pub fn run() {
             get_app_icon,
             run_as_admin,
             open_file_location,
-            get_system_info,
+            get_app_version,
+            get_app_update_date,
             reset_settings_to_default,
             export_app_data_to_file,
             import_app_data_from_file,

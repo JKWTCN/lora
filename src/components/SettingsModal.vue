@@ -31,7 +31,7 @@
                                 </div>
                                 <div class="app-details">
                                     <h3>Lora Launcher</h3>
-                                    <p class="version">版本 1.0.0</p>
+                                    <p class="version">版本 {{ appVersion }}</p>
                                     <p class="description">
                                         一个简洁高效的应用启动器，让您快速访问常用应用程序。
                                     </p>
@@ -53,7 +53,7 @@
                                 </div>
                                 <div class="info-item">
                                     <label>更新日期：</label>
-                                    <span>2025-08-17</span>
+                                    <span>{{ appUpdateDate }}</span>
                                 </div>
                             </div>
 
@@ -342,6 +342,11 @@ const activeTab = ref('about')
 const isSaving = ref(false)
 const lastSaved = ref(false)
 
+// 应用版本号
+const appVersion = ref('')
+// 应用更新日期
+const appUpdateDate = ref('')
+
 // 本地设置状态
 const localSettings = reactive({
     // 窗口设置
@@ -578,6 +583,20 @@ const loadSettings = async () => {
 
 // 初始化
 loadSettings()
+
+// 获取应用版本号
+const loadAppVersion = async () => {
+    try {
+        appVersion.value = await invoke('get_app_version')
+        appUpdateDate.value = await invoke('get_app_update_date')
+    } catch (error) {
+        console.error('获取版本信息失败:', error)
+        appVersion.value = '未知'
+        appUpdateDate.value = '未知'
+    }
+}
+
+loadAppVersion()
 </script>
 
 <style scoped>

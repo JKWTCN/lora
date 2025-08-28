@@ -2106,9 +2106,10 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "lora"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64 0.21.7",
+ "chrono",
  "ico 0.2.0",
  "image",
  "lnk",
