@@ -1670,10 +1670,12 @@ fn get_app_icon(file_path: String) -> Result<String, String> {
                                 ) {
                                     let mut png_bytes: Vec<u8> = Vec::new();
                                     {
-                                        let mut encoder =
+                                        use image::ImageEncoder;
+
+                                        let encoder =
                                             image::codecs::png::PngEncoder::new(&mut png_bytes);
                                         if encoder
-                                            .encode(
+                                            .write_image(
                                                 &img,
                                                 width as u32,
                                                 height as u32,
@@ -1860,12 +1862,16 @@ async fn toggle_window_visibility(app: tauri::AppHandle) -> Result<String, Strin
     if let Some(window) = app.get_webview_window("main") {
         if window.is_visible().unwrap_or(false) {
             window.hide().map_err(|e| format!("隐藏窗口失败: {}", e))?;
+            // 窗口隐藏时，显示任务栏图标
+            let _ = window.set_skip_taskbar(false);
             Ok("窗口已隐藏".to_string())
         } else {
             window.show().map_err(|e| format!("显示窗口失败: {}", e))?;
             window
                 .set_focus()
                 .map_err(|e| format!("聚焦窗口失败: {}", e))?;
+            // 窗口显示时，隐藏任务栏图标
+            let _ = window.set_skip_taskbar(true);
             Ok("窗口已显示".to_string())
         }
     } else {
@@ -2015,6 +2021,8 @@ pub fn run() {
                                         eprintln!("隐藏窗口失败: {}", e);
                                     } else {
                                         println!("窗口已隐藏");
+                                        // 窗口隐藏时，显示任务栏图标
+                                        let _ = window.set_skip_taskbar(false);
                                     }
                                 } else {
                                     println!("显示并聚焦窗口...");
@@ -2026,6 +2034,8 @@ pub fn run() {
                                             eprintln!("聚焦窗口失败: {}", e);
                                         } else {
                                             println!("窗口已聚焦");
+                                            // 窗口显示时，隐藏任务栏图标
+                                            let _ = window.set_skip_taskbar(true);
                                         }
                                     }
                                 }
@@ -2041,6 +2051,11 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
+            // 立即设置主窗口隐藏任务栏图标（首次启动时）
+            if let Some(main_window) = app.get_webview_window("main") {
+                let _ = main_window.set_skip_taskbar(true);
+            }
+
             // 先加载设置以获取当前状态
             let settings = load_app_settings().unwrap_or_else(|_| get_default_settings());
 
@@ -2146,6 +2161,8 @@ pub fn run() {
                             if let Some(window) = app.get_webview_window("main") {
                                 let _ = window.show();
                                 let _ = window.set_focus();
+                                // 窗口显示时，隐藏任务栏图标
+                                let _ = window.set_skip_taskbar(true);
                             }
                         }
                         "quit" => {
@@ -2162,6 +2179,8 @@ pub fn run() {
                                 if let Some(app) = tray.app_handle().get_webview_window("main") {
                                     let _ = app.show();
                                     let _ = app.set_focus();
+                                    // 窗口显示时，隐藏任务栏图标
+                                    let _ = app.set_skip_taskbar(true);
                                 }
                             }
                         }
@@ -2181,6 +2200,8 @@ pub fn run() {
 
                             // 隐藏窗口到托盘
                             let _ = window_clone.hide();
+                            // 窗口隐藏时，显示任务栏图标
+                            let _ = window_clone.set_skip_taskbar(false);
                         }
                         _ => {}
                     }
