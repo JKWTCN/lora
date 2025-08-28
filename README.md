@@ -1,6 +1,6 @@
 # LORA Organizes & Runs Apps
 
-> [English](./README.en.md) | [简体中文](./README.zh-CN.md)
+> [English](./README.md) | [简体中文](./README.zh-CN.md)
 
 > A modern app launcher based on **Tauri + Vue 3**, supporting categorized management and quick launch for efficient desktop workflows.
 
