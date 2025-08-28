@@ -1580,57 +1580,171 @@ fn save_selected_category(category_id: String) -> Result<String, String> {
 }
 
 // 获取应用图标的专用命令
+
 #[tauri::command]
 fn get_app_icon(file_path: String) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        // 使用系统关联的图标
-        let script = format!(
-            r#"
-            try {{
-                Add-Type -AssemblyName System.Drawing
-                $icon = [System.Drawing.Icon]::ExtractAssociatedIcon('{}')
-                if ($icon) {{
-                    $bitmap = $icon.ToBitmap()
-                    $stream = New-Object System.IO.MemoryStream
-                    $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
-                    $bytes = $stream.ToArray()
-                    $base64 = [System.Convert]::ToBase64String($bytes)
-                    $stream.Dispose()
-                    $bitmap.Dispose()
-                    $icon.Dispose()
-                    Write-Output "data:image/png;base64,$base64"
-                }} else {{
+        use base64::engine::general_purpose;
+        use base64::Engine;
+        use image::{ImageBuffer, Rgba};
+        use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
+        use std::ptr;
+        use winapi::um::shellapi::ExtractIconExW;
+        use winapi::um::wingdi::{GetObjectW, BITMAP};
+        use winapi::um::winuser::ICONINFO;
+
+        // 转换路径为宽字符
+        let wide_path: Vec<u16> = OsStr::new(&file_path)
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        let icon_count =
+            unsafe { ExtractIconExW(wide_path.as_ptr(), -1, ptr::null_mut(), ptr::null_mut(), 0) };
+        let mut success = false;
+        let mut result_str = String::new();
+        if icon_count > 0 {
+            let mut large_icons: Vec<winapi::shared::windef::HICON> =
+                vec![ptr::null_mut(); icon_count as usize];
+            let mut small_icons: Vec<winapi::shared::windef::HICON> =
+                vec![ptr::null_mut(); icon_count as usize];
+            let extracted = unsafe {
+                ExtractIconExW(
+                    wide_path.as_ptr(),
+                    0,
+                    large_icons.as_mut_ptr(),
+                    small_icons.as_mut_ptr(),
+                    icon_count,
+                )
+            };
+            if extracted == icon_count {
+                let icon = large_icons.get(0).copied().unwrap_or(ptr::null_mut());
+                if !icon.is_null() {
+                    let mut icon_info: ICONINFO = unsafe { std::mem::zeroed() };
+                    let result = unsafe {
+                        use winapi::um::winuser::GetIconInfo;
+                        GetIconInfo(icon, &mut icon_info)
+                    };
+                    if result != 0 {
+                        let mut bitmap: BITMAP = unsafe { std::mem::zeroed() };
+                        if unsafe {
+                            GetObjectW(
+                                icon_info.hbmColor as _,
+                                std::mem::size_of::<BITMAP>() as i32,
+                                &mut bitmap as *mut _ as _,
+                            )
+                        } != 0
+                        {
+                            let width = bitmap.bmWidth;
+                            let height = bitmap.bmHeight;
+                            let stride = bitmap.bmWidthBytes as usize;
+                            let buffer_size = (stride * height as usize) as u32;
+                            let mut buffer: Vec<u8> = vec![0; buffer_size as usize];
+                            let bytes_copied = unsafe {
+                                use winapi::um::wingdi::GetBitmapBits;
+                                GetBitmapBits(
+                                    icon_info.hbmColor as _,
+                                    buffer_size as i32,
+                                    buffer.as_mut_ptr() as _,
+                                )
+                            };
+                            if bytes_copied == buffer_size as i32 {
+                                let mut rgba_data =
+                                    Vec::with_capacity((width * height * 4) as usize);
+                                for y in 0..height {
+                                    for x in 0..width {
+                                        let offset = (y * stride as i32 + x * 4) as usize;
+                                        if offset + 3 < buffer.len() {
+                                            rgba_data.push(buffer[offset + 2]); // R
+                                            rgba_data.push(buffer[offset + 1]); // G
+                                            rgba_data.push(buffer[offset + 0]); // B
+                                            rgba_data.push(buffer[offset + 3]); // A
+                                        }
+                                    }
+                                }
+                                if let Some(img) = ImageBuffer::<Rgba<u8>, _>::from_raw(
+                                    width as u32,
+                                    height as u32,
+                                    rgba_data,
+                                ) {
+                                    let mut png_bytes: Vec<u8> = Vec::new();
+                                    {
+                                        let mut encoder =
+                                            image::codecs::png::PngEncoder::new(&mut png_bytes);
+                                        if encoder
+                                            .encode(
+                                                &img,
+                                                width as u32,
+                                                height as u32,
+                                                image::ColorType::Rgba8,
+                                            )
+                                            .is_ok()
+                                        {
+                                            let base64_str =
+                                                general_purpose::STANDARD.encode(&png_bytes);
+                                            result_str =
+                                                format!("data:image/png;base64,{}", base64_str);
+                                            success = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if success {
+            Ok(result_str)
+        } else {
+            // 回退到 PowerShell 方法
+            let script = format!(
+                r#"
+                try {{
+                    Add-Type -AssemblyName System.Drawing
+                    $icon = [System.Drawing.Icon]::ExtractAssociatedIcon('{}')
+                    if ($icon) {{
+                        $bitmap = $icon.ToBitmap()
+                        $stream = New-Object System.IO.MemoryStream
+                        $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
+                        $bytes = $stream.ToArray()
+                        $base64 = [System.Convert]::ToBase64String($bytes)
+                        $stream.Dispose()
+                        $bitmap.Dispose()
+                        $icon.Dispose()
+                        Write-Output "data:image/png;base64,$base64"
+                    }} else {{
+                        Write-Output ""
+                    }}
+                }} catch {{
                     Write-Output ""
                 }}
-            }} catch {{
-                Write-Output ""
-            }}
-            "#,
-            file_path.replace("'", "''")
-        );
+                "#,
+                file_path.replace("'", "''")
+            );
 
-        let output = Command::new("powershell")
-            .args([
-                "-WindowStyle",
-                "Hidden",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                &script,
-            ])
-            .creation_flags(0x08000000)
-            .output()
-            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
+            let output = std::process::Command::new("powershell")
+                .args([
+                    "-WindowStyle",
+                    "Hidden",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    &script,
+                ])
+                .creation_flags(0x08000000)
+                .output()
+                .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
-        let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if !result.is_empty() && result.starts_with("data:image/png;base64,") {
-            Ok(result)
-        } else {
-            Err("无法提取图标".to_string())
+            let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !result.is_empty() && result.starts_with("data:image/png;base64,") {
+                Ok(result)
+            } else {
+                Err("无法提取图标".to_string())
+            }
         }
     }
-
     #[cfg(not(target_os = "windows"))]
     {
         Err("当前平台不支持图标提取".to_string())
