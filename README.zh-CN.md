@@ -18,7 +18,7 @@ LORA 让你像管理手机 App 一样，轻松分类、搜索和启动 Windows �
 
 ## 🖥️ 截图演示
 
-![Screenshot](https://file+.vscode-resource.vscode-cdn.net/d%3A/project/lora/image/README/1756392629877.png)
+![Screenshot](image/README/1756392629877.png)
 
 ## 🛠️ 技术栈
 
