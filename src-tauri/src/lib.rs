@@ -1605,6 +1605,99 @@ fn save_selected_category(category_id: String) -> Result<String, String> {
 
 // 获取应用图标的专用命令
 
+fn extract_icon_from_exe(exe_path: &str) -> Result<String, String> {
+    use base64::engine::general_purpose;
+    use base64::Engine;
+    use std::fs;
+    use std::path::Path;
+    use std::process::Command;
+
+    // 创建临时目录，使用时间戳确保唯一性
+    let temp_dir = format!(
+        "temp_icons_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
+    // 创建临时目录
+    if !Path::new(&temp_dir).exists() {
+        fs::create_dir(&temp_dir).map_err(|e| format!("创建临时目录失败: {}", e))?;
+    }
+
+    // 使用 7z 提取 exe 文件
+    let output = Command::new("7z")
+        .args(&["e", exe_path, &format!("-o{}", temp_dir)])
+        .output()
+        .map_err(|e| format!("执行 7z 失败: {}", e))?;
+
+    if !output.status.success() {
+        // 清理临时目录
+        let _ = fs::remove_dir_all(&temp_dir);
+        return Err("7z 提取失败".to_string());
+    }
+
+    // 查找 ico 文件，选择大小最大的
+    let mut ico_files = Vec::new();
+    if let Ok(entries) = fs::read_dir(&temp_dir) {
+        for entry in entries {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                if let Some(extension) = path.extension() {
+                    if extension == "ico" {
+                        if let Ok(metadata) = fs::metadata(&path) {
+                            ico_files.push((path, metadata.len()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 选择大小最大的 ico 文件
+    let ico_path = ico_files
+        .into_iter()
+        .max_by_key(|&(_, size)| size)
+        .map(|(path, _)| path);
+
+    let result = if let Some(ico_path) = ico_path {
+        // 使用 image crate 加载 ico 文件并转换为 PNG
+        match image::open(&ico_path) {
+            Ok(img) => {
+                let img_buffer = img.to_rgba8();
+                let mut png_bytes: Vec<u8> = Vec::new();
+                {
+                    use image::ImageEncoder;
+                    let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
+                    if encoder
+                        .write_image(
+                            img_buffer.as_raw(),
+                            img_buffer.width(),
+                            img_buffer.height(),
+                            image::ColorType::Rgba8,
+                        )
+                        .is_ok()
+                    {
+                        let base64_encoded = general_purpose::STANDARD.encode(&png_bytes);
+                        Ok(format!("data:image/png;base64,{}", base64_encoded))
+                    } else {
+                        Err("转换 ico 为 PNG 失败".to_string())
+                    }
+                }
+            }
+            Err(e) => Err(format!("加载 ico 文件失败: {}", e)),
+        }
+    } else {
+        Err("未找到 ico 文件".to_string())
+    };
+
+    // 清理临时目录
+    let _ = fs::remove_dir_all(&temp_dir);
+
+    result
+}
+
 #[tauri::command]
 fn get_app_icon(file_path: String) -> Result<String, String> {
     #[cfg(target_os = "windows")]
@@ -1724,50 +1817,57 @@ fn get_app_icon(file_path: String) -> Result<String, String> {
         if success {
             Ok(result_str)
         } else {
-            // 回退到 PowerShell 方法
-            let script = format!(
-                r#"
-                try {{
-                    Add-Type -AssemblyName System.Drawing
-                    $icon = [System.Drawing.Icon]::ExtractAssociatedIcon('{}')
-                    if ($icon) {{
-                        $bitmap = $icon.ToBitmap()
-                        $stream = New-Object System.IO.MemoryStream
-                        $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
-                        $bytes = $stream.ToArray()
-                        $base64 = [System.Convert]::ToBase64String($bytes)
-                        $stream.Dispose()
-                        $bitmap.Dispose()
-                        $icon.Dispose()
-                        Write-Output "data:image/png;base64,$base64"
-                    }} else {{
-                        Write-Output ""
-                    }}
-                }} catch {{
-                    Write-Output ""
-                }}
-                "#,
-                file_path.replace("'", "''")
-            );
+            // 尝试解压 exe 方法
+            println!("尝试解压 exe 文件");
+            match extract_icon_from_exe(&file_path) {
+                Ok(icon_data) => Ok(icon_data),
+                Err(_) => {
+                    // 回退到 PowerShell 方法
+                    let script = format!(
+                        r#"
+                        try {{
+                            Add-Type -AssemblyName System.Drawing
+                            $icon = [System.Drawing.Icon]::ExtractAssociatedIcon('{}')
+                            if ($icon) {{
+                                $bitmap = $icon.ToBitmap()
+                                $stream = New-Object System.IO.MemoryStream
+                                $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
+                                $bytes = $stream.ToArray()
+                                $base64 = [System.Convert]::ToBase64String($bytes)
+                                $stream.Dispose()
+                                $bitmap.Dispose()
+                                $icon.Dispose()
+                                Write-Output "data:image/png;base64,$base64"
+                            }} else {{
+                                Write-Output ""
+                            }}
+                        }} catch {{
+                            Write-Output ""
+                        }}
+                        "#,
+                        file_path.replace("'", "''")
+                    );
 
-            let output = std::process::Command::new("powershell")
-                .args([
-                    "-WindowStyle",
-                    "Hidden",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-Command",
-                    &script,
-                ])
-                .creation_flags(0x08000000)
-                .output()
-                .map_err(|e| format!("PowerShell执行失败: {}", e))?;
+                    let output = std::process::Command::new("powershell")
+                        .args([
+                            "-WindowStyle",
+                            "Hidden",
+                            "-ExecutionPolicy",
+                            "Bypass",
+                            "-Command",
+                            &script,
+                        ])
+                        .creation_flags(0x08000000)
+                        .output()
+                        .map_err(|e| format!("PowerShell执行失败: {}", e))?;
 
-            let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !result.is_empty() && result.starts_with("data:image/png;base64,") {
-                Ok(result)
-            } else {
-                Err("无法提取图标".to_string())
+                    let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    if !result.is_empty() && result.starts_with("data:image/png;base64,") {
+                        Ok(result)
+                    } else {
+                        Err("无法提取图标".to_string())
+                    }
+                }
             }
         }
     }
