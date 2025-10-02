@@ -299,18 +299,14 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
 
                 let split_args: Vec<String> =
                     args_str.split_whitespace().map(|s| s.to_string()).collect();
-                let mut cmd_args = vec![
-                    "/C".to_string(),
-                    "start".to_string(),
-                    "".to_string(),
-                    app_path.clone(),
-                ];
-                cmd_args.extend(split_args);
 
-                let result = Command::new("cmd")
-                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                    .args(&cmd_args)
-                    .current_dir(path.parent().unwrap_or(Path::new("."))) // 使用 app_path 的父目录作为工作目录
+                // 使用更安全的进程创建方式，直接启动应用而不是通过cmd
+                let result = Command::new(&app_path)
+                    .creation_flags(0x00000008 | 0x08000000) // DETACHED_PROCESS | CREATE_NO_WINDOW
+                    .args(&split_args)
+                    .current_dir(path.parent().unwrap_or(Path::new(".")))
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
                     .spawn();
 
                 match result {
@@ -318,12 +314,12 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
                     Err(e) => Err(format!("启动应用失败: {}", e)),
                 }
             } else {
-                use std::os::windows::process::CommandExt;
-
-                let result = Command::new("cmd")
-                    .args(["/C", "start", "", &app_path])
-                    .creation_flags(0x08000000)
-                    .current_dir(path.parent().unwrap_or(Path::new("."))) // 使用 app_path 的父目录作为工作目录
+                // 使用更安全的进程创建方式
+                let result = Command::new(&app_path)
+                    .creation_flags(0x00000008 | 0x08000000) // DETACHED_PROCESS | CREATE_NO_WINDOW
+                    .current_dir(path.parent().unwrap_or(Path::new(".")))
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
                     .spawn();
 
                 match result {
@@ -332,10 +328,12 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
                 }
             }
         } else {
-            let result = Command::new("cmd")
-                .creation_flags(0x08000000)
-                .args(["/C", "start", "", &app_path])
-                .current_dir(path.parent().unwrap_or(Path::new("."))) // 使用 app_path 的父目录作为工作目录
+            // 使用更安全的进程创建方式
+            let result = Command::new(&app_path)
+                .creation_flags(0x00000008 | 0x08000000) // DETACHED_PROCESS | CREATE_NO_WINDOW
+                .current_dir(path.parent().unwrap_or(Path::new(".")))
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
                 .spawn();
 
             match result {
@@ -347,7 +345,11 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
 
     #[cfg(not(target_os = "windows"))]
     {
-        let mut cmd = Command::new(&app_path).creation_flags(0x08000000);
+        let mut cmd = Command::new(&app_path);
+
+        // 重定向输出和错误，防止子进程崩溃影响父进程
+        cmd.stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
 
         if let Some(args_str) = launch_args {
             if !args_str.trim().is_empty() {
