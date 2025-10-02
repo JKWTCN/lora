@@ -30,3 +30,4 @@ image = "0.24"
 ico = "0.2"
 base64 = "0.21"
 chrono = { version = "0.4", features = ["serde"] }
+dirs = "5.0"

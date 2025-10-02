@@ -719,8 +719,8 @@ fn detect_target_type(target_path: String) -> Result<String, String> {
 
 // 获取应用数据目录
 fn get_app_data_dir() -> Result<std::path::PathBuf, String> {
-    // 使用临时路径作为数据目录
-    let mut data_dir = std::env::temp_dir();
+    // 使用 AppData\Local 路径作为数据目录
+    let mut data_dir = dirs::data_local_dir().ok_or("无法获取 AppData\\Local 目录")?;
     data_dir.push("lora_launcher");
 
     // 确保目录存在
