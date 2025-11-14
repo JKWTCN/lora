@@ -1,3 +1,4 @@
+use chrono::{Datelike, Local, NaiveDate, Timelike};
 #[cfg(target_os = "windows")]
 use lnk::ShellLink;
 use serde::{Deserialize, Serialize};
@@ -13,6 +14,7 @@ use tauri::{
     Emitter, Manager, State,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tokio::time::sleep;
 
 // 版本信息结构
 #[derive(Serialize, Deserialize, Debug)]
@@ -94,6 +96,270 @@ pub struct AppStorage {
 #[derive(Debug)]
 pub struct AppState {
     pub settings_window_open: Arc<Mutex<bool>>,
+    pub backup_handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
+}
+
+// 备份任务管理器
+pub struct BackupManager {
+    pub is_running: Arc<Mutex<bool>>,
+}
+
+impl BackupManager {
+    pub fn new() -> Self {
+        Self {
+            is_running: Arc::new(Mutex::new(false)),
+        }
+    }
+
+    // 执行备份
+    pub async fn perform_backup() -> Result<String, String> {
+        println!("开始执行定时备份...");
+
+        // 获取应用数据目录
+        let data_dir = get_app_data_dir()?;
+
+        // 创建备份子目录
+        let backup_dir = data_dir.join("backups");
+        if !backup_dir.exists() {
+            fs::create_dir_all(&backup_dir).map_err(|e| format!("创建备份目录失败: {}", e))?;
+        }
+
+        // 生成备份文件名（带时间戳）
+        let now = Local::now();
+        let timestamp = now.format("%Y%m%d_%H%M%S").to_string();
+        let backup_file_path = backup_dir.join(format!("lora_auto_backup_{}.json", timestamp));
+
+        // 加载应用数据和设置
+        let storage = load_app_data()?;
+        let settings = load_app_settings()?;
+
+        // 创建备份数据
+        let backup_data = serde_json::json!({
+            "storage": storage,
+            "settings": settings,
+            "backup_time": now.timestamp(),
+            "backup_type": "auto",
+            "version": env!("CARGO_PKG_VERSION")
+        });
+
+        // 写入备份文件
+        let json_data = serde_json::to_string_pretty(&backup_data)
+            .map_err(|e| format!("序列化备份数据失败: {}", e))?;
+
+        fs::write(&backup_file_path, json_data).map_err(|e| format!("写入备份文件失败: {}", e))?;
+
+        // 清理旧备份（保留最近10个）
+        Self::cleanup_old_backups(&backup_dir)?;
+
+        let message = format!("自动备份成功完成: {}", backup_file_path.display());
+        println!("{}", message);
+        Ok(message)
+    }
+
+    // 清理旧备份文件，保留最近的10个
+    fn cleanup_old_backups(backup_dir: &Path) -> Result<(), String> {
+        let mut backup_files = Vec::new();
+
+        if let Ok(entries) = fs::read_dir(backup_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                        if file_name.starts_with("lora_auto_backup_")
+                            && file_name.ends_with(".json")
+                        {
+                            if let Ok(metadata) = fs::metadata(&path) {
+                                if let Ok(modified) = metadata.modified() {
+                                    backup_files.push((path, modified));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 按修改时间排序（最新的在前）
+        backup_files.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // 删除超过10个的旧备份
+        if backup_files.len() > 10 {
+            for (path, _) in backup_files.iter().skip(10) {
+                if let Err(e) = fs::remove_file(path) {
+                    println!("删除旧备份文件失败: {}, 错误: {}", path.display(), e);
+                } else {
+                    println!("已删除旧备份文件: {}", path.display());
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    // 计算下次备份时间
+    fn calculate_next_backup_time(interval: &str) -> Result<chrono::DateTime<Local>, String> {
+        let now = Local::now();
+
+        match interval {
+            "daily" => {
+                // 每天备份：明天同一时间
+                let next_day = now.date_naive().succ_opt().ok_or("计算明天日期失败")?;
+                let next_time = next_day
+                    .and_hms_opt(now.hour(), now.minute(), now.second())
+                    .ok_or("构建明天时间失败")?;
+                Ok(next_time
+                    .and_local_timezone(Local)
+                    .single()
+                    .ok_or("构建本地时间失败")?)
+            }
+            "weekly" => {
+                // 每周备份：下周同一时间
+                let days_until_next_week = 7 - now.weekday().num_days_from_monday() % 7;
+                let next_week_date =
+                    now.date_naive() + chrono::Duration::days(days_until_next_week as i64);
+                let next_time = next_week_date
+                    .and_hms_opt(now.hour(), now.minute(), now.second())
+                    .ok_or("构建下周时间失败")?;
+                Ok(next_time
+                    .and_local_timezone(Local)
+                    .single()
+                    .ok_or("构建本地时间失败")?)
+            }
+            "monthly" => {
+                // 每月备份：下个月同一时间
+                let next_month = if now.month() == 12 {
+                    now.year() + 1
+                } else {
+                    now.year()
+                };
+                let next_month_num = if now.month() == 12 {
+                    1
+                } else {
+                    now.month() + 1
+                };
+
+                // 尝试下个月同一天，如果不存在则使用下个月最后一天
+                let next_day = if let Some(date) =
+                    NaiveDate::from_ymd_opt(next_month, next_month_num, now.day())
+                {
+                    date
+                } else {
+                    // 获取下个月最后一天
+                    NaiveDate::from_ymd_opt(next_month, next_month_num + 1, 1)
+                        .and_then(|d| d.pred_opt())
+                        .ok_or("计算下个月最后一天失败")?
+                };
+
+                let next_time = next_day
+                    .and_hms_opt(now.hour(), now.minute(), now.second())
+                    .ok_or("构建下个月时间失败")?;
+                Ok(next_time
+                    .and_local_timezone(Local)
+                    .single()
+                    .ok_or("构建本地时间失败")?)
+            }
+            _ => Err("不支持的备份间隔".to_string()),
+        }
+    }
+
+    // 启动定时备份任务
+    pub async fn start_backup_task(app_handle: tauri::AppHandle) -> Result<(), String> {
+        loop {
+            // 检查是否已启用自动备份
+            let settings = load_app_settings()?;
+            if !settings.auto_backup.unwrap_or(false) {
+                println!("自动备份未启用，等待1小时后重新检查");
+                sleep(Duration::from_secs(3600)).await;
+                continue;
+            }
+
+            let backup_interval = settings.backup_interval.unwrap_or("weekly".to_string());
+            println!("启动定时备份任务，间隔: {}", backup_interval);
+
+            // 计算下次备份时间
+            let next_backup_time = Self::calculate_next_backup_time(&backup_interval)?;
+            let now = Local::now();
+
+            if next_backup_time > now {
+                let duration_until_next = next_backup_time.signed_duration_since(now);
+                let seconds_until_next = duration_until_next.num_seconds().max(0) as u64;
+
+                println!(
+                    "下次备份时间: {}, 等待 {} 秒",
+                    next_backup_time, seconds_until_next
+                );
+
+                // 等待到下次备份时间
+                sleep(Duration::from_secs(seconds_until_next)).await;
+            }
+
+            // 执行备份
+            if let Err(e) = Self::perform_backup().await {
+                println!("自动备份失败: {}", e);
+            }
+        }
+    }
+}
+
+// 手动执行备份
+#[tauri::command]
+async fn manual_backup() -> Result<String, String> {
+    match BackupManager::perform_backup().await {
+        Ok(message) => Ok(message),
+        Err(e) => Err(format!("手动备份失败: {}", e)),
+    }
+}
+
+// 获取备份状态信息
+#[tauri::command]
+fn get_backup_status() -> Result<serde_json::Value, String> {
+    let data_dir = get_app_data_dir()?;
+    let backup_dir = data_dir.join("backups");
+
+    let mut backup_files = Vec::new();
+
+    if backup_dir.exists() {
+        if let Ok(entries) = fs::read_dir(&backup_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                        if file_name.starts_with("lora_auto_backup_")
+                            && file_name.ends_with(".json")
+                        {
+                            if let Ok(metadata) = fs::metadata(&path) {
+                                if let Ok(modified) = metadata.modified() {
+                                    if let Ok(modified_datetime) =
+                                        modified.duration_since(std::time::UNIX_EPOCH)
+                                    {
+                                        backup_files.push(serde_json::json!({
+                                            "name": file_name,
+                                            "path": path.to_string_lossy(),
+                                            "size": metadata.len(),
+                                            "modified": modified_datetime.as_secs()
+                                        }));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 按修改时间排序（最新的在前）
+    backup_files.sort_by(|a, b| {
+        let a_time = a.get("modified").and_then(|v| v.as_u64()).unwrap_or(0);
+        let b_time = b.get("modified").and_then(|v| v.as_u64()).unwrap_or(0);
+        b_time.cmp(&a_time)
+    });
+
+    Ok(serde_json::json!({
+        "backup_dir": backup_dir.to_string_lossy(),
+        "backup_files": backup_files,
+        "total_count": backup_files.len()
+    }))
 }
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -2136,6 +2402,7 @@ pub fn run() {
     // 初始化应用状态
     let app_state = AppState {
         settings_window_open: Arc::new(Mutex::new(false)),
+        backup_handle: Arc::new(Mutex::new(None)),
     };
 
     tauri::Builder::default()
@@ -2361,6 +2628,18 @@ pub fn run() {
                 });
             }
 
+            // 启动定时备份任务 - 延迟到应用完全启动后
+            let app_handle_for_backup = app.handle().clone();
+            std::thread::spawn(move || {
+                // 创建一个新的 Tokio 运行时来运行备份任务
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    if let Err(e) = BackupManager::start_backup_task(app_handle_for_backup).await {
+                        eprintln!("启动备份任务失败: {}", e);
+                    }
+                });
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -2412,6 +2691,8 @@ pub fn run() {
             update_max_search_results,
             update_auto_backup,
             update_backup_interval,
+            manual_backup,
+            get_backup_status,
             save_ui_state,
             update_settings_batch,
             check_auto_start_status,
