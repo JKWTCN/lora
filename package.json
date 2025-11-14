@@ -13,7 +13,6 @@
   "dependencies": {
     "@tauri-apps/api": "^2.9.0",
     "@tauri-apps/plugin-opener": "^2",
-    "@tauri-apps/plugin-updater": "~2",
     "pnpm": "^10.15.1",
     "vue": "^3.5.13"
   },

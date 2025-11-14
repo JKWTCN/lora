@@ -8,8 +8,5 @@
   "windows": [
     "main"
   ],
-  "permissions": [
-    "updater:default",
-    "updater:default"
-  ]
+  "permissions": []
 }

@@ -293,6 +293,33 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
 
     #[cfg(target_os = "windows")]
     {
+        // 检查文件扩展名，如果是快捷方式(.lnk)，解析目标路径
+        let extension = path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        let actual_path = if extension == "lnk" {
+            // 解析快捷方式的目标路径
+            if let Some(target) = resolve_shortcut_target(&app_path) {
+                println!("解析快捷方式目标路径: {}", target);
+                target
+            } else {
+                return Err("无法解析快捷方式目标路径".to_string());
+            }
+        } else if extension == "url" {
+            // 对于 .url 文件(Internet 快捷方式)，使用系统默认方式打开
+            if let Some(url) = resolve_shortcut_target(&app_path) {
+                return open_url(url, launch_args);
+            } else {
+                return Err("无法解析URL快捷方式".to_string());
+            }
+        } else {
+            app_path.clone()
+        };
+
+        // 使用解析后的路径启动应用
         if let Some(args_str) = launch_args {
             if !args_str.trim().is_empty() {
                 use std::os::windows::process::CommandExt;
@@ -301,10 +328,10 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
                     args_str.split_whitespace().map(|s| s.to_string()).collect();
 
                 // 使用更安全的进程创建方式，直接启动应用而不是通过cmd
-                let result = Command::new(&app_path)
+                let result = Command::new(&actual_path)
                     .creation_flags(0x00000008 | 0x08000000) // DETACHED_PROCESS | CREATE_NO_WINDOW
                     .args(&split_args)
-                    .current_dir(path.parent().unwrap_or(Path::new(".")))
+                    .current_dir(Path::new(&actual_path).parent().unwrap_or(Path::new(".")))
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
                     .spawn();
@@ -315,9 +342,9 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
                 }
             } else {
                 // 使用更安全的进程创建方式
-                let result = Command::new(&app_path)
+                let result = Command::new(&actual_path)
                     .creation_flags(0x00000008 | 0x08000000) // DETACHED_PROCESS | CREATE_NO_WINDOW
-                    .current_dir(path.parent().unwrap_or(Path::new(".")))
+                    .current_dir(Path::new(&actual_path).parent().unwrap_or(Path::new(".")))
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
                     .spawn();
@@ -329,9 +356,9 @@ fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, S
             }
         } else {
             // 使用更安全的进程创建方式
-            let result = Command::new(&app_path)
+            let result = Command::new(&actual_path)
                 .creation_flags(0x00000008 | 0x08000000) // DETACHED_PROCESS | CREATE_NO_WINDOW
-                .current_dir(path.parent().unwrap_or(Path::new(".")))
+                .current_dir(Path::new(&actual_path).parent().unwrap_or(Path::new(".")))
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
                 .spawn();
@@ -2112,7 +2139,6 @@ pub fn run() {
     };
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(app_state)
         .plugin(tauri_plugin_opener::init())
         .plugin(
