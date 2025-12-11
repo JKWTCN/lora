@@ -2647,6 +2647,7 @@ pub fn run() {
             save_app_settings,
             load_app_settings,
             save_window_size,
+            get_main_window_size,
             update_prevent_auto_hide,
             update_tray_menu,
             toggle_window_visibility,
@@ -2703,4 +2704,23 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// 获取主窗口大小
+#[tauri::command]
+async fn get_main_window_size(app: tauri::AppHandle) -> Result<(u32, u32), String> {
+    // 获取主窗口
+    if let Some(window) = app.get_webview_window("main") {
+        // 获取窗口大小
+        let size = window
+            .inner_size()
+            .map_err(|e| format!("获取窗口大小失败: {}", e))?;
+        
+        // 转换为逻辑像素
+        let logical_size = size.to_logical::<u32>(window.scale_factor().unwrap_or(1.0));
+        
+        Ok((logical_size.width, logical_size.height))
+    } else {
+        Err("主窗口不存在".to_string())
+    }
 }

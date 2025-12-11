@@ -385,12 +385,36 @@ watch(localSettings, () => {
 // 方法
 const updateWindowSize = async () => {
     try {
+        // 保存窗口大小到设置
         await invoke('save_window_size', {
             width: localSettings.windowWidth,
             height: localSettings.windowHeight
         })
+        
+        // 立即应用到主窗口
+        const { WebviewWindow } = await import('@tauri-apps/api/window')
+        const { LogicalSize } = await import('@tauri-apps/api/dpi')
+        
+        // 获取主窗口（不是设置窗口）
+        try {
+            const mainWindow = new WebviewWindow('main')
+            await mainWindow.setSize(new LogicalSize(
+                localSettings.windowWidth,
+                localSettings.windowHeight
+            ))
+            console.log(`主窗口大小已更新: ${localSettings.windowWidth}x${localSettings.windowHeight}`)
+        } catch (error) {
+            console.error('无法获取主窗口:', error)
+            // 如果无法获取主窗口，尝试通过后端获取窗口大小来验证主窗口是否存在
+            try {
+                await invoke('get_main_window_size')
+                console.log('主窗口存在但无法直接操作')
+            } catch (backendError) {
+                console.error('主窗口不存在:', backendError)
+            }
+        }
     } catch (error) {
-        console.error('保存窗口大小失败:', error)
+        console.error('更新窗口大小失败:', error)
     }
 }
 

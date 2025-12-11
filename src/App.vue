@@ -1590,20 +1590,35 @@ onMounted(async () => {
       }
     }
 
+    // 窗口大小保存防抖变量
+    let resizeTimeout: number | null = null
+
     // 监听窗口大小变化
     try {
       const window = getCurrentWindow()
       await window.listen('tauri://resize', async () => {
         try {
           const size = await window.innerSize()
-          // 保存新的窗口大小
-          await invoke('save_window_size', {
-            width: size.width,
-            height: size.height
-          })
-          console.log(`保存窗口大小: ${size.width}x${size.height}`)
+          
+          // 防抖处理：清除之前的定时器，设置新的定时器
+          if (resizeTimeout) {
+            clearTimeout(resizeTimeout)
+          }
+          
+          // 延迟500ms后保存窗口大小，避免频繁保存
+          resizeTimeout = setTimeout(async () => {
+            try {
+              await invoke('save_window_size', {
+                width: size.width,
+                height: size.height
+              })
+              console.log(`保存窗口大小: ${size.width}x${size.height}`)
+            } catch (error) {
+              console.error('保存窗口大小失败:', error)
+            }
+          }, 500)
         } catch (error) {
-          console.error('保存窗口大小失败:', error)
+          console.error('处理窗口大小变化失败:', error)
         }
       })
       console.log('窗口大小监听器设置成功')
