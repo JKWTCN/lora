@@ -1001,54 +1001,16 @@ const confirmExit = () => {
 
 const createNewProject = async () => {
   console.log('新建项目')
-
-  const defaultCategory = getDefaultCategoryForNewApp()
-  if (!defaultCategory) {
-    showToast('请先创建一个分组', 'warning')
-    return
+  
+  try {
+    // 调用后端命令打开新建项目窗口
+    await invoke('open_new_project_window')
+    console.log('新建项目窗口已打开')
+  } catch (error) {
+    console.error('打开新建项目窗口失败:', error)
+    showToast('打开新建项目窗口失败', 'error')
   }
-
-  // 这里可以添加新建项目的逻辑，比如打开文件选择对话框
-  // 或者添加一个默认的新项目到当前分类
-  const newApp: AppData = {
-    id: Date.now(),
-    name: '新项目',
-    category: defaultCategory,
-    icon: '',
-    path: '',
-    target_path: '',
-    is_shortcut: false,
-    launch_args: '',
-    target_type: 'file'
-  }
-
-  apps.value.push(newApp)
-  console.log('已添加新项目:', newApp)
-
-  // 保存数据
-  await saveAppData()
-
-  // 打开编辑对话框，允许用户立即编辑新建的项目
-  editAppDialog.value = {
-    visible: true,
-    app: newApp,
-    editedName: newApp.name,
-    editedCategory: newApp.category,
-    editedIcon: newApp.icon || '',
-    editedTargetPath: newApp.target_path || newApp.path || '',
-    editedLaunchArgs: newApp.launch_args || '',
-    editedTargetType: newApp.target_type || 'file'
-  }
-
-  // 聚焦到编辑对话框的名称输入框
-  nextTick(() => {
-    const input = document.querySelector('.dialog.large-dialog .dialog-input') as HTMLInputElement | null
-    if (input) {
-      input.focus()
-      input.select()
-    }
-  })
-
+  
   hideGridContextMenu()
 }
 
@@ -1153,27 +1115,40 @@ const moveAppToCategory = async (categoryId: string) => {
 const editApp = async () => {
   if (appContextMenu.value.app) {
     console.log(`编辑应用: ${appContextMenu.value.app.name}`)
-    editAppDialog.value = {
-      visible: true,
-      app: appContextMenu.value.app,
-      editedName: appContextMenu.value.app.name,
-      editedCategory: appContextMenu.value.app.category,
-      editedIcon: appContextMenu.value.app.icon || '',
-      editedTargetPath: appContextMenu.value.app.target_path || appContextMenu.value.app.path,
-      editedLaunchArgs: appContextMenu.value.app.launch_args || '',
-      editedTargetType: appContextMenu.value.app.target_type || 'file'
-    }
+    
+    try {
+      // 调用后端命令打开编辑项目窗口
+      await invoke('open_edit_project_window', {
+        appId: appContextMenu.value.app.id
+      })
+      console.log('编辑项目窗口已打开')
+    } catch (error) {
+      console.error('打开编辑项目窗口失败:', error)
+      showToast('打开编辑项目窗口失败', 'error')
+      
+      // 如果打开新窗口失败，回退到对话框模式
+      editAppDialog.value = {
+        visible: true,
+        app: appContextMenu.value.app,
+        editedName: appContextMenu.value.app.name,
+        editedCategory: appContextMenu.value.app.category,
+        editedIcon: appContextMenu.value.app.icon || '',
+        editedTargetPath: appContextMenu.value.app.target_path || appContextMenu.value.app.path,
+        editedLaunchArgs: appContextMenu.value.app.launch_args || '',
+        editedTargetType: appContextMenu.value.app.target_type || 'file'
+      }
 
-    // 如果没有目标类型，自动检测
-    if (!appContextMenu.value.app.target_type && editAppDialog.value.editedTargetPath) {
-      try {
-        const targetType = await invoke('detect_target_type', {
-          targetPath: editAppDialog.value.editedTargetPath
-        }) as string
-        editAppDialog.value.editedTargetType = targetType as 'file' | 'folder' | 'url'
-      } catch (error) {
-        console.error('检测目标类型失败:', error)
-        editAppDialog.value.editedTargetType = 'file'
+      // 如果没有目标类型，自动检测
+      if (!appContextMenu.value.app.target_type && editAppDialog.value.editedTargetPath) {
+        try {
+          const targetType = await invoke('detect_target_type', {
+            targetPath: editAppDialog.value.editedTargetPath
+          }) as string
+          editAppDialog.value.editedTargetType = targetType as 'file' | 'folder' | 'url'
+        } catch (error) {
+          console.error('检测目标类型失败:', error)
+          editAppDialog.value.editedTargetType = 'file'
+        }
       }
     }
   }
@@ -1642,6 +1617,12 @@ onMounted(async () => {
         ? '已启用阻止自动隐藏'
         : '已禁用阻止自动隐藏'
       showToast(message, 'success')
+    })
+
+    // 监听数据更新事件
+    await listen('data-updated', () => {
+      console.log('收到数据更新通知，重新加载数据')
+      loadAppData()
     })
   }, 100) // 延迟100ms执行，让界面先渲染
 
