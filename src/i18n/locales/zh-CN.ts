@@ -139,13 +139,13 @@ export default {
     about: {
       appName: 'Lora Launcher',
       description: '一个简洁高效的应用启动器，让您快速访问常用应用程序。',
-      developer: '开发者：',
+      developer: '开发者',
       team: 'Lora Team',
-      techStack: '技术栈：',
+      techStack: '技术栈',
       technologies: 'Tauri + Vue 3',
-      license: '许可证：',
+      license: '许可证',
       mitLicense: 'MIT License',
-      updateDate: '更新日期：',
+      updateDate: '更新日期',
       links: {
         github: 'GitHub 仓库',
         reportIssue: '报告问题',
@@ -244,11 +244,33 @@ export default {
   // 新建项目窗口
   newProject: {
     title: '新建项目',
+    projectName: '项目名称',
+    projectNamePlaceholder: '请输入项目名称',
+    category: '所属分组',
+    targetType: '目标类型',
+    targetPath: '目标路径',
+    url: '网址',
+    targetTypeFile: '文件',
+    targetTypeFolder: '文件夹',
+    targetTypeUrl: '网址',
+    filePathPlaceholder: '请输入文件路径',
+    folderPathPlaceholder: '请输入文件夹路径',
+    urlPlaceholder: '请输入网址，如: https://example.com',
+    projectIcon: '项目图标',
+    launchArgs: '启动参数',
+    launchArgsPlaceholder: '请输入启动参数 (如: --fullscreen --debug)',
+    projectDescription: '项目描述',
+    projectDescriptionPlaceholder: '请输入项目描述',
+    allFiles: '所有文件',
+    createProject: '创建项目',
     form: {
       projectName: '项目名称',
       category: '所属分组',
       targetType: '目标类型',
       targetPath: '目标路径',
+      targetTypeFile: '文件',
+      targetTypeFolder: '文件夹',
+      targetTypeUrl: '网址',
       url: '网址',
       projectIcon: '项目图标',
       launchArgs: '启动参数',
@@ -257,7 +279,8 @@ export default {
       folderPlaceholder: '请输入文件夹路径',
       urlPlaceholder: '请输入网址，如: https://example.com',
       launchArgsPlaceholder: '请输入启动参数 (如: --fullscreen --debug)',
-      descriptionPlaceholder: '请输入项目描述'
+      descriptionPlaceholder: '请输入项目描述',
+      saveChanges: '保存'
     },
     footer: {
       cancel: '取消',
@@ -280,11 +303,18 @@ export default {
   // 编辑项目窗口
   editProject: {
     title: '编辑项目',
+    filePathPlaceholder: '请输入文件路径',
+    folderPathPlaceholder: '请输入文件夹路径',
+    urlPlaceholder: '请输入网址，如: https://example.com',
     form: {
       projectName: '项目名称',
+      projectNamePlaceholder: '请输入项目名称',
       category: '所属分组',
       targetType: '目标类型',
       targetPath: '目标路径',
+      targetTypeFile: '文件',
+      targetTypeFolder: '文件夹',
+      targetTypeUrl: '网址',
       url: '网址',
       projectIcon: '项目图标',
       launchArgs: '启动参数',
@@ -293,7 +323,9 @@ export default {
       folderPlaceholder: '请输入文件夹路径',
       urlPlaceholder: '请输入网址，如: https://example.com',
       launchArgsPlaceholder: '请输入启动参数 (如: --fullscreen --debug)',
-      descriptionPlaceholder: '请输入项目描述'
+      descriptionPlaceholder: '请输入项目描述',
+      projectDescriptionPlaceholder: '请输入项目描述',
+      saveChanges: '保存更改'
     },
     footer: {
       cancel: '取消',

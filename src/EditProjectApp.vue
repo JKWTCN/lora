@@ -43,13 +43,13 @@
                         <div class="settings-row">
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">{{ t('editProject.projectName') }}</span>
+                                    <span class="label-text">{{ t('editProject.form.projectName') }}</span>
                                     <span class="label-required">*</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <input type="text"
                                            v-model="projectData.name"
-                                           :placeholder="t('editProject.projectNamePlaceholder')"
+                                           :placeholder="t('editProject.form.projectNamePlaceholder')"
                                            class="setting-input" />
                                     <div class="input-icon">📋</div>
                                 </div>
@@ -57,7 +57,7 @@
 
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">{{ t('editProject.category') }}</span>
+                                    <span class="label-text">{{ t('editProject.form.category') }}</span>
                                     <span class="label-required">*</span>
                                 </label>
                                 <div class="input-wrapper">
@@ -75,16 +75,16 @@
                         <div class="settings-row">
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">{{ t('editProject.targetType') }}</span>
+                                    <span class="label-text">{{ t('editProject.form.targetType') }}</span>
                                     <span class="label-required">*</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <select v-model="projectData.targetType"
                                             @change="handleTargetTypeChange"
                                             class="setting-input">
-                                        <option value="file">{{ t('editProject.targetTypeFile') }}</option>
-                                        <option value="folder">{{ t('editProject.targetTypeFolder') }}</option>
-                                        <option value="url">{{ t('editProject.targetTypeUrl') }}</option>
+                                        <option value="file">{{ t('editProject.form.targetTypeFile') }}</option>
+                                        <option value="folder">{{ t('editProject.form.targetTypeFolder') }}</option>
+                                        <option value="url">{{ t('editProject.form.targetTypeUrl') }}</option>
                                     </select>
                                     <div class="input-icon">🎯</div>
                                 </div>
@@ -92,7 +92,7 @@
 
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text" v-if="projectData.targetType !== 'url'">{{ t('editProject.targetPath') }}</span>
+                                    <span class="label-text" v-if="projectData.targetType !== 'url'">{{ t('editProject.form.targetPath') }}</span>
                                     <span class="label-text" v-else>{{ t('editProject.url') }}</span>
                                     <span class="label-required">*</span>
                                 </label>
@@ -114,7 +114,7 @@
                         <div class="settings-row">
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">{{ t('editProject.projectIcon') }}</span>
+                                    <span class="label-text">{{ t('editProject.form.projectIcon') }}</span>
                                     <span class="label-optional">{{ t('common.optional') }}</span>
                                 </label>
                                 <div class="icon-section compact">
@@ -147,13 +147,13 @@
 
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">{{ t('editProject.launchArgs') }}</span>
+                                    <span class="label-text">{{ t('editProject.form.launchArgs') }}</span>
                                     <span class="label-optional">{{ t('common.optional') }}</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <input type="text"
                                            v-model="projectData.launchArgs"
-                                           :placeholder="t('editProject.launchArgsPlaceholder')"
+                                           :placeholder="t('editProject.form.launchArgsPlaceholder')"
                                            class="setting-input" />
                                     <div class="input-icon">⚙️</div>
                                 </div>
@@ -164,12 +164,12 @@
                         <div class="settings-row">
                             <div class="setting-item full-width">
                                 <label class="setting-label">
-                                    <span class="label-text">{{ t('editProject.projectDescription') }}</span>
+                                    <span class="label-text">{{ t('editProject.form.projectDescription') }}</span>
                                     <span class="label-optional">{{ t('common.optional') }}</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <textarea v-model="projectData.description"
-                                              :placeholder="t('editProject.projectDescriptionPlaceholder')"
+                                              :placeholder="t('editProject.form.projectDescriptionPlaceholder')"
                                               class="setting-input textarea"></textarea>
                                     <div class="input-icon">💬</div>
                                 </div>
@@ -199,7 +199,7 @@
                 </button>
                 <button @click="saveProject" class="footer-button primary" :disabled="!canSave">
                     <i class="icon-check"></i>
-                    {{ t('editProject.saveChanges') }}
+                    {{ t('editProject.form.saveChanges') }}
                 </button>
             </div>
         </div>

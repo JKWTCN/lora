@@ -139,13 +139,13 @@ export default {
     about: {
       appName: 'Lora Launcher',
       description: 'A concise and efficient application launcher that lets you quickly access commonly used applications.',
-      developer: 'Developer: ',
+      developer: 'Developer',
       team: 'Lora Team',
-      techStack: 'Tech Stack: ',
+      techStack: 'Tech Stack',
       technologies: 'Tauri + Vue 3',
-      license: 'License: ',
+      license: 'License',
       mitLicense: 'MIT License',
-      updateDate: 'Update Date: ',
+      updateDate: 'Update Date',
       links: {
         github: 'GitHub Repository',
         reportIssue: 'Report Issue',
@@ -244,12 +244,34 @@ export default {
   // 新建项目窗口
   newProject: {
     title: 'New Project',
+    projectName: 'Project Name',
+    projectNamePlaceholder: 'Please enter project name',
+    category: 'Category',
+    targetType: 'Target Type',
+    targetPath: 'Target Path',
+    url: 'URL',
+    targetTypeFile: 'File',
+    targetTypeFolder: 'Folder',
+    targetTypeUrl: 'URL',
+    filePathPlaceholder: 'Please enter file path',
+    folderPathPlaceholder: 'Please enter folder path',
+    urlPlaceholder: 'Please enter URL, e.g.: https://example.com',
+    projectIcon: 'Project Icon',
+    launchArgs: 'Launch Arguments',
+    launchArgsPlaceholder: 'Please enter launch arguments (e.g.: --fullscreen --debug)',
+    projectDescription: 'Project Description',
+    projectDescriptionPlaceholder: 'Please enter project description',
+    allFiles: 'All Files',
+    createProject: 'Create Project',
     form: {
       projectName: 'Project Name',
       category: 'Category',
       targetType: 'Target Type',
       targetPath: 'Target Path',
       url: 'URL',
+      targetTypeFile: 'File',
+      targetTypeFolder: 'Folder',
+      targetTypeUrl: 'URL',
       projectIcon: 'Project Icon',
       launchArgs: 'Launch Arguments',
       projectDescription: 'Project Description',
@@ -257,7 +279,8 @@ export default {
       folderPlaceholder: 'Please enter folder path',
       urlPlaceholder: 'Please enter URL, e.g.: https://example.com',
       launchArgsPlaceholder: 'Please enter launch arguments (e.g.: --fullscreen --debug)',
-      descriptionPlaceholder: 'Please enter project description'
+      descriptionPlaceholder: 'Please enter project description',
+      saveChanges: 'Save'
     },
     footer: {
       cancel: 'Cancel',
@@ -280,11 +303,18 @@ export default {
   // 编辑项目窗口
   editProject: {
     title: 'Edit Project',
+    filePathPlaceholder: 'Please enter file path',
+    folderPathPlaceholder: 'Please enter folder path',
+    urlPlaceholder: 'Please enter URL, e.g.: https://example.com',
     form: {
       projectName: 'Project Name',
+      projectNamePlaceholder: 'Please enter project name',
       category: 'Category',
       targetType: 'Target Type',
       targetPath: 'Target Path',
+      targetTypeFile: 'File',
+      targetTypeFolder: 'Folder',
+      targetTypeUrl: 'URL',
       url: 'URL',
       projectIcon: 'Project Icon',
       launchArgs: 'Launch Arguments',
@@ -293,7 +323,9 @@ export default {
       folderPlaceholder: 'Please enter folder path',
       urlPlaceholder: 'Please enter URL, e.g.: https://example.com',
       launchArgsPlaceholder: 'Please enter launch arguments (e.g.: --fullscreen --debug)',
-      descriptionPlaceholder: 'Please enter project description'
+      descriptionPlaceholder: 'Please enter project description',
+      projectDescriptionPlaceholder: 'Please enter project description',
+      saveChanges: 'Save Changes'
     },
     footer: {
       cancel: 'Cancel',

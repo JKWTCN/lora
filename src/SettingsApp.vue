@@ -326,9 +326,9 @@ const { t } = useI18n()
 
 // 标签页配置
 const tabs = computed(() => [
-    { id: 'about', name: t('settings.about'), icon: 'icon-info' },
-    { id: 'ui', name: t('settings.ui'), icon: 'icon-display' },
-    { id: 'features', name: t('settings.features'), icon: 'icon-settings' }
+    { id: 'about', name: t('settings.tabs.about'), icon: 'icon-info' },
+    { id: 'ui', name: t('settings.tabs.ui'), icon: 'icon-display' },
+    { id: 'features', name: t('settings.tabs.features'), icon: 'icon-settings' }
 ])
 
 const activeTab = ref('about')
