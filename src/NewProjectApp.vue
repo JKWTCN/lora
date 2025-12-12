@@ -24,13 +24,13 @@
                         <div class="settings-row">
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">项目名称</span>
+                                    <span class="label-text">{{ t('newProject.projectName') }}</span>
                                     <span class="label-required">*</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <input type="text"
                                            v-model="projectData.name"
-                                           placeholder="请输入项目名称"
+                                           :placeholder="t('newProject.projectNamePlaceholder')"
                                            class="setting-input" />
                                     <div class="input-icon">📋</div>
                                 </div>
@@ -38,7 +38,7 @@
 
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">所属分组</span>
+                                    <span class="label-text">{{ t('newProject.category') }}</span>
                                     <span class="label-required">*</span>
                                 </label>
                                 <div class="input-wrapper">
@@ -56,16 +56,16 @@
                         <div class="settings-row">
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">目标类型</span>
+                                    <span class="label-text">{{ t('newProject.targetType') }}</span>
                                     <span class="label-required">*</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <select v-model="projectData.targetType"
                                             @change="handleTargetTypeChange"
                                             class="setting-input">
-                                        <option value="file">文件</option>
-                                        <option value="folder">文件夹</option>
-                                        <option value="url">网址</option>
+                                        <option value="file">{{ t('newProject.targetTypeFile') }}</option>
+                                        <option value="folder">{{ t('newProject.targetTypeFolder') }}</option>
+                                        <option value="url">{{ t('newProject.targetTypeUrl') }}</option>
                                     </select>
                                     <div class="input-icon">🎯</div>
                                 </div>
@@ -73,19 +73,19 @@
 
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text" v-if="projectData.targetType !== 'url'">目标路径</span>
-                                    <span class="label-text" v-else>网址</span>
+                                    <span class="label-text" v-if="projectData.targetType !== 'url'">{{ t('newProject.targetPath') }}</span>
+                                    <span class="label-text" v-else>{{ t('newProject.url') }}</span>
                                     <span class="label-required">*</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <input type="text"
                                            v-model="projectData.targetPath"
-                                           :placeholder="projectData.targetType === 'file' ? '请输入文件路径' : (projectData.targetType === 'folder' ? '请输入文件夹路径' : '请输入网址，如: https://example.com')"
+                                           :placeholder="projectData.targetType === 'file' ? t('newProject.filePathPlaceholder') : (projectData.targetType === 'folder' ? t('newProject.folderPathPlaceholder') : t('newProject.urlPlaceholder'))"
                                            class="setting-input"
                                            @input="handlePathChange" />
                                     <button v-if="projectData.targetType !== 'url'" class="browse-button" @click="browseTarget" type="button">
                                         <i class="icon-folder"></i>
-                                        浏览
+                                        {{ t('common.browse') }}
                                     </button>
                                     <div v-else class="input-icon">🌐</div>
                                 </div>
@@ -96,8 +96,8 @@
                         <div class="settings-row">
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">项目图标</span>
-                                    <span class="label-optional">可选</span>
+                                    <span class="label-text">{{ t('newProject.projectIcon') }}</span>
+                                    <span class="label-optional">{{ t('common.optional') }}</span>
                                 </label>
                                 <div class="icon-section compact">
                                     <div class="icon-preview-container">
@@ -116,12 +116,12 @@
                                     <div class="icon-actions">
                                         <button class="browse-button icon-button primary" @click="selectIcon" type="button">
                                             <i class="icon-image"></i>
-                                            选择
+                                            {{ t('common.select') }}
                                         </button>
                                         <button v-if="projectData.icon" class="browse-button icon-button danger" @click="clearIcon"
                                             type="button">
                                             <i class="icon-close"></i>
-                                            清除
+                                            {{ t('common.clear') }}
                                         </button>
                                     </div>
                                 </div>
@@ -129,13 +129,13 @@
 
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">启动参数</span>
-                                    <span class="label-optional">可选</span>
+                                    <span class="label-text">{{ t('newProject.launchArgs') }}</span>
+                                    <span class="label-optional">{{ t('common.optional') }}</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <input type="text"
                                            v-model="projectData.launchArgs"
-                                           placeholder="请输入启动参数 (如: --fullscreen --debug)"
+                                           :placeholder="t('newProject.launchArgsPlaceholder')"
                                            class="setting-input" />
                                     <div class="input-icon">⚙️</div>
                                 </div>
@@ -146,12 +146,12 @@
                         <div class="settings-row">
                             <div class="setting-item full-width">
                                 <label class="setting-label">
-                                    <span class="label-text">项目描述</span>
-                                    <span class="label-optional">可选</span>
+                                    <span class="label-text">{{ t('newProject.projectDescription') }}</span>
+                                    <span class="label-optional">{{ t('common.optional') }}</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <textarea v-model="projectData.description"
-                                              placeholder="请输入项目描述"
+                                              :placeholder="t('newProject.projectDescriptionPlaceholder')"
                                               class="setting-input textarea"></textarea>
                                     <div class="input-icon">💬</div>
                                 </div>
@@ -177,11 +177,11 @@
             <div class="footer-right">
                 <button @click="cancelProject" class="footer-button secondary">
                     <i class="icon-close"></i>
-                    取消
+                    {{ t('common.cancel') }}
                 </button>
                 <button @click="saveProject" class="footer-button primary" :disabled="!canSave">
                     <i class="icon-check"></i>
-                    创建项目
+                    {{ t('newProject.createProject') }}
                 </button>
             </div>
         </div>
@@ -191,6 +191,9 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const isSaving = ref(false)
 const lastSaved = ref(false)
@@ -211,8 +214,8 @@ const projectData = reactive({
 
 // 保存状态文本
 const saveStatusText = computed(() => {
-    if (isSaving.value) return '正在创建...'
-    if (lastSaved.value) return '已创建'
+    if (isSaving.value) return t('newProject.creating')
+    if (lastSaved.value) return t('newProject.created')
     return ''
 })
 
@@ -240,19 +243,19 @@ const browseTarget = async () => {
         if (projectData.targetType === 'file') {
             // 选择文件
             const filters = [
-                ['所有文件', ['*']],
-                ['可执行文件', ['exe', 'bat', 'cmd', 'msi']],
-                ['脚本文件', ['ps1', 'vbs', 'js', 'py']],
-                ['快捷方式', ['lnk', 'url']]
+                [t('newProject.allFiles'), ['*']],
+                [t('newProject.executableFiles'), ['exe', 'bat', 'cmd', 'msi']],
+                [t('newProject.scriptFiles'), ['ps1', 'vbs', 'js', 'py']],
+                [t('newProject.shortcutFiles'), ['lnk', 'url']]
             ]
             selectedPath = await invoke('open_file_dialog', {
-                title: '选择目标文件',
+                title: t('newProject.selectTargetFile'),
                 filters: filters
             })
         } else if (projectData.targetType === 'folder') {
             // 选择文件夹
             selectedPath = await invoke('open_folder_dialog', {
-                title: '选择目标文件夹'
+                title: t('newProject.selectTargetFolder')
             })
         }
 
@@ -265,8 +268,8 @@ const browseTarget = async () => {
         }
     } catch (error) {
         console.error('浏览文件失败:', error)
-        if (error !== '用户取消了选择') {
-            alert('浏览文件失败: ' + error)
+        if (error !== t('newProject.userCancelled')) {
+            alert(t('newProject.browseFileError') + ': ' + error)
         }
     }
 }
@@ -322,12 +325,12 @@ const handlePathChange = async () => {
 const selectIcon = async () => {
     try {
         const filters = [
-            ['图片文件', ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'ico', 'svg']],
-            ['图标文件', ['ico', 'png']],
-            ['所有文件', ['*']]
+            [t('newProject.imageFiles'), ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'ico', 'svg']],
+            [t('newProject.iconFiles'), ['ico', 'png']],
+            [t('newProject.allFiles'), ['*']]
         ]
         const selectedPath = await invoke('open_file_dialog', {
-            title: '选择图标文件',
+            title: t('newProject.selectIconFile'),
             filters: filters
         })
 
@@ -348,8 +351,8 @@ const selectIcon = async () => {
         }
     } catch (error) {
         console.error('选择图标失败:', error)
-        if (error !== '用户取消了选择') {
-            alert('选择图标失败: ' + error)
+        if (error !== t('newProject.userCancelled')) {
+            alert(t('newProject.selectIconError') + ': ' + error)
         }
     }
 }
@@ -394,7 +397,7 @@ const cancelProject = async () => {
 
 const saveProject = async () => {
     if (!canSave.value) {
-        alert('请填写必要的信息')
+        alert(t('newProject.fillRequiredFields'))
         return
     }
 
@@ -434,7 +437,7 @@ const saveProject = async () => {
         }, 1000)
     } catch (error) {
         console.error('创建项目失败:', error)
-        alert('创建项目失败: ' + error)
+        alert(t('newProject.createProjectError') + ': ' + error)
     } finally {
         isSaving.value = false
     }
@@ -455,7 +458,7 @@ const loadCategories = async () => {
 
         // 确保"全部应用"分组始终存在
         if (!convertedCategories.some(cat => cat.id === 'all')) {
-            convertedCategories.unshift({ id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true })
+            convertedCategories.unshift({ id: 'all', name: t('common.allApps'), icon: 'icon-apps', isDefault: true })
         }
 
         categories.value = convertedCategories

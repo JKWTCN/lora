@@ -21,29 +21,29 @@
                                 <img src="/tauri.svg" alt="Lora" />
                             </div>
                             <div class="app-details">
-                                <h3>Lora Launcher</h3>
-                                <p class="version">版本 {{ appVersion }}</p>
+                                <h3>{{ $t('settings.about.appName') }}</h3>
+                                <p class="version">{{ $t('common.version') }} {{ appVersion }}</p>
                                 <p class="description">
-                                    一个简洁高效的应用启动器，让您快速访问常用应用程序。
+                                    {{ $t('settings.about.description') }}
                                 </p>
                             </div>
                         </div>
 
                         <div class="info-grid">
                             <div class="info-item">
-                                <label>开发者：</label>
+                                <label>{{ $t('settings.about.developer') }}：</label>
                                 <span>Lora Team</span>
                             </div>
                             <div class="info-item">
-                                <label>技术栈：</label>
+                                <label>{{ $t('settings.about.techStack') }}：</label>
                                 <span>Tauri + Vue 3</span>
                             </div>
                             <div class="info-item">
-                                <label>许可证：</label>
+                                <label>{{ $t('settings.about.license') }}：</label>
                                 <span>MIT License</span>
                             </div>
                             <div class="info-item">
-                                <label>更新日期：</label>
+                                <label>{{ $t('settings.about.updateDate') }}：</label>
                                 <span>{{ appUpdateDate }}</span>
                             </div>
                         </div>
@@ -51,15 +51,15 @@
                         <div class="links-section">
                             <button class="link-button" @click="openUrl('https://github.com/JKWTCN/lora')">
                                 <i class="icon-github"></i>
-                                GitHub 仓库
+                                {{ $t('settings.about.links.github') }}
                             </button>
                             <button class="link-button" @click="openUrl('https://github.com/JKWTCN/lora/issues')">
                                 <i class="icon-bug"></i>
-                                报告问题
+                                {{ $t('settings.about.links.reportIssue') }}
                             </button>
                             <button class="link-button" @click="openUrl('https://github.com/JKWTCN/lora/releases')">
                                 <i class="icon-download"></i>
-                                检查更新
+                                {{ $t('settings.about.links.checkUpdate') }}
                             </button>
                         </div>
                     </div>
@@ -68,10 +68,10 @@
                 <!-- 界面设置页面 -->
                 <div v-if="activeTab === 'ui'" class="panel-content">
                     <div class="settings-group">
-                        <h3>窗口设置</h3>
+                        <h3>{{ $t('settings.ui.window.title') }}</h3>
 
                         <div class="setting-item">
-                            <label>窗口宽度</label>
+                            <label>{{ $t('settings.ui.window.width') }}</label>
                             <div class="input-group">
                                 <input type="number" v-model.number="localSettings.windowWidth" min="400" max="1920"
                                     @change="updateWindowSize" />
@@ -80,7 +80,7 @@
                         </div>
 
                         <div class="setting-item">
-                            <label>窗口高度</label>
+                            <label>{{ $t('settings.ui.window.height') }}</label>
                             <div class="input-group">
                                 <input type="number" v-model.number="localSettings.windowHeight" min="300" max="1080"
                                     @change="updateWindowSize" />
@@ -92,28 +92,28 @@
                             <label>
                                 <input type="checkbox" v-model="localSettings.preventAutoHide"
                                     @change="updatePreventAutoHide" />
-                                阻止窗口自动隐藏
+                                {{ $t('settings.ui.window.preventAutoHide') }}
                             </label>
                             <p class="setting-description">
-                                启用此选项后，窗口失去焦点时不会自动隐藏
+                                {{ $t('settings.ui.window.preventAutoHideDesc') }}
                             </p>
                         </div>
                     </div>
 
                     <div class="settings-group">
-                        <h3>外观设置</h3>
+                        <h3>{{ $t('settings.ui.appearance.title') }}</h3>
 
                         <div class="setting-item">
-                            <label>主题</label>
+                            <label>{{ $t('settings.ui.appearance.theme') }}</label>
                             <select v-model="localSettings.theme" @change="updateTheme">
-                                <option value="auto">自动</option>
-                                <option value="light">浅色</option>
-                                <option value="dark">深色</option>
+                                <option value="auto">{{ $t('settings.ui.appearance.auto') }}</option>
+                                <option value="light">{{ $t('settings.ui.appearance.light') }}</option>
+                                <option value="dark">{{ $t('settings.ui.appearance.dark') }}</option>
                             </select>
                         </div>
 
                         <div class="setting-item">
-                            <label>应用图标大小</label>
+                            <label>{{ $t('settings.ui.appearance.iconSize') }}</label>
                             <div class="slider-group">
                                 <input type="range" v-model.number="localSettings.iconSize" min="48" max="128" step="8"
                                     @input="updateIconSize" />
@@ -122,7 +122,7 @@
                         </div>
 
                         <div class="setting-item">
-                            <label>侧栏宽度</label>
+                            <label>{{ $t('settings.ui.appearance.sidebarWidth') }}</label>
                             <div class="slider-group">
                                 <input type="range" v-model.number="localSettings.sidebarWidth" min="120" max="300"
                                     step="10" @input="updateSidebarWidth" />
@@ -132,25 +132,25 @@
                     </div>
 
                     <div class="settings-group">
-                        <h3>动画设置</h3>
+                        <h3>{{ $t('settings.ui.animation.title') }}</h3>
 
                         <div class="setting-item">
                             <label>
                                 <input type="checkbox" v-model="localSettings.enableAnimations"
                                     @change="updateAnimations" />
-                                启用动画效果
+                                {{ $t('settings.ui.animation.enableAnimations') }}
                             </label>
                             <p class="setting-description">
-                                禁用动画可以提高性能，特别是在低配置设备上
+                                {{ $t('settings.ui.animation.enableAnimationsDesc') }}
                             </p>
                         </div>
 
                         <div class="setting-item" v-if="localSettings.enableAnimations">
-                            <label>动画速度</label>
+                            <label>{{ $t('settings.ui.animation.speed') }}</label>
                             <select v-model="localSettings.animationSpeed" @change="updateAnimationSpeed">
-                                <option value="slow">慢速</option>
-                                <option value="normal">正常</option>
-                                <option value="fast">快速</option>
+                                <option value="slow">{{ $t('settings.ui.animation.slow') }}</option>
+                                <option value="normal">{{ $t('settings.ui.animation.normal') }}</option>
+                                <option value="fast">{{ $t('settings.ui.animation.fast') }}</option>
                             </select>
                         </div>
                     </div>
@@ -159,16 +159,16 @@
                 <!-- 功能设置页面 -->
                 <div v-if="activeTab === 'features'" class="panel-content">
                     <div class="settings-group">
-                        <h3>启动设置</h3>
+                        <h3>{{ $t('settings.features.startup.title') }}</h3>
 
                         <div class="setting-item">
                             <label>
                                 <input type="checkbox" v-model="localSettings.startWithSystem"
                                     @change="updateStartWithSystem" />
-                                开机自动启动
+                                {{ $t('settings.features.startup.startWithSystem') }}
                             </label>
                             <p class="setting-description">
-                                将 Lora 添加到系统启动项，开机时自动运行
+                                {{ $t('settings.features.startup.startWithSystemDesc') }}
                             </p>
                         </div>
 
@@ -176,10 +176,10 @@
                             <label>
                                 <input type="checkbox" v-model="localSettings.startMinimized"
                                     @change="updateStartMinimized" />
-                                启动时最小化到托盘
+                                {{ $t('settings.features.startup.startMinimized') }}
                             </label>
                             <p class="setting-description">
-                                程序启动时直接最小化到系统托盘，不显示主窗口
+                                {{ $t('settings.features.startup.startMinimizedDesc') }}
                             </p>
                         </div>
 
@@ -187,23 +187,23 @@
                             <label>
                                 <input type="checkbox" v-model="localSettings.autoHideAfterLaunch"
                                     @change="updateAutoHideAfterLaunch" />
-                                运行应用后自动隐藏
+                                {{ $t('settings.features.startup.autoHideAfterLaunch') }}
                             </label>
                             <p class="setting-description">
-                                启动应用后自动隐藏启动器窗口，避免占用屏幕空间
+                                {{ $t('settings.features.startup.autoHideAfterLaunchDesc') }}
                             </p>
                         </div>
                     </div>
 
                     <div class="settings-group">
-                        <h3>快捷键设置</h3>
+                        <h3>{{ $t('settings.features.hotkey.title') }}</h3>
 
                         <div class="setting-item">
-                            <label>显示/隐藏窗口</label>
+                            <label>{{ $t('settings.features.hotkey.toggleWindow') }}</label>
                             <div class="hotkey-input">
                                 <input type="text" v-model="localSettings.toggleHotkey" @keydown="captureHotkey"
-                                    placeholder="点击设置快捷键" readonly />
-                                <button @click="clearHotkey" class="clear-button">清除</button>
+                                    :placeholder="$t('settings.features.hotkey.setHotkey')" readonly />
+                                <button @click="clearHotkey" class="clear-button">{{ $t('settings.features.hotkey.clear') }}</button>
                             </div>
                         </div>
 
@@ -211,25 +211,25 @@
                             <label>
                                 <input type="checkbox" v-model="localSettings.globalHotkey"
                                     @change="updateGlobalHotkey" />
-                                启用全局快捷键
+                                {{ $t('settings.features.hotkey.enableGlobalHotkey') }}
                             </label>
                             <p class="setting-description">
-                                在任何窗口下都能使用快捷键唤起 Lora
+                                {{ $t('settings.features.hotkey.enableGlobalHotkeyDesc') }}
                             </p>
                         </div>
                     </div>
 
                     <div class="settings-group">
-                        <h3>搜索设置</h3>
+                        <h3>{{ $t('settings.features.search.title') }}</h3>
 
                         <div class="setting-item">
                             <label>
                                 <input type="checkbox" v-model="localSettings.fuzzySearch"
                                     @change="updateFuzzySearch" />
-                                启用模糊搜索
+                                {{ $t('settings.features.search.enableFuzzy') }}
                             </label>
                             <p class="setting-description">
-                                允许不完全匹配的搜索结果，提高搜索的容错性
+                                {{ $t('settings.features.search.enableFuzzyDesc') }}
                             </p>
                         </div>
 
@@ -237,43 +237,43 @@
                             <label>
                                 <input type="checkbox" v-model="localSettings.searchInPath"
                                     @change="updateSearchInPath" />
-                                搜索文件路径
+                                {{ $t('settings.features.search.searchInPath') }}
                             </label>
                             <p class="setting-description">
-                                在搜索时包含文件路径信息
+                                {{ $t('settings.features.search.searchInPathDesc') }}
                             </p>
                         </div>
 
                         <div class="setting-item">
-                            <label>最大搜索结果数</label>
+                            <label>{{ $t('settings.features.search.maxResults') }}</label>
                             <select v-model.number="localSettings.maxSearchResults" @change="updateMaxSearchResults">
-                                <option :value="10">10 个</option>
-                                <option :value="20">20 个</option>
-                                <option :value="50">50 个</option>
-                                <option :value="100">100 个</option>
+                                <option :value="10">10 {{ $t('settings.features.search.results') }}</option>
+                                <option :value="20">20 {{ $t('settings.features.search.results') }}</option>
+                                <option :value="50">50 {{ $t('settings.features.search.results') }}</option>
+                                <option :value="100">100 {{ $t('settings.features.search.results') }}</option>
                             </select>
                         </div>
                     </div>
 
                     <div class="settings-group">
-                        <h3>数据管理</h3>
+                        <h3>{{ $t('settings.features.data.title') }}</h3>
 
                         <div class="setting-item">
                             <label>
                                 <input type="checkbox" v-model="localSettings.autoBackup" @change="updateAutoBackup" />
-                                自动备份数据
+                                {{ $t('settings.features.data.autoBackup') }}
                             </label>
                             <p class="setting-description">
-                                定期自动备份应用数据，防止数据丢失
+                                {{ $t('settings.features.data.autoBackupDesc') }}
                             </p>
                         </div>
 
                         <div class="setting-item" v-if="localSettings.autoBackup">
-                            <label>备份频率</label>
+                            <label>{{ $t('settings.features.data.backupInterval') }}</label>
                             <select v-model="localSettings.backupInterval" @change="updateBackupInterval">
-                                <option value="daily">每天</option>
-                                <option value="weekly">每周</option>
-                                <option value="monthly">每月</option>
+                                <option value="daily">{{ $t('settings.features.data.daily') }}</option>
+                                <option value="weekly">{{ $t('settings.features.data.weekly') }}</option>
+                                <option value="monthly">{{ $t('settings.features.data.monthly') }}</option>
                             </select>
                         </div>
 
@@ -281,15 +281,15 @@
                             <div class="button-group">
                                 <button @click="exportData" class="action-button">
                                     <i class="icon-export"></i>
-                                    导出数据
+                                    {{ $t('settings.features.data.exportData') }}
                                 </button>
                                 <button @click="importData" class="action-button">
                                     <i class="icon-import"></i>
-                                    导入数据
+                                    {{ $t('settings.features.data.importData') }}
                                 </button>
                                 <button @click="resetData" class="action-button danger">
                                     <i class="icon-reset"></i>
-                                    重置数据
+                                    {{ $t('settings.features.data.resetData') }}
                                 </button>
                             </div>
                         </div>
@@ -307,10 +307,10 @@
             </div>
             <div class="footer-right">
                 <button @click="resetToDefaults" class="footer-button secondary">
-                    恢复默认
+                    {{ $t('settings.footer.restoreDefaults') }}
                 </button>
                 <button @click="saveSettings" class="footer-button primary">
-                    保存设置
+                    {{ $t('settings.footer.saveSettings') }}
                 </button>
             </div>
         </div>
@@ -320,13 +320,16 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 // 标签页配置
-const tabs = [
-    { id: 'about', name: '关于', icon: 'icon-info' },
-    { id: 'ui', name: '界面设置', icon: 'icon-display' },
-    { id: 'features', name: '功能设置', icon: 'icon-settings' }
-]
+const tabs = computed(() => [
+    { id: 'about', name: t('settings.about'), icon: 'icon-info' },
+    { id: 'ui', name: t('settings.ui'), icon: 'icon-display' },
+    { id: 'features', name: t('settings.features'), icon: 'icon-settings' }
+])
 
 const activeTab = ref('about')
 const isSaving = ref(false)
@@ -372,8 +375,8 @@ const localSettings = reactive({
 
 // 保存状态文本
 const saveStatusText = computed(() => {
-    if (isSaving.value) return '正在保存...'
-    if (lastSaved.value) return '已保存'
+    if (isSaving.value) return t('settings.saving')
+    if (lastSaved.value) return t('settings.saved')
     return ''
 })
 
@@ -593,10 +596,10 @@ const exportData = async () => {
         isSaving.value = true
         const result = await invoke('export_data')
         console.log('数据导出成功:', result)
-        alert('数据导出成功！')
+        alert(t('settings.dataExportSuccess'))
     } catch (error) {
         console.error('导出数据失败:', error)
-        alert('导出数据失败: ' + error)
+        alert(t('settings.dataExportFailed') + ': ' + error)
     } finally {
         isSaving.value = false
     }
@@ -607,29 +610,29 @@ const importData = async () => {
         isSaving.value = true
         const result = await invoke('import_data')
         console.log('数据导入成功:', result)
-        alert('数据导入成功！请重启应用以应用更改。')
+        alert(t('settings.dataImportSuccess'))
         // 重新加载设置
         await loadSettings()
     } catch (error) {
         console.error('导入数据失败:', error)
-        alert('导入数据失败: ' + error)
+        alert(t('settings.dataImportFailed') + ': ' + error)
     } finally {
         isSaving.value = false
     }
 }
 
 const resetData = async () => {
-    if (confirm('确定要重置所有数据吗？此操作不可撤销！')) {
+    if (confirm(t('settings.confirmResetData'))) {
         try {
             isSaving.value = true
             const result = await invoke('reset_data')
             console.log('数据重置成功:', result)
-            alert('数据重置成功！请重启应用。')
+            alert(t('settings.dataResetSuccess'))
             // 重新加载设置
             await loadSettings()
         } catch (error) {
             console.error('重置数据失败:', error)
-            alert('重置数据失败: ' + error)
+            alert(t('settings.dataResetFailed') + ': ' + error)
         } finally {
             isSaving.value = false
         }
@@ -645,16 +648,16 @@ const openUrl = async (url) => {
 }
 
 const resetToDefaults = async () => {
-    if (confirm('确定要恢复所有设置到默认值吗？')) {
+    if (confirm(t('settings.confirmResetSettings'))) {
         try {
             isSaving.value = true
             await invoke('reset_settings_to_default')
             // 重新加载设置
             await loadSettings()
-            alert('设置已恢复到默认值')
+            alert(t('settings.settingsResetSuccess'))
         } catch (error) {
             console.error('恢复默认设置失败:', error)
-            alert('恢复默认设置失败: ' + error)
+            alert(t('settings.settingsResetFailed') + ': ' + error)
         } finally {
             isSaving.value = false
         }

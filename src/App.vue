@@ -1,26 +1,27 @@
-<template>
+在`<template>
   <div class="app-container" @mouseenter="isMouseInWindow = true" @mouseleave="isMouseInWindow = false">
     <!-- 加载指示器 -->
     <div v-if="isLoading" class="loading-overlay">
       <div class="loading-content">
         <div class="loading-spinner"></div>
-        <div class="loading-text">正在启动 Lora...</div>
+        <div class="loading-text">{{ $t('app.loading') }}</div>
       </div>
     </div>
 
     <!-- 自定义标题栏 -->
     <div class="titlebar">
       <div class="titlebar-left" data-tauri-drag-region @mousedown="handleDragStart" @mouseup="handleDragEnd">
-        <span class="app-title" data-tauri-drag-region>Lora</span>
+        <span class="app-title" data-tauri-drag-region>{{ $t('app.title') }}</span>
       </div>
       <div class="titlebar-right">
-        <button class="titlebar-button" @click="toggleSearch" title="搜索">
+        <LanguageSwitch />
+        <button class="titlebar-button" @click="toggleSearch" :title="$t('main.search.placeholder')">
           <i class="icon-search"></i>
         </button>
-        <button class="titlebar-button" @click="toggleMenu" title="菜单">
+        <button class="titlebar-button" @click="toggleMenu" :title="$t('common.settings')">
           <i class="icon-menu"></i>
         </button>
-        <button class="titlebar-button titlebar-close" @click="closeApp" title="关闭">
+        <button class="titlebar-button titlebar-close" @click="closeApp" :title="$t('common.close')">
           <i class="icon-close"></i>
         </button>
       </div>
@@ -47,28 +48,28 @@
         <div v-if="contextMenu.visible" class="context-menu"
           :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }" @click.stop>
           <div class="context-menu-item" @click="createNewCategory">
-            <span>新建分组</span>
+            <span>{{ $t('main.contextMenu.newCategory') }}</span>
           </div>
           <div v-if="contextMenu.category && !contextMenu.category.isDefault" class="context-menu-item"
             :class="{ 'context-menu-item-disabled': !contextMenu.category }" @click="renameCategory">
-            <span>重命名</span>
+            <span>{{ $t('main.contextMenu.rename') }}</span>
           </div>
           <div v-if="contextMenu.category && !contextMenu.category.isDefault"
             class="context-menu-item context-menu-item-danger"
             :class="{ 'context-menu-item-disabled': !contextMenu.category }" @click="deleteCategory">
-            <span>删除</span>
+            <span>{{ $t('main.contextMenu.delete') }}</span>
           </div>
           <template v-if="!contextMenu.category">
             <div class="context-menu-item context-menu-item-disabled">
-              <span>重命名</span>
+              <span>{{ $t('main.contextMenu.rename') }}</span>
             </div>
             <div class="context-menu-item context-menu-item-disabled">
-              <span>删除</span>
+              <span>{{ $t('main.contextMenu.delete') }}</span>
             </div>
           </template>
           <div class="context-menu-divider"></div>
           <div class="context-menu-item context-menu-item-danger" @click="deleteAllCategories">
-            <span>删除全部分组</span>
+            <span>{{ $t('main.contextMenu.deleteAll') }}</span>
           </div>
         </div>
       </Teleport>
@@ -78,29 +79,29 @@
         <div v-if="appContextMenu.visible" class="context-menu"
           :style="{ left: appContextMenu.x + 'px', top: appContextMenu.y + 'px' }" @click.stop>
           <div class="context-menu-item" @click="runAsAdmin">
-            <span>管理员权限运行</span>
+            <span>{{ $t('main.contextMenu.runAsAdmin') }}</span>
           </div>
           <div class="context-menu-divider"></div>
           <div class="context-menu-item" @click="openFileLocation">
-            <span>打开文件位置</span>
+            <span>{{ $t('main.contextMenu.openFileLocation') }}</span>
           </div>
           <div class="context-menu-item" @click="copyFullPath">
-            <span>复制完整路径</span>
+            <span>{{ $t('main.contextMenu.copyFullPath') }}</span>
           </div>
           <div class="context-menu-divider"></div>
           <div class="context-menu-item" @click="showMoveToSubmenu">
-            <span>移动到</span>
+            <span>{{ $t('main.contextMenu.moveTo') }}</span>
             <span class="arrow-right">▶</span>
           </div>
           <div class="context-menu-divider"></div>
           <div class="context-menu-item" @click="editApp">
-            <span>编辑</span>
+            <span>{{ $t('main.contextMenu.editApp') }}</span>
           </div>
           <div class="context-menu-item context-menu-item-danger" @click="deleteApp">
-            <span>删除</span>
+            <span>{{ $t('main.contextMenu.deleteApp') }}</span>
           </div>
           <div class="context-menu-item context-menu-item-danger" @click="deleteAllApps">
-            <span>删除全部</span>
+            <span>{{ $t('main.contextMenu.deleteAllApps') }}</span>
           </div>
         </div>
       </Teleport>
@@ -110,7 +111,7 @@
         <div v-if="gridContextMenu.visible" class="context-menu"
           :style="{ left: gridContextMenu.x + 'px', top: gridContextMenu.y + 'px' }" @click.stop>
           <div class="context-menu-item" @click="createNewProject">
-            <span>新建项目</span>
+            <span>{{ $t('common.create') }} {{ $t('newProject.title') }}</span>
           </div>
         </div>
       </Teleport>
@@ -131,15 +132,18 @@
         <div v-if="mainMenu.visible" class="context-menu main-menu"
           :style="{ left: mainMenu.x + 'px', top: mainMenu.y + 'px' }" @click.stop>
           <div class="context-menu-item" @click="togglePreventAutoHide">
-            <span>{{ appSettings.preventAutoHide ? '✓' : '○' }} 阻止自动隐藏</span>
+            <span>{{ appSettings.preventAutoHide ? '✓' : '○' }} {{ $t('settings.ui.window.preventAutoHide') }}</span>
           </div>
           <div class="context-menu-divider"></div>
           <div class="context-menu-item" @click="openSettings">
-            <span>设置</span>
+            <span>{{ $t('common.settings') }}</span>
           </div>
+          <!-- <div class="context-menu-item" @click="openLanguageSettings">
+            <span>{{ $t('language.switch') }}</span>
+          </div> -->
           <div class="context-menu-divider"></div>
           <div class="context-menu-item context-menu-item-danger" @click="confirmExit">
-            <span>退出</span>
+            <span>{{ $t('main.confirm.exit') }}</span>
           </div>
         </div>
       </Teleport>
@@ -148,15 +152,15 @@
       <div v-if="renameDialog.visible" class="dialog-overlay" @click="cancelRename">
         <div class="dialog" @click.stop>
           <div class="dialog-header">
-            <h3>重命名分组</h3>
+            <h3>{{ $t('main.dialog.renameCategory') }}</h3>
           </div>
           <div class="dialog-content">
-            <input v-model="renameDialog.newName" type="text" class="dialog-input" placeholder="请输入新名称"
+            <input v-model="renameDialog.newName" type="text" class="dialog-input" :placeholder="$t('main.dialog.newName')"
               @keyup.enter="confirmRename" @keyup.escape="cancelRename" ref="renameInput">
           </div>
           <div class="dialog-actions">
-            <button class="dialog-button dialog-button-secondary" @click="cancelRename">取消</button>
-            <button class="dialog-button dialog-button-primary" @click="confirmRename">确认</button>
+            <button class="dialog-button dialog-button-secondary" @click="cancelRename">{{ $t('common.cancel') }}</button>
+            <button class="dialog-button dialog-button-primary" @click="confirmRename">{{ $t('common.confirm') }}</button>
           </div>
         </div>
       </div>
@@ -174,16 +178,16 @@
       <div v-if="editAppDialog.visible" class="dialog-overlay" @click="cancelEditApp">
         <div class="dialog large-dialog" @click.stop>
           <div class="dialog-header">
-            <h3>编辑应用</h3>
+            <h3>{{ $t('main.dialog.editApp') }}</h3>
           </div>
           <div class="dialog-content">
             <div class="form-group">
-              <label>应用名称:</label>
-              <input v-model="editAppDialog.editedName" type="text" class="dialog-input" placeholder="请输入应用名称"
+              <label>{{ $t('main.dialog.appName') }}:</label>
+              <input v-model="editAppDialog.editedName" type="text" class="dialog-input" :placeholder="$t('main.dialog.appName')"
                 @keyup.enter="confirmEditApp" @keyup.escape="cancelEditApp">
             </div>
             <div class="form-group">
-              <label>所属分组:</label>
+              <label>{{ $t('main.dialog.category') }}:</label>
               <select v-model="editAppDialog.editedCategory" class="dialog-select">
                 <option v-for="category in categories.filter(cat => cat.id !== 'all')" :key="category.id"
                   :value="category.id">
@@ -192,22 +196,22 @@
               </select>
             </div>
             <div class="form-group">
-              <label>目标路径:</label>
+              <label>{{ $t('main.dialog.targetPath') }}:</label>
               <div class="input-group">
                 <input v-model="editAppDialog.editedTargetPath" type="text" class="dialog-input"
-                  placeholder="请输入文件、文件夹路径或网址" @blur="detectTargetType">
+                  :placeholder="$t('main.dialog.filePlaceholder')" @blur="detectTargetType">
                 <button class="browse-button" @click="browseTarget" type="button">
-                  浏览
+                  {{ $t('common.browse') }}
                 </button>
               </div>
             </div>
             <div class="form-group">
-              <label>启动参数 (可选):</label>
+              <label>{{ $t('main.dialog.launchArgs') }}:</label>
               <input v-model="editAppDialog.editedLaunchArgs" type="text" class="dialog-input"
-                placeholder="请输入启动参数 (如: --fullscreen --debug)">
+                :placeholder="$t('main.dialog.launchArgsPlaceholder')">
             </div>
             <div class="form-group">
-              <label>图标 (可选):</label>
+              <label>{{ $t('main.dialog.icon') }}:</label>
               <div class="icon-section">
                 <div class="icon-preview">
                   <img
@@ -222,19 +226,19 @@
                 </div>
                 <div class="icon-actions">
                   <button class="browse-button icon-button" @click="selectIcon" type="button">
-                    选择图标
+                    {{ $t('main.dialog.selectIcon') }}
                   </button>
                   <button v-if="editAppDialog.editedIcon" class="browse-button icon-button danger" @click="clearIcon"
                     type="button">
-                    清除图标
+                    {{ $t('main.dialog.clearIcon') }}
                   </button>
                 </div>
               </div>
             </div>
           </div>
           <div class="dialog-actions">
-            <button class="dialog-button dialog-button-secondary" @click="cancelEditApp">取消</button>
-            <button class="dialog-button dialog-button-primary" @click="confirmEditApp">确认</button>
+            <button class="dialog-button dialog-button-secondary" @click="cancelEditApp">{{ $t('common.cancel') }}</button>
+            <button class="dialog-button dialog-button-primary" @click="confirmEditApp">{{ $t('common.confirm') }}</button>
           </div>
         </div>
       </div>
@@ -247,12 +251,12 @@
         <div class="content-header" v-show="showSearchBox">
           <!-- <h1>{{ getCurrentCategoryName() }}</h1> -->
           <div class="search-box">
-            <input v-model="searchQuery" type="text" placeholder="搜索应用..." class="search-input" ref="searchInputRef"
+            <input v-model="searchQuery" type="text" :placeholder="$t('main.search.placeholder')" class="search-input" ref="searchInputRef"
               @keyup.escape="hideSearchBox" @keydown="handleSearchKeydown">
             <div v-if="searchQuery" class="search-info">
-              找到 {{ filteredApps.length }} 个结果
+              {{ $t('main.search.results', { count: filteredApps.length }) }}
               <span v-if="filteredApps.length > 0" class="search-hint">
-                • 按 Enter 启动第一个 • 按 ESC 退出搜索
+                • {{ $t('main.search.hint') }}
               </span>
             </div>
           </div>
@@ -281,7 +285,7 @@
         <div v-if="isDragOver" class="drag-overlay">
           <div class="drag-message">
             <i class="icon-plus"></i>
-            <p>拖拽程序文件到这里添加到启动器</p>
+            <p>{{ $t('main.drag.message') }}</p>
           </div>
         </div>
       </div>
@@ -297,6 +301,10 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { LogicalSize } from '@tauri-apps/api/dpi'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { useI18n } from 'vue-i18n'
+import LanguageSwitch from './components/LanguageSwitch.vue'
+
+const { t } = useI18n()
 
 // 定义数据接口
 interface AppData {
@@ -439,7 +447,7 @@ const searchInputRef = ref(null)
 
 // 分类数据
 const categories = ref<CategoryData[]>([
-  { id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true },
+  { id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true },
 ])
 
 // 应用数据
@@ -449,7 +457,7 @@ const apps = ref<AppData[]>([])
 const ensureDefaultCategory = () => {
   const hasAllCategory = categories.value.some(cat => cat.id === 'all')
   if (!hasAllCategory) {
-    categories.value.unshift({ id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true })
+    categories.value.unshift({ id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true })
   }
 }
 
@@ -532,7 +540,7 @@ const loadAppData = async () => {
     console.error('加载应用数据失败:', error)
     // 使用默认数据
     categories.value = [
-      { id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true }
+      { id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true }
     ]
     apps.value = []
     selectedCategory.value = 'all'
@@ -713,7 +721,7 @@ const launchApp = async (app: any) => {
   const targetPath = app.target_path || app.path
   if (!targetPath) {
     console.error('应用路径不存在')
-    alert('应用路径不存在，无法启动')
+    alert(t('main.alert.appPathNotExist'))
     return
   }
 
@@ -741,7 +749,7 @@ const launchApp = async (app: any) => {
     console.log('启动成功')
   } catch (error) {
     console.error('启动应用失败:', error)
-    alert(`启动应用失败: ${error}`)
+    alert(`${t('main.alert.launchFailed')}: ${error}`)
   }
 }
 
@@ -970,12 +978,12 @@ const togglePreventAutoHide = async () => {
 
     // 显示状态反馈
     const message = newValue
-      ? '已启用阻止自动隐藏'
-      : '已禁用阻止自动隐藏'
+      ? t('main.toast.preventAutoHideEnabled')
+      : t('main.toast.preventAutoHideDisabled')
     showToast(message, 'success')
   } catch (error) {
     console.error('更新阻止自动隐藏设置失败:', error)
-    showToast('设置更新失败', 'error')
+    showToast(t('main.toast.settingsUpdateFailed'), 'error')
   }
 
   hideMainMenu()
@@ -987,15 +995,25 @@ const openSettings = async () => {
     await invoke('open_settings_window')
   } catch (error) {
     console.error('打开设置窗口失败:', error)
-    showToast('打开设置窗口失败', 'error')
+    showToast(t('main.toast.openSettingsFailed'), 'error')
   }
   hideMainMenu()
 }
 
 const confirmExit = () => {
-  if (confirm('确定要退出应用吗？')) {
+  if (confirm(t('main.confirm.exit'))) {
     closeApp()
   }
+  hideMainMenu()
+}
+
+const openLanguageSettings = () => {
+  // 这里可以打开语言设置对话框或切换语言
+  // 暂时使用简单的语言切换
+  const currentLocale = localStorage.getItem('locale') || 'zh-CN'
+  const newLocale = currentLocale === 'zh-CN' ? 'en-US' : 'zh-CN'
+  localStorage.setItem('locale', newLocale)
+  location.reload() // 重新加载页面以应用新语言
   hideMainMenu()
 }
 
@@ -1008,7 +1026,7 @@ const createNewProject = async () => {
     console.log('新建项目窗口已打开')
   } catch (error) {
     console.error('打开新建项目窗口失败:', error)
-    showToast('打开新建项目窗口失败', 'error')
+    showToast(t('main.toast.openNewProjectFailed'), 'error')
   }
   
   hideGridContextMenu()
@@ -1023,7 +1041,7 @@ const runAsAdmin = async () => {
       console.log('管理员权限运行结果:', result)
     } catch (error) {
       console.error('以管理员权限运行失败:', error)
-      alert(`以管理员权限运行失败: ${error}`)
+      alert(`${t('main.alert.runAsAdminFailed')}: ${error}`)
     }
   }
   hideAppContextMenu()
@@ -1037,7 +1055,7 @@ const openFileLocation = async () => {
       console.log('打开文件位置结果:', result)
     } catch (error) {
       console.error('打开文件位置失败:', error)
-      alert(`打开文件位置失败: ${error}`)
+      alert(`${t('main.alert.openFileLocationFailed')}: ${error}`)
     }
   }
   hideAppContextMenu()
@@ -1049,7 +1067,7 @@ const copyFullPath = async () => {
       await navigator.clipboard.writeText(appContextMenu.value.app.path || '')
       console.log(`已复制路径: ${appContextMenu.value.app.path}`)
       // 可以添加一个临时提示
-      showToast('路径已复制到剪贴板')
+      showToast(t('main.toast.pathCopied'))
     } catch (error) {
       console.error('复制路径失败:', error)
       // 备用方法：创建临时文本区域
@@ -1059,7 +1077,7 @@ const copyFullPath = async () => {
       textArea.select()
       document.execCommand('copy')
       document.body.removeChild(textArea)
-      showToast('路径已复制到剪贴板')
+      showToast(t('main.toast.pathCopied'))
     }
   }
   hideAppContextMenu()
@@ -1124,7 +1142,7 @@ const editApp = async () => {
       console.log('编辑项目窗口已打开')
     } catch (error) {
       console.error('打开编辑项目窗口失败:', error)
-      showToast('打开编辑项目窗口失败', 'error')
+      showToast(t('main.toast.openEditProjectFailed'), 'error')
       
       // 如果打开新窗口失败，回退到对话框模式
       editAppDialog.value = {
@@ -1157,7 +1175,7 @@ const editApp = async () => {
 
 const deleteApp = async () => {
   if (appContextMenu.value.app) {
-    if (confirm(`确定要删除应用 "${appContextMenu.value.app.name}" 吗？`)) {
+    if (confirm(t('app.confirmDeleteApp', { name: appContextMenu.value.app.name }))) {
       try {
         // 调用后端删除
         await invoke('delete_app', { appId: appContextMenu.value.app.id })
@@ -1167,7 +1185,7 @@ const deleteApp = async () => {
         console.log(`已删除应用: ${appContextMenu.value.app.name}`)
       } catch (error) {
         console.error('删除应用失败:', error)
-        alert('删除应用失败')
+        alert(t('main.alert.deleteAppFailed'))
       }
     }
   }
@@ -1175,7 +1193,7 @@ const deleteApp = async () => {
 }
 
 const deleteAllApps = async () => {
-  if (confirm('确定要删除当前分类下的所有应用吗？')) {
+  if (confirm(t('main.confirm.deleteAllApps'))) {
     try {
       // 获取要删除的应用列表
       const appsToDelete = selectedCategory.value === 'all'
@@ -1197,7 +1215,7 @@ const deleteAllApps = async () => {
       console.log('已删除所有应用')
     } catch (error) {
       console.error('删除应用失败:', error)
-      alert('删除应用失败')
+      alert(t('main.alert.deleteAppFailed'))
     }
   }
   hideAppContextMenu()
@@ -1207,7 +1225,7 @@ const createNewCategory = async () => {
   const newId = Date.now().toString()
   const newCategory: CategoryData = {
     id: newId,
-    name: '新分组',
+    name: t('main.contextMenu.newCategory'),
     icon: 'icon-apps',
     isDefault: false
   }
@@ -1292,7 +1310,7 @@ const confirmEditApp = async () => {
 
       // 保存数据
       await saveAppData()
-      showToast('应用信息已更新', 'success')
+      showToast(t('main.toast.appUpdated'), 'success')
     }
   }
   cancelEditApp()
@@ -1315,25 +1333,25 @@ const cancelEditApp = () => {
 const browseTarget = async () => {
   try {
     // 显示选择对话框让用户选择文件或文件夹
-    const choice = confirm('选择文件请点击"确定"，选择文件夹请点击"取消"')
+    const choice = confirm(t('common.select'))
 
     let selectedPath = ''
     if (choice) {
       // 选择文件
       const filters = [
-        ['所有文件', ['*']],
-        ['可执行文件', ['exe', 'bat', 'cmd', 'msi']],
-        ['脚本文件', ['ps1', 'vbs', 'js', 'py']],
-        ['快捷方式', ['lnk', 'url']]
+        [t('common.allFiles'), ['*']],
+        [t('common.executableFiles'), ['exe', 'bat', 'cmd', 'msi']],
+        [t('common.scriptFiles'), ['ps1', 'vbs', 'js', 'py']],
+        [t('common.shortcutFiles'), ['lnk', 'url']]
       ]
       selectedPath = await invoke('open_file_dialog', {
-        title: '选择目标文件',
+        title: t('common.selectFile'),
         filters: filters
       }) as string
     } else {
       // 选择文件夹
       selectedPath = await invoke('open_folder_dialog', {
-        title: '选择目标文件夹'
+        title: t('common.selectFolder'),
       }) as string
     }
 
@@ -1344,8 +1362,8 @@ const browseTarget = async () => {
     }
   } catch (error) {
     console.error('浏览文件失败:', error)
-    if (error !== '用户取消了选择') {
-      showToast('浏览文件失败: ' + error, 'error')
+    if (error !== t('common.userCancelled')) {
+      showToast(t('main.alert.browseFileFailed') + ': ' + error, 'error')
     }
   }
 }
@@ -1372,12 +1390,12 @@ const detectTargetType = async () => {
 const selectIcon = async () => {
   try {
     const filters = [
-      ['图片文件', ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'ico', 'svg']],
-      ['图标文件', ['ico', 'png']],
-      ['所有文件', ['*']]
+      [t('common.imageFiles'), ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'ico', 'svg']],
+      [t('common.iconFiles'), ['ico', 'png']],
+      [t('common.allFiles'), ['*']]
     ]
     const selectedPath = await invoke('open_file_dialog', {
-      title: '选择图标文件',
+      title: t('common.selectIcon'),
       filters: filters
     }) as string
 
@@ -1398,8 +1416,8 @@ const selectIcon = async () => {
     }
   } catch (error) {
     console.error('选择图标失败:', error)
-    if (error !== '用户取消了选择') {
-      showToast('选择图标失败: ' + error, 'error')
+    if (error !== t('common.userCancelled')) {
+      showToast(t('main.alert.selectIconFailed') + ': ' + error, 'error')
     }
   }
 }
@@ -1416,8 +1434,8 @@ const deleteCategory = async () => {
     // 确认删除操作
     const appsInCategory = apps.value.filter(app => app.category === categoryId)
     const confirmMessage = appsInCategory.length > 0
-      ? `确定要删除分组 "${contextMenu.value.category.name}" 吗？这将同时删除该分组下的 ${appsInCategory.length} 个应用。`
-      : `确定要删除分组 "${contextMenu.value.category.name}" 吗？`
+      ? t('app.confirmDeleteGroupWithApps', { name: contextMenu.value.category.name, count: appsInCategory.length })
+      : t('app.confirmDeleteGroup', { name: contextMenu.value.category.name })
 
     if (!confirm(confirmMessage)) {
       hideContextMenu()
@@ -1453,7 +1471,7 @@ const deleteCategory = async () => {
 const deleteAllCategories = async () => {
   const customCategories = categories.value.filter(cat => !cat.isDefault)
   if (customCategories.length === 0) {
-    alert('没有自定义分组可以删除。')
+    alert(t('main.alert.noCustomCategories'))
     hideContextMenu()
     return
   }
@@ -1463,8 +1481,8 @@ const deleteAllCategories = async () => {
   const appsToDelete = apps.value.filter(app => deletedCategoryIds.includes(app.category))
 
   const confirmMessage = appsToDelete.length > 0
-    ? `确定要删除所有 ${customCategories.length} 个自定义分组吗？这将同时删除 ${appsToDelete.length} 个应用。`
-    : `确定要删除所有 ${customCategories.length} 个自定义分组吗？`
+    ? t('app.confirmDeleteAllGroupsWithApps', { groupCount: customCategories.length, appCount: appsToDelete.length })
+    : t('app.confirmDeleteAllGroups', { groupCount: customCategories.length })
 
   if (!confirm(confirmMessage)) {
     hideContextMenu()
@@ -1614,8 +1632,8 @@ onMounted(async () => {
 
       // 显示状态反馈
       const message = event.payload
-        ? '已启用阻止自动隐藏'
-        : '已禁用阻止自动隐藏'
+        ? t('main.toast.preventAutoHideEnabled')
+        : t('main.toast.preventAutoHideDisabled')
       showToast(message, 'success')
     })
 
@@ -2069,7 +2087,7 @@ const handleFileDrop = async (filePath: string) => {
   } catch (error) {
     console.error('处理文件失败:', error)
     // 可以显示错误提示
-    alert(`无法添加文件 "${filePath}": ${error}`)
+    alert(`${t('app.cannotAddFile', { path: filePath })}: ${error}`)
   }
 }
 

@@ -23,11 +23,11 @@
         <div v-if="hasError" class="error-overlay">
             <div class="error-container">
                 <div class="error-icon">⚠️</div>
-                <div class="error-title">加载失败</div>
+                <div class="error-title">{{ t('editProject.loadFailed') }}</div>
                 <div class="error-message">{{ errorMessage }}</div>
                 <div class="error-actions">
-                    <button @click="retryLoading" class="retry-button">重试</button>
-                    <button @click="cancelEdit" class="cancel-button">关闭</button>
+                    <button @click="retryLoading" class="retry-button">{{ t('common.retry') }}</button>
+                    <button @click="cancelEdit" class="cancel-button">{{ t('common.close') }}</button>
                 </div>
             </div>
         </div>
@@ -43,13 +43,13 @@
                         <div class="settings-row">
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">项目名称</span>
+                                    <span class="label-text">{{ t('editProject.projectName') }}</span>
                                     <span class="label-required">*</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <input type="text"
                                            v-model="projectData.name"
-                                           placeholder="请输入项目名称"
+                                           :placeholder="t('editProject.projectNamePlaceholder')"
                                            class="setting-input" />
                                     <div class="input-icon">📋</div>
                                 </div>
@@ -57,7 +57,7 @@
 
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">所属分组</span>
+                                    <span class="label-text">{{ t('editProject.category') }}</span>
                                     <span class="label-required">*</span>
                                 </label>
                                 <div class="input-wrapper">
@@ -75,16 +75,16 @@
                         <div class="settings-row">
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">目标类型</span>
+                                    <span class="label-text">{{ t('editProject.targetType') }}</span>
                                     <span class="label-required">*</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <select v-model="projectData.targetType"
                                             @change="handleTargetTypeChange"
                                             class="setting-input">
-                                        <option value="file">文件</option>
-                                        <option value="folder">文件夹</option>
-                                        <option value="url">网址</option>
+                                        <option value="file">{{ t('editProject.targetTypeFile') }}</option>
+                                        <option value="folder">{{ t('editProject.targetTypeFolder') }}</option>
+                                        <option value="url">{{ t('editProject.targetTypeUrl') }}</option>
                                     </select>
                                     <div class="input-icon">🎯</div>
                                 </div>
@@ -92,18 +92,18 @@
 
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text" v-if="projectData.targetType !== 'url'">目标路径</span>
-                                    <span class="label-text" v-else>网址</span>
+                                    <span class="label-text" v-if="projectData.targetType !== 'url'">{{ t('editProject.targetPath') }}</span>
+                                    <span class="label-text" v-else>{{ t('editProject.url') }}</span>
                                     <span class="label-required">*</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <input type="text"
                                            v-model="projectData.targetPath"
-                                           :placeholder="projectData.targetType === 'file' ? '请输入文件路径' : (projectData.targetType === 'folder' ? '请输入文件夹路径' : '请输入网址，如: https://example.com')"
+                                           :placeholder="projectData.targetType === 'file' ? t('editProject.filePathPlaceholder') : (projectData.targetType === 'folder' ? t('editProject.folderPathPlaceholder') : t('editProject.urlPlaceholder'))"
                                            class="setting-input" />
                                     <button v-if="projectData.targetType !== 'url'" class="browse-button" @click="browseTarget" type="button">
                                         <i class="icon-folder"></i>
-                                        浏览
+                                        {{ t('common.browse') }}
                                     </button>
                                     <div v-else class="input-icon">🌐</div>
                                 </div>
@@ -114,8 +114,8 @@
                         <div class="settings-row">
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">项目图标</span>
-                                    <span class="label-optional">可选</span>
+                                    <span class="label-text">{{ t('editProject.projectIcon') }}</span>
+                                    <span class="label-optional">{{ t('common.optional') }}</span>
                                 </label>
                                 <div class="icon-section compact">
                                     <div class="icon-preview-container">
@@ -134,12 +134,12 @@
                                     <div class="icon-actions">
                                         <button class="browse-button icon-button primary" @click="selectIcon" type="button">
                                             <i class="icon-image"></i>
-                                            选择
+                                            {{ t('common.select') }}
                                         </button>
                                         <button v-if="projectData.icon" class="browse-button icon-button danger" @click="clearIcon"
                                             type="button">
                                             <i class="icon-close"></i>
-                                            清除
+                                            {{ t('common.clear') }}
                                         </button>
                                     </div>
                                 </div>
@@ -147,13 +147,13 @@
 
                             <div class="setting-item half-width">
                                 <label class="setting-label">
-                                    <span class="label-text">启动参数</span>
-                                    <span class="label-optional">可选</span>
+                                    <span class="label-text">{{ t('editProject.launchArgs') }}</span>
+                                    <span class="label-optional">{{ t('common.optional') }}</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <input type="text"
                                            v-model="projectData.launchArgs"
-                                           placeholder="请输入启动参数 (如: --fullscreen --debug)"
+                                           :placeholder="t('editProject.launchArgsPlaceholder')"
                                            class="setting-input" />
                                     <div class="input-icon">⚙️</div>
                                 </div>
@@ -164,12 +164,12 @@
                         <div class="settings-row">
                             <div class="setting-item full-width">
                                 <label class="setting-label">
-                                    <span class="label-text">项目描述</span>
-                                    <span class="label-optional">可选</span>
+                                    <span class="label-text">{{ t('editProject.projectDescription') }}</span>
+                                    <span class="label-optional">{{ t('common.optional') }}</span>
                                 </label>
                                 <div class="input-wrapper">
                                     <textarea v-model="projectData.description"
-                                              placeholder="请输入项目描述"
+                                              :placeholder="t('editProject.projectDescriptionPlaceholder')"
                                               class="setting-input textarea"></textarea>
                                     <div class="input-icon">💬</div>
                                 </div>
@@ -195,11 +195,11 @@
             <div class="footer-right">
                 <button @click="cancelEdit" class="footer-button secondary">
                     <i class="icon-close"></i>
-                    取消
+                    {{ t('common.cancel') }}
                 </button>
                 <button @click="saveProject" class="footer-button primary" :disabled="!canSave">
                     <i class="icon-check"></i>
-                    保存更改
+                    {{ t('editProject.saveChanges') }}
                 </button>
             </div>
         </div>
@@ -210,6 +210,9 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 // 调试日志函数
 const debugLog = (message, data = null) => {
@@ -219,7 +222,7 @@ const debugLog = (message, data = null) => {
 
 // 加载状态
 const isLoading = ref(true)
-const loadingText = ref('正在加载数据...')
+const loadingText = ref(t('editProject.loadingData'))
 const hasError = ref(false)
 const errorMessage = ref('')
 
@@ -244,8 +247,8 @@ const projectData = reactive({
 
 // 保存状态文本
 const saveStatusText = computed(() => {
-    if (isSaving.value) return '正在保存...'
-    if (lastSaved.value) return '已保存'
+    if (isSaving.value) return t('editProject.saving')
+    if (lastSaved.value) return t('editProject.saved')
     return ''
 })
 
@@ -273,21 +276,21 @@ const browseTarget = async () => {
         if (projectData.targetType === 'file') {
             // 选择文件
             const filters = [
-                ['所有文件', ['*']],
-                ['可执行文件', ['exe', 'bat', 'cmd', 'msi']],
-                ['脚本文件', ['ps1', 'vbs', 'js', 'py']],
-                ['快捷方式', ['lnk', 'url']]
+                [t('editProject.allFiles'), ['*']],
+                [t('editProject.executableFiles'), ['exe', 'bat', 'cmd', 'msi']],
+                [t('editProject.scriptFiles'), ['ps1', 'vbs', 'js', 'py']],
+                [t('editProject.shortcutFiles'), ['lnk', 'url']]
             ]
-            debugLog('调用 Tauri API: open_file_dialog', { title: '选择目标文件', filters })
+            debugLog('调用 Tauri API: open_file_dialog', { title: t('editProject.selectTargetFile'), filters })
             selectedPath = await invoke('open_file_dialog', {
-                title: '选择目标文件',
+                title: t('editProject.selectTargetFile'),
                 filters: filters
             })
         } else if (projectData.targetType === 'folder') {
             // 选择文件夹
-            debugLog('调用 Tauri API: open_folder_dialog', { title: '选择目标文件夹' })
+            debugLog('调用 Tauri API: open_folder_dialog', { title: t('editProject.selectTargetFolder') })
             selectedPath = await invoke('open_folder_dialog', {
-                title: '选择目标文件夹'
+                title: t('editProject.selectTargetFolder')
             })
         }
 
@@ -300,8 +303,8 @@ const browseTarget = async () => {
     } catch (error) {
         debugLog('浏览文件失败', error)
         console.error('浏览文件失败:', error)
-        if (error !== '用户取消了选择') {
-            alert('浏览文件失败: ' + error)
+        if (error !== t('editProject.userCancelled')) {
+            alert(t('editProject.browseFileError') + ': ' + error)
         }
     }
 }
@@ -330,13 +333,13 @@ const selectIcon = async () => {
     debugLog('开始选择图标')
     try {
         const filters = [
-            ['图片文件', ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'ico', 'svg']],
-            ['图标文件', ['ico', 'png']],
-            ['所有文件', ['*']]
+            [t('editProject.imageFiles'), ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'ico', 'svg']],
+            [t('editProject.iconFiles'), ['ico', 'png']],
+            [t('editProject.allFiles'), ['*']]
         ]
-        debugLog('调用 Tauri API: open_file_dialog', { title: '选择图标文件', filters })
+        debugLog('调用 Tauri API: open_file_dialog', { title: t('editProject.selectIconFile'), filters })
         const selectedPath = await invoke('open_file_dialog', {
-            title: '选择图标文件',
+            title: t('editProject.selectIconFile'),
             filters: filters
         })
 
@@ -363,8 +366,8 @@ const selectIcon = async () => {
     } catch (error) {
         debugLog('选择图标失败', error)
         console.error('选择图标失败:', error)
-        if (error !== '用户取消了选择') {
-            alert('选择图标失败: ' + error)
+        if (error !== t('editProject.userCancelled')) {
+            alert(t('editProject.selectIconError') + ': ' + error)
         }
     }
 }
@@ -414,7 +417,7 @@ const saveProject = async () => {
     debugLog('开始保存项目', projectData)
     if (!canSave.value) {
         debugLog('验证失败，缺少必要信息')
-        alert('请填写必要的信息')
+        alert(t('editProject.fillRequiredFields'))
         return
     }
 
@@ -456,7 +459,7 @@ const saveProject = async () => {
     } catch (error) {
         debugLog('保存项目失败', error)
         console.error('保存项目失败:', error)
-        alert('保存项目失败: ' + error)
+        alert(t('editProject.saveProjectError') + ': ' + error)
     } finally {
         isSaving.value = false
     }
@@ -465,7 +468,7 @@ const saveProject = async () => {
 // 加载分类数据
 const loadCategories = async () => {
     debugLog('开始加载分类数据')
-    loadingText.value = '正在加载分类数据...'
+    loadingText.value = t('editProject.loadingCategories')
     
     try {
         debugLog('调用 Tauri API: load_app_data')
@@ -486,7 +489,7 @@ const loadCategories = async () => {
         // 确保"全部应用"分组始终存在
         if (!convertedCategories.some(cat => cat.id === 'all')) {
             debugLog('添加默认"全部应用"分组')
-            convertedCategories.unshift({ id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true })
+            convertedCategories.unshift({ id: 'all', name: t('common.allApps'), icon: 'icon-apps', isDefault: true })
         }
 
         categories.value = convertedCategories
@@ -497,8 +500,8 @@ const loadCategories = async () => {
         
         // 降级处理：提供默认分类
         categories.value = [
-            { id: 'all', name: '全部应用', icon: 'icon-apps', isDefault: true },
-            { id: 'default', name: '默认分组', icon: 'icon-folder', isDefault: false }
+            { id: 'all', name: t('common.allApps'), icon: 'icon-apps', isDefault: true },
+            { id: 'default', name: t('editProject.defaultCategory'), icon: 'icon-folder', isDefault: false }
         ]
         debugLog('使用默认分类数据', categories.value)
         
@@ -509,7 +512,7 @@ const loadCategories = async () => {
 // 加载应用数据
 const loadAppData = async () => {
     debugLog('开始加载应用数据')
-    loadingText.value = '正在加载应用数据...'
+    loadingText.value = t('editProject.loadingAppData')
     
     try {
         // 从URL参数获取应用ID
@@ -536,7 +539,7 @@ const loadAppData = async () => {
                 }
             } catch (labelError) {
                 debugLog('从窗口标签获取ID失败', labelError)
-                throw new Error('未找到应用ID参数，请确保通过正确的方式打开编辑窗口')
+                throw new Error(t('editProject.noAppIdError'))
             }
         } else {
             appId.value = parseInt(id)
@@ -597,7 +600,7 @@ const initializeApp = async () => {
     } catch (error) {
         debugLog('应用初始化失败', error)
         hasError.value = true
-        errorMessage.value = error.message || '未知错误'
+        errorMessage.value = error.message || t('editProject.unknownError')
     } finally {
         isLoading.value = false
     }
