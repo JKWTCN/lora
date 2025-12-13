@@ -31,7 +31,7 @@ import { useI18n } from 'vue-i18n'
 import { setLanguage, getCurrentLanguage } from '../i18n'
 import type { SupportedLocale } from '../i18n/types'
 
-const { t, locale } = useI18n()
+const { locale } = useI18n()
 
 const showDropdown = ref(false)
 
@@ -57,7 +57,8 @@ const selectLanguage = (langCode: SupportedLocale) => {
 }
 
 const closeDropdown = (event: MouseEvent) => {
-  if (!event.target.closest('.language-switch')) {
+  const target = event.target as Element | null
+  if (!target || !target.closest('.language-switch')) {
     showDropdown.value = false
   }
 }

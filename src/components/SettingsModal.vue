@@ -662,7 +662,7 @@ loadSettings()
 // 监听窗口尺寸变更事件，确保拖动调整时设置面板能实时显示新值
 window.addEventListener('window-size-changed', (e) => {
     try {
-        const detail = (e as CustomEvent).detail
+        const detail = (e instanceof CustomEvent) ? e.detail : undefined
         if (detail && typeof detail.width === 'number' && typeof detail.height === 'number') {
             localSettings.windowWidth = detail.width
             localSettings.windowHeight = detail.height

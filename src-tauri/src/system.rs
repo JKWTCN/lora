@@ -28,7 +28,7 @@ pub fn detect_target_type(target_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn open_url(url: String, launch_args: Option<String>) -> Result<String, String> {
+pub fn open_url(url: String, _launch_args: Option<String>) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         // use std::os::windows::process::CommandExt;
@@ -90,7 +90,7 @@ pub fn open_url(url: String, launch_args: Option<String>) -> Result<String, Stri
 }
 
 #[tauri::command]
-pub fn open_folder(folder_path: String, launch_args: Option<String>) -> Result<String, String> {
+pub fn open_folder(folder_path: String, _launch_args: Option<String>) -> Result<String, String> {
     let path = Path::new(&folder_path);
     if !path.exists() {
         return Err("文件夹不存在".to_string());

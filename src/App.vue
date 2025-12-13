@@ -1012,15 +1012,6 @@ const confirmExit = async () => {
   hideMainMenu()
 }
 
-const openLanguageSettings = () => {
-  // 这里可以打开语言设置对话框或切换语言
-  // 暂时使用简单的语言切换
-  const currentLocale = localStorage.getItem('locale') || 'zh-CN'
-  const newLocale = currentLocale === 'zh-CN' ? 'en-US' : 'zh-CN'
-  localStorage.setItem('locale', newLocale)
-  location.reload() // 重新加载页面以应用新语言
-  hideMainMenu()
-}
 
 const createNewProject = async () => {
   console.log('新建项目')
@@ -1606,8 +1597,10 @@ onMounted(async () => {
             lw = logicalSize[0]
             lh = logicalSize[1]
           } else if (logicalSize && typeof logicalSize === 'object') {
-            lw = logicalSize[0] ?? logicalSize.width ?? logicalSize["0"]
-            lh = logicalSize[1] ?? logicalSize.height ?? logicalSize["1"]
+            // logicalSize may be an object with numeric keys or width/height props
+            const obj = logicalSize as Record<string, any>
+            lw = (Array.isArray(logicalSize) ? logicalSize[0] : undefined) ?? obj.width ?? obj['0']
+            lh = (Array.isArray(logicalSize) ? logicalSize[1] : undefined) ?? obj.height ?? obj['1']
           }
 
           if (lw == null || lh == null) {
@@ -1630,7 +1623,9 @@ onMounted(async () => {
               console.log(`保存窗口逻辑大小: ${lw}x${lh}`)
               // 通知前端其他组件（例如设置面板）窗口大小已改变（使用逻辑尺寸）
               try {
-                window.dispatchEvent(new CustomEvent('window-size-changed', { detail: { width: lw, height: lh } }))
+                if (typeof globalThis !== 'undefined' && typeof (globalThis as any).dispatchEvent === 'function') {
+                  globalThis.dispatchEvent(new CustomEvent('window-size-changed', { detail: { width: lw, height: lh } }))
+                }
               } catch (e) {
                 console.error('触发 window-size-changed 事件失败:', e)
               }
