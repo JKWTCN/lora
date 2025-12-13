@@ -1,192 +1,117 @@
-# LORA Organizes & Runs Apps
+# LORA - Modern App Launcher
 
-> [English](./README.md) | [简体中文](./README.zh-CN.md)
+<div align="center">
 
-> A modern app launcher based on **Tauri + Vue 3**, supporting categorized management and quick launch for efficient desktop workflows.
+![Version](https://img.shields.io/badge/version-0.1.7-blue.svg)
+![Tauri](https://img.shields.io/badge/Tauri-v2-orange.svg)
+![Vue](https://img.shields.io/badge/Vue-3-green.svg)
+![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
 
-## 🖼️ Overview
+[English](./README.md) | [简体中文](./README.zh-CN.md)
 
-LORA lets you manage, search, and launch Windows programs as easily as mobile apps. Clean UI, smooth operations, and drag-and-drop batch management are supported.
+</div>
 
-## 🚀 Features
+> **LORA** is a modern, lightweight application launcher built with **Tauri v2** and **Vue 3**. It helps you organize your desktop applications into categories, search them instantly, and launch them with a single click. Designed for efficiency and aesthetics.
 
-- **Drag & Drop Apps**: Supports multiple executable types, batch drag, and automatic validation.
-- **Category Management**: Custom groups, quick move via right-click, rename and delete supported.
-- **Quick Launch**: Single/double click, run as admin, more options via right-click.
-- **Smart Search**: Real-time search, keyboard shortcut focus.
-- **Modern UI**: Custom title bar, responsive design, smooth animations.
-- **Lightweight**: Built with Tauri for minimal resource usage and fast startup.
-- **Cross-platform**: Currently optimized for Windows with future cross-platform support.
+## 🖼️ Preview
 
-## 🖥️ Screenshots
+![1765596627735](image/README/1765596627735.png)
 
-![Screenshot](image/README/1756392629877.png)
+## ✨ Key Features
+
+- **📂 Drag & Drop Management**: Simply drag `.exe` or `.lnk` files into the window to add them.
+- **🗂️ Smart Categorization**: Create custom groups to organize your apps (e.g., "Work", "Games", "Tools").
+- **🚀 Quick Launch**: Launch apps instantly. Right-click for "Run as Administrator".
+- **🔍 Instant Search**: Press `Ctrl+F` to focus the search bar and find apps by name.
+- **🌍 Multi-language Support**: Fully localized in English and Simplified Chinese.
+- **💾 Data Backup**: Built-in backup and restore functionality to keep your configuration safe.
+- **🎨 Modern UI**: Clean, responsive interface with smooth animations and custom title bar.
+- **⚡ Lightweight**: Powered by Rust and Tauri, ensuring minimal resource usage.
+
+## 📥 Download
+
+Download the latest version from the [Releases Page](https://github.com/JKWTCN/lora/releases).
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: Vue 3 + TypeScript + Vite
-- **Backend**: Rust + Tauri
-- **Style**: CSS3 + Flexbox/Grid
-- **Package Manager**: pnpm
+- **Frontend**: Vue 3, TypeScript, Vite
+- **Backend**: Rust, Tauri v2
+- **State Management**: Reactive Vue Store
+- **I18n**: vue-i18n
+- **Styling**: Native CSS Variables, Flexbox/Grid
 
-## 📦 Installation & Usage
+## 📦 Development
 
-### Requirements
+### Prerequisites
 
-- Node.js >= 18
-- Rust >= 1.60
-- pnpm >= 8
+- **Node.js** >= 18
+- **pnpm** >= 8
+- **Rust** >= 1.70
+- **Visual Studio Code** (Recommended) with Tauri + Rust Analyzer extensions
 
-### Development
+### Setup
 
-```bash
-# Clone the repository
-git clone https://github.com/JKWTCN/lora.git
-cd lora
+1. **Clone the repository**
 
-# Install dependencies
-pnpm install
+   ```bash
+   git clone https://github.com/JKWTCN/lora.git
+   cd lora
+   ```
+2. **Install dependencies**
 
-# Run in development mode
-pnpm tauri dev
-```
+   ```bash
+   pnpm install
+   ```
+3. **Run in development mode**
+
+   ```bash
+   pnpm tauri dev
+   ```
+
+   This will start the Vite dev server and the Tauri application window.
 
 ### Build
 
-```bash
-# Build for production
-pnpm tauri build
+To build the application for production:
 
-# The built application will be in src-tauri/target/release/bundle/
+```bash
+pnpm tauri build
 ```
 
-## 🎯 Usage
+The output installer/executable will be located in `src-tauri/target/release/bundle/`.
 
-### Getting Started
+## 🎯 Usage Guide
 
-1. **Launch LORA**: Run the application after installation
-2. **Add Apps**: Drag executable files (.exe, .bat, etc.) to the main window or right-click to create a new project
-3. **Organize**: Create custom categories to organize your applications
-4. **Launch**: Single-click or double-click to launch applications
+1. **Add Apps**: Drag and drop any executable or shortcut onto the main area.
+2. **Edit Info**: Right-click an app card to rename, change icon, or delete.
+3. **Manage Categories**: Right-click the sidebar to add, rename, or delete categories.
+4. **Settings**: Click the gear icon to access settings (Language, Backup, etc.).
 
-### Advanced Features
+## ⌨️ Shortcuts
 
-- **Batch Operations**: Select multiple apps to move, delete, or modify properties
-- **Admin Mode**: Right-click and select "Run as administrator" for elevated privileges
-- **Search**: Use Ctrl+F to quickly find applications
-- **Custom Icons**: Applications automatically extract their icons for display
-
-## 🔧 Shortcuts
-
-- `Esc`: Hide search box
-- `Ctrl+F`: Focus search
-- `Enter`: Launch selected application
-- `Delete`: Remove selected application (with confirmation)
+| Shortcut     | Action                      |
+| ------------ | --------------------------- |
+| `Ctrl + F` | Focus Search Bar            |
+| `Esc`      | Clear Search / Close Modals |
+| `Enter`    | Launch Selected App         |
+| `Delete`   | Remove Selected App         |
 
 ## 📁 Project Structure
 
 ```
 lora/
-├── src/                 # Vue frontend source code
-│   ├── components/      # Vue components
-│   ├── assets/          # Static assets
-│   └── *.vue, *.ts      # Application files
-├── src-tauri/           # Rust backend source code
-│   ├── src/             # Rust source files
-│   ├── icons/           # Application icons
+├── src/                 # Frontend (Vue 3)
+│   ├── components/      # UI Components
+│   ├── i18n/            # Localization files
+│   ├── assets/          # Styles and static images
+│   └── ...
+├── src-tauri/           # Backend (Rust)
+│   ├── src/             # Rust source code (Commands, Models)
+│   ├── icons/           # App icons
 │   └── tauri.conf.json  # Tauri configuration
-├── public/              # Public assets
-├── image/               # Screenshots and images
-└── *.json, *.md         # Configuration and documentation
+└── ...
 ```
-
-## 📝 Changelog
-
-### v0.1.6
-
-- 🎉 Latest stable release
-- 🔧 Performance optimizations
-- 🐞 Bug fixes and stability improvements
-
-### v0.1.5
-
-- ✨ New features added
-- 🔧 Performance optimizations
-- 🐞 Bug fixes
-
-### v0.1.4
-
-- ✨ Enhanced user interface
-- 🔧 Performance optimizations
-- 🐞 Bug fixes
-
-### v0.1.3
-
-- ✨ New category management features
-- 🔧 Performance optimizations
-- 🐞 Bug fixes
-
-### v0.1.2
-
-- 🔧 Minor bug fixes and improvements
-
-### v0.1.1
-
-- 🔧 Performance optimizations
-- 🐞 Bug fixes
-
-### v0.1.0
-
-- 🎉 Initial release
-- 📁 Basic category management
-- 🔍 App search
-- 🎨 Modern UI
-
-## 🤝 Contributing
-
-We welcome contributions! Here's how you can help:
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Commit your changes**: `git commit -m 'Add some amazing feature'`
-4. **Push to the branch**: `git push origin feature/amazing-feature`
-5. **Open a Pull Request**
-
-### Development Guidelines
-
-- Follow the existing code style and conventions
-- Add tests for new features
-- Update documentation as needed
-- Ensure all tests pass before submitting
-
-## ❓ FAQ
-
-Q: Error on launch or unable to add apps?
-
-A: Make sure Node.js and Rust are up-to-date and run as admin.
-
-Q: How to batch add apps?
-
-A: Drag multiple files to the main window.
-
-Q: Default group can't be deleted?
-
-A: Default group is protected from deletion to avoid accidental data loss.
-
-Q: Can I customize the appearance?
-
-A: Currently, LORA uses a fixed modern theme. Customization options may be added in future versions.
-
-Q: Is data portable?
-
-A: Yes, your app data is stored locally and can be backed up by copying the application data directory.
 
 ## 📄 License
 
-MIT License
-
-## 🙏 Acknowledgments
-
-- Thanks to the [Tauri](https://tauri.app/) team for the amazing framework
-- Thanks to the [Vue.js](https://vuejs.org/) team for the excellent frontend framework
-- Thanks to all contributors who have helped make LORA better
+Copyright (c) 2025 JKWTCN. All rights reserved.
