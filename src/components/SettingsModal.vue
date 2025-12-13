@@ -559,7 +559,29 @@ const resetToDefaults = () => {
 const saveSettings = async () => {
     isSaving.value = true
     try {
-        await invoke('save_app_settings', { settings: localSettings })
+        // 将前端 camelCase 字段映射为后端期望的 snake_case 字段
+        const settingsPayload = {
+            prevent_auto_hide: localSettings.preventAutoHide,
+            window_width: localSettings.windowWidth,
+            window_height: localSettings.windowHeight,
+            theme: localSettings.theme,
+            icon_size: localSettings.iconSize,
+            sidebar_width: localSettings.sidebarWidth,
+            enable_animations: localSettings.enableAnimations,
+            animation_speed: localSettings.animationSpeed,
+            start_with_system: localSettings.startWithSystem,
+            start_minimized: localSettings.startMinimized,
+            auto_hide_after_launch: localSettings.autoHideAfterLaunch,
+            toggle_hotkey: localSettings.toggleHotkey,
+            global_hotkey: localSettings.globalHotkey,
+            fuzzy_search: localSettings.fuzzySearch,
+            search_in_path: localSettings.searchInPath,
+            max_search_results: localSettings.maxSearchResults,
+            auto_backup: localSettings.autoBackup,
+            backup_interval: localSettings.backupInterval
+        }
+
+        await invoke('save_app_settings', { settings: settingsPayload })
         lastSaved.value = true
         setTimeout(() => {
             lastSaved.value = false
@@ -575,7 +597,60 @@ const saveSettings = async () => {
 const loadSettings = async () => {
     try {
         const settings = await invoke('load_app_settings')
-        Object.assign(localSettings, settings)
+        // 后端使用 snake_case 字段，前端使用 camelCase，手动映射以确保字段正确更新
+        if (settings) {
+            if (settings.window_width !== undefined && settings.window_width !== null) {
+                localSettings.windowWidth = settings.window_width
+            }
+            if (settings.window_height !== undefined && settings.window_height !== null) {
+                localSettings.windowHeight = settings.window_height
+            }
+            if (settings.prevent_auto_hide !== undefined && settings.prevent_auto_hide !== null) {
+                localSettings.preventAutoHide = settings.prevent_auto_hide
+            }
+            if (settings.theme !== undefined && settings.theme !== null) {
+                localSettings.theme = settings.theme
+            }
+            if (settings.icon_size !== undefined && settings.icon_size !== null) {
+                localSettings.iconSize = settings.icon_size
+            }
+            if (settings.sidebar_width !== undefined && settings.sidebar_width !== null) {
+                localSettings.sidebarWidth = settings.sidebar_width
+            }
+            if (settings.enable_animations !== undefined && settings.enable_animations !== null) {
+                localSettings.enableAnimations = settings.enable_animations
+            }
+            if (settings.animation_speed !== undefined && settings.animation_speed !== null) {
+                localSettings.animationSpeed = settings.animation_speed
+            }
+            if (settings.start_with_system !== undefined && settings.start_with_system !== null) {
+                localSettings.startWithSystem = settings.start_with_system
+            }
+            if (settings.start_minimized !== undefined && settings.start_minimized !== null) {
+                localSettings.startMinimized = settings.start_minimized
+            }
+            if (settings.toggle_hotkey !== undefined && settings.toggle_hotkey !== null) {
+                localSettings.toggleHotkey = settings.toggle_hotkey
+            }
+            if (settings.global_hotkey !== undefined && settings.global_hotkey !== null) {
+                localSettings.globalHotkey = settings.global_hotkey
+            }
+            if (settings.fuzzy_search !== undefined && settings.fuzzy_search !== null) {
+                localSettings.fuzzySearch = settings.fuzzy_search
+            }
+            if (settings.search_in_path !== undefined && settings.search_in_path !== null) {
+                localSettings.searchInPath = settings.search_in_path
+            }
+            if (settings.max_search_results !== undefined && settings.max_search_results !== null) {
+                localSettings.maxSearchResults = settings.max_search_results
+            }
+            if (settings.auto_backup !== undefined && settings.auto_backup !== null) {
+                localSettings.autoBackup = settings.auto_backup
+            }
+            if (settings.backup_interval !== undefined && settings.backup_interval !== null) {
+                localSettings.backupInterval = settings.backup_interval
+            }
+        }
     } catch (error) {
         console.error('加载设置失败:', error)
     }
@@ -583,6 +658,21 @@ const loadSettings = async () => {
 
 // 初始化
 loadSettings()
+
+// 监听窗口尺寸变更事件，确保拖动调整时设置面板能实时显示新值
+window.addEventListener('window-size-changed', (e) => {
+    try {
+        const detail = (e as CustomEvent).detail
+        if (detail && typeof detail.width === 'number' && typeof detail.height === 'number') {
+            localSettings.windowWidth = detail.width
+            localSettings.windowHeight = detail.height
+            // 触发界面更新事件
+            emit('update:settings', { ...localSettings })
+        }
+    } catch (err) {
+        console.error('处理 window-size-changed 事件失败:', err)
+    }
+})
 
 // 获取应用版本号
 const loadAppVersion = async () => {

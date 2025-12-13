@@ -1000,9 +1000,14 @@ const openSettings = async () => {
   hideMainMenu()
 }
 
-const confirmExit = () => {
+const confirmExit = async () => {
   if (confirm(t('main.confirm.exit'))) {
-    closeApp()
+    try {
+      await invoke('quit_app')
+    } catch (error) {
+      console.error('退出应用失败:', error)
+      showToast(t('main.toast.exitFailed'), 'error')
+    }
   }
   hideMainMenu()
 }
@@ -1591,21 +1596,44 @@ onMounted(async () => {
       const window = getCurrentWindow()
       await window.listen('tauri://resize', async () => {
         try {
-          const size = await window.innerSize()
-          
+          // 获取后端转换为逻辑像素的主窗口大小，避免 DPI 缩放造成的物理/逻辑像素混淆
+          const logicalSize = await invoke('get_main_window_size')
+
+          // defensive parsing: server returns [width, height] or object
+          let lw = null
+          let lh = null
+          if (Array.isArray(logicalSize) && logicalSize.length >= 2) {
+            lw = logicalSize[0]
+            lh = logicalSize[1]
+          } else if (logicalSize && typeof logicalSize === 'object') {
+            lw = logicalSize[0] ?? logicalSize.width ?? logicalSize["0"]
+            lh = logicalSize[1] ?? logicalSize.height ?? logicalSize["1"]
+          }
+
+          if (lw == null || lh == null) {
+            console.error('无法从后端获取逻辑窗口尺寸', logicalSize)
+            return
+          }
+
           // 防抖处理：清除之前的定时器，设置新的定时器
           if (resizeTimeout) {
             clearTimeout(resizeTimeout)
           }
-          
+
           // 延迟500ms后保存窗口大小，避免频繁保存
           resizeTimeout = setTimeout(async () => {
             try {
               await invoke('save_window_size', {
-                width: size.width,
-                height: size.height
+                width: lw,
+                height: lh
               })
-              console.log(`保存窗口大小: ${size.width}x${size.height}`)
+              console.log(`保存窗口逻辑大小: ${lw}x${lh}`)
+              // 通知前端其他组件（例如设置面板）窗口大小已改变（使用逻辑尺寸）
+              try {
+                window.dispatchEvent(new CustomEvent('window-size-changed', { detail: { width: lw, height: lh } }))
+              } catch (e) {
+                console.error('触发 window-size-changed 事件失败:', e)
+              }
             } catch (error) {
               console.error('保存窗口大小失败:', error)
             }
@@ -1866,8 +1894,9 @@ const handleWindowBlur = async () => {
     return
   }
 
-  // 只有在用户已交互且没有阻止自动隐藏的情况下才隐藏窗口
-  if (!appSettings.value.preventAutoHide && userInteracted.value) {
+  // 只有在没有阻止自动隐藏且（用户已交互或窗口刚刚显示）的情况下才隐藏窗口
+  // 这保证了通过快捷键显示窗口后，用户点击窗口外部能立即触发自动隐藏
+  if (!appSettings.value.preventAutoHide && (userInteracted.value || windowJustShown.value)) {
     // 延迟检查，给鼠标事件时间更新状态
     const delay = 100
 
@@ -1961,14 +1990,13 @@ const toggleMenu = (e: MouseEvent) => {
 // 设置相关方法已移除，现在使用独立设置窗口
 
 const closeApp = async () => {
-  console.log('关闭应用被调用')
+  console.log('关闭/隐藏 应用 被调用，调用后端切换窗口可见性')
   try {
-    const appWindow = getCurrentWindow()
-    console.log('获取到窗口对象:', appWindow)
-    await appWindow.close()
-    console.log('窗口关闭命令已发送')
+    await invoke('toggle_window_visibility')
+    console.log('已请求后端切换窗口可见性')
   } catch (error) {
-    console.error('关闭窗口时出错:', error)
+    console.error('请求切换窗口可见性失败:', error)
+    showToast(t('main.toast.toggleVisibilityFailed'), 'error')
   }
 }
 
@@ -2024,7 +2052,7 @@ const handleDrop = async (e: Event) => {
 const handleFileDrop = async (filePath: string) => {
   console.log('处理文件:', filePath)
   console.log("调用自定义命令")
-  await invoke('my_custom_command');
+  //await invoke('my_custom_command');
 
   try {
     // 检查 invoke 函数是否可用

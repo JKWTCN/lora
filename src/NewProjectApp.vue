@@ -297,8 +297,8 @@ const handlePathChange = async () => {
         return
     }
 
-    // 只对文件类型自动获取图标
-    if (projectData.targetType !== 'file') {
+    // 对文件或 URL 类型自动获取图标
+    if (projectData.targetType !== 'file' && projectData.targetType !== 'url') {
         return
     }
 

@@ -1,6 +1,6 @@
 [package]
 name = "lora"
-version = "0.1.6"
+version = "0.1.7"
 description = "一个基于 Tauri + Vue 3 的现代化应用启动器，支持分类管理和快速启动。"
 authors = ["icloudwar"]
 edition = "2021"
@@ -31,3 +31,6 @@ ico = "0.2"
 base64 = "0.21"
 chrono = { version = "0.4", features = ["serde"] }
 dirs = "5.0"
+reqwest = { version = "0.11", features = ["blocking", "json", "rustls-tls"] }
+mime = "0.3"
+url = "2"
