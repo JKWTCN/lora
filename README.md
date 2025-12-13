@@ -6,6 +6,7 @@
 ![Tauri](https://img.shields.io/badge/Tauri-v2-orange.svg)
 ![Vue](https://img.shields.io/badge/Vue-3-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
@@ -112,6 +113,14 @@ lora/
 └── ...
 ```
 
+## 🙏 Acknowledgements
+
+- [Tauri](https://tauri.app/) - Build smaller, faster, and more secure desktop applications with a web frontend.
+- [Vue.js](https://vuejs.org/) - The Progressive JavaScript Framework.
+- [Vite](https://vitejs.dev/) - Next Generation Frontend Tooling.
+
 ## 📄 License
 
-Copyright (c) 2025 JKWTCN. All rights reserved.
+This project is licensed under the MIT License.
+
+Copyright (c) 2025 JKWTCN.

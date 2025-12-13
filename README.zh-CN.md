@@ -6,6 +6,7 @@
 ![Tauri](https://img.shields.io/badge/Tauri-v2-orange.svg)
 ![Vue](https://img.shields.io/badge/Vue-3-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 [English](./README.md) | [简体中文](./README.zh-CN.md)
 
@@ -112,6 +113,14 @@ lora/
 └── ...
 ```
 
-## 📄 版权说明
+## 🙏 鸣谢
 
-Copyright (c) 2025 JKWTCN. All rights reserved.
+- [Tauri](https://tauri.app/) - 构建更小、更快、更安全的桌面应用。
+- [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架。
+- [Vite](https://vitejs.dev/) - 下一代前端开发与构建工具。
+
+## 📄 开源协议
+
+本项目基于 MIT 协议开源。
+
+Copyright (c) 2025 JKWTCN.
