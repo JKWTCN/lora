@@ -1,14 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
-// 版本信息结构
-#[derive(Serialize, Deserialize, Debug)]
-pub struct VersionInfo {
-    pub version: String,
-    pub update_date: String,
-    pub last_sync: String,
-}
-
 // 应用数据结构
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AppData {

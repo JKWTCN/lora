@@ -1,5 +1,3 @@
-use std::fs;
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 
@@ -15,8 +13,11 @@ mod system_integration;
 mod window_manager;
 mod windows;
 use crate::backup::BackupManager;
-use crate::models::{AppState, VersionInfo};
+use crate::models::AppState;
 use crate::system_integration::{create_global_shortcut_handler, initialize_global_shortcuts, initialize_tray};
+
+// 引入编译时生成的构建信息
+include!(concat!(env!("OUT_DIR"), "/build_info.rs"));
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -34,19 +35,8 @@ fn get_app_version() -> String {
 // 获取应用更新日期
 #[tauri::command]
 fn get_app_update_date() -> String {
-    // 尝试从 version-info.json 文件读取更新日期
-    let version_info_path = Path::new("version-info.json");
-
-    if let Ok(json_data) = fs::read_to_string(version_info_path) {
-        if let Ok(version_info) = serde_json::from_str::<VersionInfo>(&json_data) {
-            return version_info.update_date;
-        }
-    }
-
-    // 如果读取失败，返回当前UTC日期作为后备
-    use chrono::Utc;
-    let now = Utc::now();
-    now.format("%Y-%m-%d").to_string()
+    // 返回编译时硬编码的日期
+    BUILD_DATE.to_string()
 }
 
 // 退出应用
