@@ -477,6 +477,8 @@ fn get_default_settings() -> AppSettings {
         max_search_results: Some(20),
         auto_backup: Some(true),
         backup_interval: Some("weekly".to_string()),
+        last_backup_time: None,
+        next_backup_time: None,
         // 界面状态记录默认值
         active_tab: Some("about".to_string()),
         last_selected_category: None,

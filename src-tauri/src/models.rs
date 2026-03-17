@@ -50,6 +50,8 @@ pub struct AppSettings {
     // 数据管理
     pub auto_backup: Option<bool>,
     pub backup_interval: Option<String>,
+    pub last_backup_time: Option<i64>, // 上次备份时间(时间戳)
+    pub next_backup_time: Option<i64>, // 下次计划的备份时间(时间戳)
     // 界面状态记录
     pub active_tab: Option<String>,
     pub last_selected_category: Option<String>,

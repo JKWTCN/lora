@@ -1,6 +1,5 @@
-use crate::data::get_app_data_dir;
-use crate::data::{load_app_data, load_app_settings};
-use chrono::{Local, Datelike, Timelike, NaiveDate};
+use crate::data::{get_app_data_dir, load_app_data, load_app_settings, save_app_settings};
+use chrono::{Local, Datelike, Timelike, NaiveDate, Utc, TimeZone};
 use serde_json::json;
 use std::fs;
 use std::path::Path;
@@ -107,22 +106,51 @@ impl BackupManager {
     pub async fn start_backup_task(_app_handle: tauri::AppHandle) -> Result<(), String> {
         loop {
             let settings = load_app_settings()?;
+
+            // 检查是否启用了自动备份
             if !settings.auto_backup.unwrap_or(false) {
                 sleep(Duration::from_secs(3600)).await;
                 continue;
             }
 
             let backup_interval = settings.backup_interval.unwrap_or("weekly".to_string());
-            let next_backup_time = Self::calculate_next_backup_time(&backup_interval)?;
             let now = Local::now();
 
-            if next_backup_time > now {
-                let duration_until_next = next_backup_time.signed_duration_since(now);
-                let seconds_until_next = duration_until_next.num_seconds().max(0) as u64;
-                sleep(Duration::from_secs(seconds_until_next)).await;
-            }
+            // 检查是否有计划的备份时间
+            let planned_backup_time = settings.next_backup_time
+                .and_then(|t| chrono::DateTime::<Utc>::from_timestamp(t, 0))
+                .map(|dt| dt.with_timezone(&Local));
 
-            let _ = Self::perform_backup().await;
+            let should_backup_now = match planned_backup_time {
+                Some(planned_time) => {
+                    // 有计划时间,检查是否到了
+                    now >= planned_time
+                }
+                None => {
+                    // 没有计划时间(首次启动),立即备份一次
+                    true
+                }
+            };
+
+            if should_backup_now {
+                // 执行备份
+                let _ = Self::perform_backup().await;
+
+                // 更新下次备份时间
+                let next_time = Self::calculate_next_backup_time(&backup_interval)?;
+                let mut settings = load_app_settings()?;
+                settings.last_backup_time = Some(now.timestamp());
+                settings.next_backup_time = Some(next_time.timestamp());
+                save_app_settings(settings)?;
+
+                println!("备份完成,下次备份时间: {}", next_time.format("%Y-%m-%d %H:%M:%S"));
+            } else {
+                // 计算还需要等待多久
+                let duration = planned_backup_time.unwrap().signed_duration_since(now);
+                let sleep_seconds = duration.num_seconds().min(3600).max(0) as u64; // 最多等待1小时后重新检查
+                println!("距离下次备份还有 {} 秒,等待中...", sleep_seconds);
+                sleep(Duration::from_secs(sleep_seconds)).await;
+            }
         }
     }
 }
