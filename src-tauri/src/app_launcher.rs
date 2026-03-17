@@ -125,7 +125,12 @@ pub fn launch_app(app_path: String, launch_args: Option<String>) -> Result<Strin
     {
         // 如果 launch_args 不存在或者为 ""
         if launch_args.is_none() || launch_args.as_ref().unwrap().trim().is_empty() {
-            Command::new("explorer").arg(app_path).spawn().map_err(|e| format!("启动应用失败: {}", e))?;
+            // 使用 start 命令启动，会自动设置正确的工作目录
+            let work_dir = Path::new(&app_path).parent().unwrap_or(Path::new("."));
+            Command::new("cmd")
+                .args(["/c", "start", "", "/D", &work_dir.to_string_lossy(), &app_path])
+                .spawn()
+                .map_err(|e| format!("启动应用失败: {}", e))?;
             return Ok("应用启动成功".to_string());
         }
         // 检查文件扩展名，如果是快捷方式(.lnk)，解析目标路径
