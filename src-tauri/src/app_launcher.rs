@@ -129,6 +129,7 @@ pub fn launch_app(app_path: String, launch_args: Option<String>) -> Result<Strin
             let work_dir = Path::new(&app_path).parent().unwrap_or(Path::new("."));
             Command::new("cmd")
                 .args(["/c", "start", "", "/D", &work_dir.to_string_lossy(), &app_path])
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW - 隐藏命令行窗口
                 .spawn()
                 .map_err(|e| format!("启动应用失败: {}", e))?;
             return Ok("应用启动成功".to_string());

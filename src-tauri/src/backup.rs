@@ -1,5 +1,5 @@
 use crate::data::{get_app_data_dir, load_app_data, load_app_settings, save_app_settings};
-use chrono::{Local, Datelike, Timelike, NaiveDate, Utc, TimeZone};
+use chrono::{Local, Datelike, Timelike, NaiveDate, Utc};
 use serde_json::json;
 use std::fs;
 use std::path::Path;
