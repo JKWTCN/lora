@@ -263,8 +263,23 @@
         </div>
 
         <div class="app-grid" @contextmenu.prevent="showGridContextMenu($event)">
-          <div v-for="app in filteredApps" :key="app.id" class="app-item" @click="launchApp(app)"
-            @dblclick="launchApp(app)" @contextmenu.prevent="showAppContextMenu($event, app)">
+          <div
+            v-for="(app, index) in filteredApps"
+            :key="app.id"
+            class="app-item"
+            :class="{}"
+            :data-app-id="app.id"
+            :data-app-index="index"
+            draggable="true"
+            @click="launchApp(app)"
+            @dblclick="launchApp(app)"
+            @contextmenu.prevent="showAppContextMenu($event, app)"
+            @dragstart="handleAppDragStart($event, app, index)"
+            @dragover.prevent.stop="handleAppDragOver($event)"
+            @dragleave="handleAppDragLeave"
+            @drop.prevent.stop="handleAppDrop($event, app, index)"
+            @dragend="handleAppDragEnd"
+          >
             <div class="app-icon">
               <!-- 如果是 Base64 图标 (真实应用图标) -->
               <img :src="app.icon" :alt="app.name"
@@ -300,7 +315,6 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { LogicalSize } from '@tauri-apps/api/dpi'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
 import LanguageSwitch from './components/LanguageSwitch.vue'
 
@@ -317,6 +331,7 @@ interface AppData {
   is_shortcut?: false
   launch_args?: string // 启动参数
   target_type?: 'file' | 'folder' | 'url' // 目标类型
+  order?: number // 排序字段，用于图标拖拽排序
 }
 
 interface CategoryData {
@@ -338,6 +353,12 @@ const isLoading = ref(true) // 加载状态
 // 拖拽相关状态
 const isDragOver = ref(false)
 const dragCounter = ref(0)
+
+// 图标拖拽排序状态
+// 使用非响应式普通变量，避免 dragstart 期间触发 Vue 重渲染，防止 WebView2 丢失拖拽上下文
+let isDraggingApp = false
+let draggedAppIndex = -1
+let draggedAppData: AppData | null = null
 
 // 右键菜单相关
 const contextMenu = ref<{
@@ -683,6 +704,13 @@ const filteredApps = computed(() => {
     )
     console.log('按搜索词筛选后:', result)
   }
+
+  // 按 order 字段排序
+  result.sort((a, b) => {
+    const aOrder = a.order ?? Number.MAX_SAFE_INTEGER
+    const bOrder = b.order ?? Number.MAX_SAFE_INTEGER
+    return aOrder - bOrder
+  })
 
   console.log('最终结果:', result)
   return result
@@ -1997,13 +2025,22 @@ const closeApp = async () => {
 
 // 拖拽处理函数
 const handleDragEnter = (e: Event) => {
-  console.log('拖拽进入事件触发')
   e.preventDefault()
+
+  if (!isExternalFileDrag(e)) {
+    return
+  }
+
+  console.log('拖拽进入事件触发')
   dragCounter.value++
   isDragOver.value = true
 }
 
 const handleDragLeave = (e: Event) => {
+  if (!isExternalFileDrag(e)) {
+    return
+  }
+
   console.log('拖拽离开事件触发')
   e.preventDefault()
   dragCounter.value--
@@ -2013,11 +2050,20 @@ const handleDragLeave = (e: Event) => {
 }
 
 const handleDragOver = (e: Event) => {
-  console.log('拖拽悬停事件触发')
+  // 无论内外部拖拽都必须 preventDefault，否则浏览器显示禁止光标
   e.preventDefault()
+
+  if (!isExternalFileDrag(e)) {
+    return
+  }
+
+  console.log('拖拽悬停事件触发')
 }
 
 const handleDrop = async (e: Event) => {
+  if (!isExternalFileDrag(e)) {
+    return
+  }
 
   e.preventDefault()
   isDragOver.value = false
@@ -2115,46 +2161,120 @@ const handleFileDrop = async (filePath: string) => {
 }
 
 // 在 onMounted 中添加拖拽事件监听器
-const setupDragAndDrop = async () => {
-  console.log('设置拖拽功能...')
+const setupAppItemDragEvents = () => {
+  console.log('设置图标拖拽排序事件...')
 
-  // 监听 Tauri 拖拽事件
-  try {
-    console.log('设置 Tauri 拖拽事件监听...')
-    await listen('tauri://drag', (event) => {
-      console.log('Tauri 拖拽事件:', event)
-    })
-
-    await listen('tauri://drag-over', (event) => {
-      console.log('Tauri 拖拽悬停事件:', event)
-      isDragOver.value = true
-    })
-
-    await listen('tauri://drag-drop', async (event: any) => {
-      console.log('Tauri 拖拽释放事件:', event)
-      isDragOver.value = false
-
-      if (event.payload && event.payload.paths) {
-        const paths = event.payload.paths as string[]
-        console.log('拖拽的文件路径:', paths)
-
-        for (const filePath of paths) {
-          await handleFileDrop(filePath)
-        }
-      }
-    })
-
-    await listen('tauri://drag-leave', (event) => {
-      console.log('Tauri 拖拽离开事件:', event)
-      isDragOver.value = false
-    })
-
-    console.log('Tauri 拖拽事件监听设置完成')
-  } catch (error) {
-    console.error('设置 Tauri 拖拽事件失败:', error)
+  // 使用 MutationObserver 监听 app-grid 的变化，为新添加的元素绑定事件
+  const appGrid = document.querySelector('.app-grid') as HTMLElement
+  if (!appGrid) {
+    console.error('未找到 app-grid 元素')
+    return
   }
 
-  // 同时保留传统的DOM拖拽事件作为备用
+  // 绑定事件到所有 app-item 元素的函数
+  const bindEventsToAppItems = () => {
+    const appItems = document.querySelectorAll('.app-item')
+    console.log(`为 ${appItems.length} 个 app-item 绑定拖拽事件`)
+
+    appItems.forEach((item) => {
+      const appItem = item as HTMLElement
+
+      // 移除旧的事件监听器（如果存在）
+      appItem.removeEventListener('dragover', handleAppDragOverNative)
+      appItem.removeEventListener('drop', handleAppDropNative)
+
+      // 添加 dragover 事件
+      appItem.addEventListener('dragover', handleAppDragOverNative)
+
+      // 添加 drop 事件
+      appItem.addEventListener('drop', handleAppDropNative)
+    })
+  }
+
+  // 原生 dragover 事件处理函数
+  const handleAppDragOverNative = (e: Event) => {
+    const dragEvent = e as DragEvent
+    console.log('appItem dragover 被触发')
+    dragEvent.preventDefault()
+    dragEvent.stopPropagation()
+
+    if (dragEvent.dataTransfer) {
+      dragEvent.dataTransfer.dropEffect = 'move'
+    }
+  }
+
+  // 原生 drop 事件处理函数
+  const handleAppDropNative = (e: Event) => {
+    const dragEvent = e as DragEvent
+    console.log('appItem drop 被触发')
+
+    const targetItem = dragEvent.currentTarget as HTMLElement
+    const targetIndex = parseInt(targetItem.dataset.appIndex || '-1')
+
+    // 使用当前显示的应用列表来获取目标应用
+    const currentApps = selectedCategory.value === 'all'
+      ? apps.value
+      : apps.value.filter(app => app.category === selectedCategory.value)
+
+    const targetApp = currentApps[targetIndex]
+
+    console.log('drop 目标:', { targetIndex, targetApp })
+
+    if (!targetApp || !draggedAppData) {
+      console.log('目标应用或拖拽数据无效')
+      clearDragState()
+      return
+    }
+
+    void handleAppDrop(dragEvent, targetApp, targetIndex)
+  }
+
+  // 初始绑定
+  bindEventsToAppItems()
+
+  // 使用 MutationObserver 监听 DOM 变化
+  const observer = new MutationObserver((mutations) => {
+    let needsRebind = false
+    for (const mutation of mutations) {
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        needsRebind = true
+        break
+      }
+    }
+    if (needsRebind) {
+      bindEventsToAppItems()
+    }
+  })
+
+  observer.observe(appGrid, { childList: true, subtree: true })
+
+  console.log('图标拖拽排序事件设置完成')
+}
+
+const isExternalFileDrag = (e: Event) => {
+  if (isDraggingApp) {
+    return false
+  }
+
+  const dragEvent = e as DragEvent
+  const types = dragEvent.dataTransfer?.types
+
+  if (!types) {
+    return false
+  }
+
+  return Array.from(types).includes('Files')
+}
+
+const setupDragAndDrop = () => {
+  console.log('设置拖拽功能...')
+
+  // 设置图标拖拽排序的原生事件监听
+  setupAppItemDragEvents()
+
+  // dragDropEnabled: false 时 tauri://drag* 事件不会触发，完全依赖 DOM 层事件
+
+  // DOM 拖拽事件（外部文件拖入 + 兜底）
   const appContainer = document.querySelector('.app-container') as HTMLElement
   const launcherContainer = document.querySelector('.launcher-container') as HTMLElement
   const mainContent = document.querySelector('.main-content') as HTMLElement
@@ -2197,6 +2317,103 @@ const cleanupDragAndDrop = () => {
       element.removeEventListener('dragover', handleDragOver)
       element.removeEventListener('drop', handleDrop)
     }
+  })
+}
+
+// ===== 图标拖拽排序相关函数 =====
+
+// 开始拖拽应用图标
+const handleAppDragStart = (e: DragEvent, app: AppData, index: number) => {
+  console.log('handleAppDragStart 被调用', { app: app.name, index })
+
+  // 仅修改非响应式变量，不触发 Vue 重渲染，避免 WebView2 在 dragstart 期间被打断
+  isDraggingApp = true
+  draggedAppIndex = index
+  draggedAppData = app
+
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('application/json', JSON.stringify({ id: app.id, index }))
+    console.log('dataTransfer 已设置')
+  }
+
+  const appItem = e.currentTarget as HTMLElement
+  appItem.classList.add('dragging')
+  console.log('dragging class 已添加')
+}
+
+// 拖拽经过其他图标
+const handleAppDragOver = (e: DragEvent) => {
+  console.log('handleAppDragOver 被调用')
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = 'move'
+  }
+}
+
+// 拖拽离开图标区域
+const handleAppDragLeave = () => {
+  console.log('handleAppDragLeave 被调用')
+}
+
+// 在目标位置释放图标
+const handleAppDrop = async (e: DragEvent, targetApp: AppData, targetIndex: number) => {
+  e.preventDefault()
+  console.log('handleAppDrop 被调用', {
+    targetApp: targetApp.name,
+    targetIndex,
+    sourceIndex: draggedAppIndex
+  })
+
+  if (!draggedAppData || draggedAppIndex === targetIndex) {
+    clearDragState()
+    return
+  }
+
+  const sourceApp = draggedAppData
+  const sourceIndex = draggedAppIndex
+
+  // 重新排序本地数组
+  const currentApps = selectedCategory.value === 'all'
+    ? [...apps.value]
+    : apps.value.filter(app => app.category === selectedCategory.value)
+
+  // 从源位置移除
+  currentApps.splice(sourceIndex, 1)
+  // 插入到目标位置
+  currentApps.splice(targetIndex, 0, sourceApp)
+
+  // 更新所有相关应用的 order 值
+  currentApps.forEach((app, idx) => {
+    const originalApp = apps.value.find(a => a.id === app.id)
+    if (originalApp) {
+      originalApp.order = idx
+    }
+  })
+
+  clearDragState()
+
+  // 保存排序到后端
+  try {
+    await invoke('save_apps_order', { apps: apps.value })
+    console.log('应用排序已保存')
+  } catch (error) {
+    console.error('保存应用排序失败:', error)
+  }
+}
+
+// 拖拽结束
+const handleAppDragEnd = () => {
+  clearDragState()
+}
+
+// 清除拖拽状态
+const clearDragState = () => {
+  isDraggingApp = false
+  draggedAppIndex = -1
+  draggedAppData = null
+
+  document.querySelectorAll('.app-item.dragging').forEach(el => {
+    el.classList.remove('dragging')
   })
 }
 </script>
@@ -2448,6 +2665,19 @@ const cleanupDragAndDrop = () => {
 .app-item:hover {
   transform: translateY(-1px);
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* 拖拽中的应用图标样式 */
+.app-item.dragging {
+  opacity: 0.4;
+}
+
+.app-item[draggable="true"] {
+  cursor: grab;
+}
+
+.app-item[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 .app-icon {

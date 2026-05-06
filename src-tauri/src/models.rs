@@ -13,6 +13,7 @@ pub struct AppData {
     pub is_shortcut: bool,
     pub launch_args: Option<String>, // 启动参数
     pub target_type: Option<String>, // 目标类型: file, folder, url
+    pub order: Option<i32>,          // 排序字段，用于图标拖拽排序
 }
 
 // 分类数据结构

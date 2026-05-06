@@ -53,10 +53,23 @@ pub fn load_app_data() -> Result<AppStorage, String> {
         Err(e) => return Err(format!("读取文件失败: {}", e)),
     };
 
-    let storage: AppStorage = match serde_json::from_slice(&json_data) {
+    let mut storage: AppStorage = match serde_json::from_slice(&json_data) {
         Ok(storage) => storage,
         Err(e) => return Err(format!("解析数据失败: {}", e)),
     };
+
+    // 为没有 order 字段的历史数据自动分配排序值
+    // 按分类分组，每个分类内按 id 顺序分配 order
+    let mut category_order_map: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+
+    for app in &mut storage.apps {
+        if app.order.is_none() {
+            let category = &app.category;
+            let next_order = category_order_map.entry(category.clone()).or_insert(0);
+            app.order = Some(*next_order);
+            *next_order += 1;
+        }
+    }
 
     Ok(storage)
 }
@@ -351,4 +364,18 @@ pub fn clear_all_data() -> Result<String, String> {
     let default_settings = get_default_settings();
     save_app_settings(default_settings)?;
     Ok("所有数据已清空".to_string())
+}
+
+#[tauri::command]
+pub fn save_apps_order(apps: Vec<AppData>) -> Result<String, String> {
+    let mut storage = load_app_data()?;
+
+    for updated_app in apps {
+        if let Some(existing_app) = storage.apps.iter_mut().find(|a| a.id == updated_app.id) {
+            existing_app.order = updated_app.order;
+        }
+    }
+
+    save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+    Ok("排序保存成功".to_string())
 }
