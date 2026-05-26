@@ -321,6 +321,7 @@
 <script setup>
 import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { confirmDialog } from '../utils/customDialog'
 
 const props = defineProps({
     visible: {
@@ -514,7 +515,7 @@ const importData = async () => {
 }
 
 const resetData = async () => {
-    if (confirm('确定要重置所有数据吗？此操作不可撤销！')) {
+    if (await confirmDialog('确定要重置所有数据吗？此操作不可撤销！')) {
         try {
             // TODO: 实现数据重置功能
             console.log('重置数据')
@@ -532,8 +533,8 @@ const openUrl = async (url) => {
     }
 }
 
-const resetToDefaults = () => {
-    if (confirm('确定要恢复所有设置到默认值吗？')) {
+const resetToDefaults = async () => {
+    if (await confirmDialog('确定要恢复所有设置到默认值吗？')) {
         Object.assign(localSettings, {
             windowWidth: 800,
             windowHeight: 600,

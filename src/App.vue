@@ -313,6 +313,7 @@ import { LogicalSize } from '@tauri-apps/api/dpi'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from 'vue-i18n'
 import LanguageSwitch from './components/LanguageSwitch.vue'
+import { alertDialog, confirmDialog } from './utils/customDialog'
 
 const { t } = useI18n()
 
@@ -755,7 +756,7 @@ const launchApp = async (app: any) => {
   const targetPath = app.target_path || app.path
   if (!targetPath) {
     console.error('应用路径不存在')
-    alert(t('main.alert.appPathNotExist'))
+    await alertDialog(t('main.alert.appPathNotExist'), { type: 'warning' })
     return
   }
 
@@ -783,7 +784,7 @@ const launchApp = async (app: any) => {
     console.log('启动成功')
   } catch (error) {
     console.error('启动应用失败:', error)
-    alert(`${t('main.alert.launchFailed')}: ${error}`)
+    await alertDialog(t('main.alert.launchFailed', { error: String(error) }), { type: 'error' })
   }
 }
 
@@ -1045,7 +1046,7 @@ const openSettings = async () => {
 }
 
 const confirmExit = async () => {
-  if (confirm(t('main.confirm.exit'))) {
+  if (await confirmDialog(t('main.confirm.exit'))) {
     try {
       await invoke('quit_app')
     } catch (error) {
@@ -1081,7 +1082,7 @@ const runAsAdmin = async () => {
       console.log('管理员权限运行结果:', result)
     } catch (error) {
       console.error('以管理员权限运行失败:', error)
-      alert(`${t('main.alert.runAsAdminFailed')}: ${error}`)
+      await alertDialog(t('main.alert.runAsAdminFailed', { error: String(error) }), { type: 'error' })
     }
   }
   hideAppContextMenu()
@@ -1095,7 +1096,7 @@ const openFileLocation = async () => {
       console.log('打开文件位置结果:', result)
     } catch (error) {
       console.error('打开文件位置失败:', error)
-      alert(`${t('main.alert.openFileLocationFailed')}: ${error}`)
+      await alertDialog(t('main.alert.openFileLocationFailed', { error: String(error) }), { type: 'error' })
     }
   }
   hideAppContextMenu()
@@ -1215,7 +1216,7 @@ const editApp = async () => {
 
 const deleteApp = async () => {
   if (appContextMenu.value.app) {
-    if (confirm(t('app.confirmDeleteApp', { name: appContextMenu.value.app.name }))) {
+    if (await confirmDialog(t('main.confirm.deleteApp', { name: appContextMenu.value.app.name }))) {
       try {
         // 调用后端删除
         await invoke('delete_app', { appId: appContextMenu.value.app.id })
@@ -1225,7 +1226,7 @@ const deleteApp = async () => {
         console.log(`已删除应用: ${appContextMenu.value.app.name}`)
       } catch (error) {
         console.error('删除应用失败:', error)
-        alert(t('main.alert.deleteAppFailed'))
+        await alertDialog(t('main.alert.deleteAppFailed'), { type: 'error' })
       }
     }
   }
@@ -1233,7 +1234,7 @@ const deleteApp = async () => {
 }
 
 const deleteAllApps = async () => {
-  if (confirm(t('main.confirm.deleteAllApps'))) {
+  if (await confirmDialog(t('main.confirm.deleteAllApps'))) {
     try {
       // 获取要删除的应用列表
       const appsToDelete = selectedCategory.value === 'all'
@@ -1255,7 +1256,7 @@ const deleteAllApps = async () => {
       console.log('已删除所有应用')
     } catch (error) {
       console.error('删除应用失败:', error)
-      alert(t('main.alert.deleteAppFailed'))
+      await alertDialog(t('main.alert.deleteAppFailed'), { type: 'error' })
     }
   }
   hideAppContextMenu()
@@ -1373,7 +1374,10 @@ const cancelEditApp = () => {
 const browseTarget = async () => {
   try {
     // 显示选择对话框让用户选择文件或文件夹
-    const choice = confirm(t('common.select'))
+    const choice = await confirmDialog(t('common.select'), {
+      confirmText: t('common.selectFile'),
+      cancelText: t('common.selectFolder')
+    })
 
     let selectedPath = ''
     if (choice) {
@@ -1474,10 +1478,10 @@ const deleteCategory = async () => {
     // 确认删除操作
     const appsInCategory = apps.value.filter(app => app.category === categoryId)
     const confirmMessage = appsInCategory.length > 0
-      ? t('app.confirmDeleteGroupWithApps', { name: contextMenu.value.category.name, count: appsInCategory.length })
-      : t('app.confirmDeleteGroup', { name: contextMenu.value.category.name })
+      ? t('main.confirm.deleteCategory', { name: contextMenu.value.category.name, count: appsInCategory.length })
+      : t('main.confirm.deleteCategoryEmpty', { name: contextMenu.value.category.name })
 
-    if (!confirm(confirmMessage)) {
+    if (!(await confirmDialog(confirmMessage))) {
       hideContextMenu()
       return
     }
@@ -1511,7 +1515,7 @@ const deleteCategory = async () => {
 const deleteAllCategories = async () => {
   const customCategories = categories.value.filter(cat => !cat.isDefault)
   if (customCategories.length === 0) {
-    alert(t('main.alert.noCustomCategories'))
+    await alertDialog(t('main.alert.noCustomCategories'), { type: 'info' })
     hideContextMenu()
     return
   }
@@ -1521,10 +1525,10 @@ const deleteAllCategories = async () => {
   const appsToDelete = apps.value.filter(app => deletedCategoryIds.includes(app.category))
 
   const confirmMessage = appsToDelete.length > 0
-    ? t('app.confirmDeleteAllGroupsWithApps', { groupCount: customCategories.length, appCount: appsToDelete.length })
-    : t('app.confirmDeleteAllGroups', { groupCount: customCategories.length })
+    ? t('main.confirm.deleteAllCategories', { groupCount: customCategories.length, appCount: appsToDelete.length })
+    : t('main.confirm.deleteAllCategoriesEmpty', { groupCount: customCategories.length })
 
-  if (!confirm(confirmMessage)) {
+  if (!(await confirmDialog(confirmMessage))) {
     hideContextMenu()
     return
   }
@@ -2309,7 +2313,7 @@ const handleFileDrop = async (filePath: string) => {
   } catch (error) {
     console.error('处理文件失败:', error)
     // 可以显示错误提示
-    alert(`${t('app.cannotAddFile', { path: filePath })}: ${error}`)
+    await alertDialog(`${t('app.cannotAddFile', { path: filePath })}: ${error}`, { type: 'error' })
   }
 }
 

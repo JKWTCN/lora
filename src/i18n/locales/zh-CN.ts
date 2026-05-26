@@ -114,7 +114,9 @@ export default {
       deleteApp: '确定要删除应用 "{name}" 吗？',
       deleteAllApps: '确定要删除当前分类下的所有应用吗？',
       deleteCategory: '确定要删除分组 "{name}" 吗？这将同时删除该分组下的 {count} 个应用。',
-      deleteAllCategories: '确定要删除所有 {count} 个自定义分组吗？这将同时删除 {count} 个应用。',
+      deleteCategoryEmpty: '确定要删除分组 "{name}" 吗？',
+      deleteAllCategories: '确定要删除所有 {groupCount} 个自定义分组吗？这将同时删除 {appCount} 个应用。',
+      deleteAllCategoriesEmpty: '确定要删除所有 {groupCount} 个自定义分组吗？',
       exit: '退出'
     },
     alert: {

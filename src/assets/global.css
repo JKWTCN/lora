@@ -15,3 +15,120 @@ body {
     height: 100vh;
     width: 100vw;
 }
+
+.custom-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.42);
+    backdrop-filter: blur(8px);
+}
+
+.custom-dialog {
+    width: min(420px, 100%);
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 16px;
+    padding: 22px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 8px;
+    background: #ffffff;
+    color: #172033;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+}
+
+.custom-dialog-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1;
+    background: #eef4ff;
+    color: #2563eb;
+}
+
+.custom-dialog-warning .custom-dialog-icon {
+    background: #fff7ed;
+    color: #ea580c;
+}
+
+.custom-dialog-error .custom-dialog-icon {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.custom-dialog-success .custom-dialog-icon {
+    background: #ecfdf5;
+    color: #059669;
+}
+
+.custom-dialog-body h3 {
+    margin: 0 0 8px;
+    font-size: 17px;
+    font-weight: 650;
+    line-height: 1.35;
+}
+
+.custom-dialog-message {
+    margin: 0;
+    color: #475569;
+    font-size: 14px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.custom-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 22px;
+}
+
+.custom-dialog-button {
+    min-width: 76px;
+    height: 34px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.custom-dialog-button:focus-visible {
+    outline: 2px solid rgba(37, 99, 235, 0.35);
+    outline-offset: 2px;
+}
+
+.custom-dialog-button:hover {
+    transform: translateY(-1px);
+}
+
+.custom-dialog-secondary {
+    background: #eef2f7;
+    color: #334155;
+}
+
+.custom-dialog-secondary:hover {
+    background: #e2e8f0;
+}
+
+.custom-dialog-primary {
+    background: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
+}
+
+.custom-dialog-primary:hover {
+    background: #1d4ed8;
+}

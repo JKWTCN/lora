@@ -321,6 +321,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from 'vue-i18n'
+import { alertDialog, confirmDialog } from './utils/customDialog'
 
 const { t } = useI18n()
 
@@ -596,10 +597,10 @@ const exportData = async () => {
         isSaving.value = true
         const result = await invoke('export_data')
         console.log('数据导出成功:', result)
-        alert(t('settings.dataExportSuccess'))
+        await alertDialog(t('settings.alert.exportSuccess'), { type: 'success' })
     } catch (error) {
         console.error('导出数据失败:', error)
-        alert(t('settings.dataExportFailed') + ': ' + error)
+        await alertDialog(t('settings.alert.exportFailed', { error: String(error) }), { type: 'error' })
     } finally {
         isSaving.value = false
     }
@@ -610,29 +611,29 @@ const importData = async () => {
         isSaving.value = true
         const result = await invoke('import_data')
         console.log('数据导入成功:', result)
-        alert(t('settings.dataImportSuccess'))
+        await alertDialog(t('settings.alert.importSuccess'), { type: 'success' })
         // 重新加载设置
         await loadSettings()
     } catch (error) {
         console.error('导入数据失败:', error)
-        alert(t('settings.dataImportFailed') + ': ' + error)
+        await alertDialog(t('settings.alert.importFailed', { error: String(error) }), { type: 'error' })
     } finally {
         isSaving.value = false
     }
 }
 
 const resetData = async () => {
-    if (confirm(t('settings.confirmResetData'))) {
+    if (await confirmDialog(t('settings.confirm.resetData'))) {
         try {
             isSaving.value = true
             const result = await invoke('reset_data')
             console.log('数据重置成功:', result)
-            alert(t('settings.dataResetSuccess'))
+            await alertDialog(t('settings.alert.resetSuccess'), { type: 'success' })
             // 重新加载设置
             await loadSettings()
         } catch (error) {
             console.error('重置数据失败:', error)
-            alert(t('settings.dataResetFailed') + ': ' + error)
+            await alertDialog(t('settings.alert.resetFailed', { error: String(error) }), { type: 'error' })
         } finally {
             isSaving.value = false
         }
@@ -648,16 +649,16 @@ const openUrl = async (url) => {
 }
 
 const resetToDefaults = async () => {
-    if (confirm(t('settings.confirmResetSettings'))) {
+    if (await confirmDialog(t('settings.confirm.resetSettings'))) {
         try {
             isSaving.value = true
             await invoke('reset_settings_to_default')
             // 重新加载设置
             await loadSettings()
-            alert(t('settings.settingsResetSuccess'))
+            await alertDialog(t('settings.alert.restoreDefaultsSuccess'), { type: 'success' })
         } catch (error) {
             console.error('恢复默认设置失败:', error)
-            alert(t('settings.settingsResetFailed') + ': ' + error)
+            await alertDialog(t('settings.alert.restoreDefaultsFailed', { error: String(error) }), { type: 'error' })
         } finally {
             isSaving.value = false
         }

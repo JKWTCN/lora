@@ -114,7 +114,9 @@ export default {
       deleteApp: 'Are you sure you want to delete application "{name}"?',
       deleteAllApps: 'Are you sure you want to delete all applications in the current category?',
       deleteCategory: 'Are you sure you want to delete category "{name}"? This will also delete {count} applications in this category.',
-      deleteAllCategories: 'Are you sure you want to delete all {count} custom categories? This will also delete {count} applications.',
+      deleteCategoryEmpty: 'Are you sure you want to delete category "{name}"?',
+      deleteAllCategories: 'Are you sure you want to delete all {groupCount} custom categories? This will also delete {appCount} applications.',
+      deleteAllCategoriesEmpty: 'Are you sure you want to delete all {groupCount} custom categories?',
       exit: 'Exit'
     },
     alert: {

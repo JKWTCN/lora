@@ -211,6 +211,7 @@ import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useI18n } from 'vue-i18n'
+import { alertDialog } from './utils/customDialog'
 
 const { t } = useI18n()
 
@@ -304,7 +305,7 @@ const browseTarget = async () => {
         debugLog('浏览文件失败', error)
         console.error('浏览文件失败:', error)
         if (error !== t('editProject.userCancelled')) {
-            alert(t('editProject.browseFileError') + ': ' + error)
+            await alertDialog(t('editProject.browseFileError') + ': ' + error, { type: 'error' })
         }
     }
 }
@@ -367,7 +368,7 @@ const selectIcon = async () => {
         debugLog('选择图标失败', error)
         console.error('选择图标失败:', error)
         if (error !== t('editProject.userCancelled')) {
-            alert(t('editProject.selectIconError') + ': ' + error)
+            await alertDialog(t('editProject.selectIconError') + ': ' + error, { type: 'error' })
         }
     }
 }
@@ -417,7 +418,7 @@ const saveProject = async () => {
     debugLog('开始保存项目', projectData)
     if (!canSave.value) {
         debugLog('验证失败，缺少必要信息')
-        alert(t('editProject.fillRequiredFields'))
+        await alertDialog(t('editProject.fillRequiredFields'), { type: 'warning' })
         return
     }
 
@@ -459,7 +460,7 @@ const saveProject = async () => {
     } catch (error) {
         debugLog('保存项目失败', error)
         console.error('保存项目失败:', error)
-        alert(t('editProject.saveProjectError') + ': ' + error)
+        await alertDialog(t('editProject.saveProjectError') + ': ' + error, { type: 'error' })
     } finally {
         isSaving.value = false
     }
