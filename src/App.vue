@@ -1046,6 +1046,8 @@ const openSettings = async () => {
 }
 
 const confirmExit = async () => {
+  hideMainMenu()
+
   if (await confirmDialog(t('main.confirm.exit'))) {
     try {
       await invoke('quit_app')
@@ -1054,7 +1056,6 @@ const confirmExit = async () => {
       showToast(t('main.toast.exitFailed'), 'error')
     }
   }
-  hideMainMenu()
 }
 
 
@@ -1215,25 +1216,29 @@ const editApp = async () => {
 }
 
 const deleteApp = async () => {
-  if (appContextMenu.value.app) {
-    if (await confirmDialog(t('main.confirm.deleteApp', { name: appContextMenu.value.app.name }))) {
+  const appToDelete = appContextMenu.value.app
+  hideAppContextMenu()
+
+  if (appToDelete) {
+    if (await confirmDialog(t('main.confirm.deleteApp', { name: appToDelete.name }))) {
       try {
         // 调用后端删除
-        await invoke('delete_app', { appId: appContextMenu.value.app.id })
+        await invoke('delete_app', { appId: appToDelete.id })
 
         // 从前端数组中移除
-        apps.value = apps.value.filter(app => app.id !== appContextMenu.value.app.id)
-        console.log(`已删除应用: ${appContextMenu.value.app.name}`)
+        apps.value = apps.value.filter(app => app.id !== appToDelete.id)
+        console.log(`已删除应用: ${appToDelete.name}`)
       } catch (error) {
         console.error('删除应用失败:', error)
         await alertDialog(t('main.alert.deleteAppFailed'), { type: 'error' })
       }
     }
   }
-  hideAppContextMenu()
 }
 
 const deleteAllApps = async () => {
+  hideAppContextMenu()
+
   if (await confirmDialog(t('main.confirm.deleteAllApps'))) {
     try {
       // 获取要删除的应用列表
@@ -1259,7 +1264,6 @@ const deleteAllApps = async () => {
       await alertDialog(t('main.alert.deleteAppFailed'), { type: 'error' })
     }
   }
-  hideAppContextMenu()
 }
 
 const createNewCategory = async () => {
@@ -1472,17 +1476,19 @@ const clearIcon = () => {
 }
 
 const deleteCategory = async () => {
-  if (contextMenu.value.category && !contextMenu.value.category.isDefault) {
-    const categoryId = contextMenu.value.category.id
+  const categoryToDelete = contextMenu.value.category
+  hideContextMenu()
+
+  if (categoryToDelete && !categoryToDelete.isDefault) {
+    const categoryId = categoryToDelete.id
 
     // 确认删除操作
     const appsInCategory = apps.value.filter(app => app.category === categoryId)
     const confirmMessage = appsInCategory.length > 0
-      ? t('main.confirm.deleteCategory', { name: contextMenu.value.category.name, count: appsInCategory.length })
-      : t('main.confirm.deleteCategoryEmpty', { name: contextMenu.value.category.name })
+      ? t('main.confirm.deleteCategory', { name: categoryToDelete.name, count: appsInCategory.length })
+      : t('main.confirm.deleteCategoryEmpty', { name: categoryToDelete.name })
 
     if (!(await confirmDialog(confirmMessage))) {
-      hideContextMenu()
       return
     }
 
@@ -1509,14 +1515,14 @@ const deleteCategory = async () => {
     // 保存数据
     await saveAppData()
   }
-  hideContextMenu()
 }
 
 const deleteAllCategories = async () => {
+  hideContextMenu()
+
   const customCategories = categories.value.filter(cat => !cat.isDefault)
   if (customCategories.length === 0) {
     await alertDialog(t('main.alert.noCustomCategories'), { type: 'info' })
-    hideContextMenu()
     return
   }
 
@@ -1529,7 +1535,6 @@ const deleteAllCategories = async () => {
     : t('main.confirm.deleteAllCategoriesEmpty', { groupCount: customCategories.length })
 
   if (!(await confirmDialog(confirmMessage))) {
-    hideContextMenu()
     return
   }
 
@@ -1553,7 +1558,6 @@ const deleteAllCategories = async () => {
 
   // 保存数据
   await saveAppData()
-  hideContextMenu()
 }
 
 // 拖拽调整侧栏宽度
