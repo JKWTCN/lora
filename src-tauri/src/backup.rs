@@ -1,5 +1,5 @@
 use crate::data::{get_app_data_dir, load_app_data, load_app_settings, save_app_settings};
-use chrono::{Local, Datelike, Timelike, NaiveDate, Utc};
+use chrono::{Datelike, Local, NaiveDate, Timelike, Utc};
 use serde_json::json;
 use std::fs;
 use std::path::Path;
@@ -37,7 +37,8 @@ impl BackupManager {
         let settings = load_app_settings()?;
 
         let backup_data = json!({"storage": storage, "settings": settings, "backup_time": now.timestamp(), "backup_type": "auto", "version": env!("CARGO_PKG_VERSION")});
-        let json_data = serde_json::to_string_pretty(&backup_data).map_err(|e| format!("序列化备份数据失败: {}", e))?;
+        let json_data = serde_json::to_string_pretty(&backup_data)
+            .map_err(|e| format!("序列化备份数据失败: {}", e))?;
         fs::write(&backup_file_path, json_data).map_err(|e| format!("写入备份文件失败: {}", e))?;
 
         // cleanup: keep last 10
@@ -54,7 +55,9 @@ impl BackupManager {
                 let path = entry.path();
                 if path.is_file() {
                     if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                        if file_name.starts_with("lora_auto_backup_") && file_name.ends_with(".json") {
+                        if file_name.starts_with("lora_auto_backup_")
+                            && file_name.ends_with(".json")
+                        {
                             if let Ok(metadata) = fs::metadata(&path) {
                                 if let Ok(modified) = metadata.modified() {
                                     backup_files.push((path, modified));
@@ -83,21 +86,53 @@ impl BackupManager {
         match interval {
             "daily" => {
                 let next_day = now.date_naive().succ_opt().ok_or("计算明天日期失败")?;
-                let next_time = next_day.and_hms_opt(now.hour(), now.minute(), now.second()).ok_or("构建明天时间失败")?;
-                Ok(next_time.and_local_timezone(Local).single().ok_or("构建本地时间失败")?)
+                let next_time = next_day
+                    .and_hms_opt(now.hour(), now.minute(), now.second())
+                    .ok_or("构建明天时间失败")?;
+                Ok(next_time
+                    .and_local_timezone(Local)
+                    .single()
+                    .ok_or("构建本地时间失败")?)
             }
             "weekly" => {
                 let days_until_next_week = 7 - now.weekday().num_days_from_monday() % 7;
-                let next_week_date = now.date_naive() + chrono::Duration::days(days_until_next_week as i64);
-                let next_time = next_week_date.and_hms_opt(now.hour(), now.minute(), now.second()).ok_or("构建下周时间失败")?;
-                Ok(next_time.and_local_timezone(Local).single().ok_or("构建本地时间失败")?)
+                let next_week_date =
+                    now.date_naive() + chrono::Duration::days(days_until_next_week as i64);
+                let next_time = next_week_date
+                    .and_hms_opt(now.hour(), now.minute(), now.second())
+                    .ok_or("构建下周时间失败")?;
+                Ok(next_time
+                    .and_local_timezone(Local)
+                    .single()
+                    .ok_or("构建本地时间失败")?)
             }
             "monthly" => {
-                let next_month = if now.month() == 12 { now.year() + 1 } else { now.year() };
-                let next_month_num = if now.month() == 12 { 1 } else { now.month() + 1 };
-                let next_day = if let Some(date) = NaiveDate::from_ymd_opt(next_month, next_month_num, now.day()) { date } else { NaiveDate::from_ymd_opt(next_month, next_month_num + 1, 1).and_then(|d| d.pred_opt()).ok_or("计算下个月最后一天失败")? };
-                let next_time = next_day.and_hms_opt(now.hour(), now.minute(), now.second()).ok_or("构建下个月时间失败")?;
-                Ok(next_time.and_local_timezone(Local).single().ok_or("构建本地时间失败")?)
+                let next_month = if now.month() == 12 {
+                    now.year() + 1
+                } else {
+                    now.year()
+                };
+                let next_month_num = if now.month() == 12 {
+                    1
+                } else {
+                    now.month() + 1
+                };
+                let next_day = if let Some(date) =
+                    NaiveDate::from_ymd_opt(next_month, next_month_num, now.day())
+                {
+                    date
+                } else {
+                    NaiveDate::from_ymd_opt(next_month, next_month_num + 1, 1)
+                        .and_then(|d| d.pred_opt())
+                        .ok_or("计算下个月最后一天失败")?
+                };
+                let next_time = next_day
+                    .and_hms_opt(now.hour(), now.minute(), now.second())
+                    .ok_or("构建下个月时间失败")?;
+                Ok(next_time
+                    .and_local_timezone(Local)
+                    .single()
+                    .ok_or("构建本地时间失败")?)
             }
             _ => Err("不支持的备份间隔".to_string()),
         }
@@ -117,7 +152,8 @@ impl BackupManager {
             let now = Local::now();
 
             // 检查是否有计划的备份时间
-            let planned_backup_time = settings.next_backup_time
+            let planned_backup_time = settings
+                .next_backup_time
                 .and_then(|t| chrono::DateTime::<Utc>::from_timestamp(t, 0))
                 .map(|dt| dt.with_timezone(&Local));
 
@@ -143,7 +179,10 @@ impl BackupManager {
                 settings.next_backup_time = Some(next_time.timestamp());
                 save_app_settings(settings)?;
 
-                println!("备份完成,下次备份时间: {}", next_time.format("%Y-%m-%d %H:%M:%S"));
+                println!(
+                    "备份完成,下次备份时间: {}",
+                    next_time.format("%Y-%m-%d %H:%M:%S")
+                );
             } else {
                 // 计算还需要等待多久
                 let duration = planned_backup_time.unwrap().signed_duration_since(now);
@@ -173,10 +212,14 @@ pub fn get_backup_status() -> Result<serde_json::Value, String> {
                 let path = entry.path();
                 if path.is_file() {
                     if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                        if file_name.starts_with("lora_auto_backup_") && file_name.ends_with(".json") {
+                        if file_name.starts_with("lora_auto_backup_")
+                            && file_name.ends_with(".json")
+                        {
                             if let Ok(metadata) = fs::metadata(&path) {
                                 if let Ok(modified) = metadata.modified() {
-                                    if let Ok(modified_datetime) = modified.duration_since(std::time::UNIX_EPOCH) {
+                                    if let Ok(modified_datetime) =
+                                        modified.duration_since(std::time::UNIX_EPOCH)
+                                    {
                                         backup_files.push(serde_json::json!({"name": file_name, "path": path.to_string_lossy(), "size": metadata.len(), "modified": modified_datetime.as_secs()}));
                                     }
                                 }
@@ -194,5 +237,7 @@ pub fn get_backup_status() -> Result<serde_json::Value, String> {
         b_time.cmp(&a_time)
     });
 
-    Ok(serde_json::json!({"backup_dir": backup_dir.to_string_lossy(), "backup_files": backup_files, "total_count": backup_files.len()}))
+    Ok(
+        serde_json::json!({"backup_dir": backup_dir.to_string_lossy(), "backup_files": backup_files, "total_count": backup_files.len()}),
+    )
 }

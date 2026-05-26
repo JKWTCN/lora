@@ -28,7 +28,8 @@ pub fn save_app_data(
         categories,
         selected_category,
     };
-    let json_data = serde_json::to_string_pretty(&storage).map_err(|e| format!("序列化数据失败: {}", e))?;
+    let json_data =
+        serde_json::to_string_pretty(&storage).map_err(|e| format!("序列化数据失败: {}", e))?;
 
     fs::write(&file_path, json_data).map_err(|e| format!("保存文件失败: {}", e))?;
 
@@ -60,7 +61,8 @@ pub fn load_app_data() -> Result<AppStorage, String> {
 
     // 为没有 order 字段的历史数据自动分配排序值
     // 按分类分组，每个分类内按 id 顺序分配 order
-    let mut category_order_map: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+    let mut category_order_map: std::collections::HashMap<String, i32> =
+        std::collections::HashMap::new();
 
     for app in &mut storage.apps {
         if app.order.is_none() {
@@ -79,7 +81,8 @@ pub fn save_app_settings(settings: AppSettings) -> Result<String, String> {
     let data_dir = get_app_data_dir()?;
     let file_path = data_dir.join("settings.json");
 
-    let json_data = serde_json::to_string_pretty(&settings).map_err(|e| format!("序列化设置失败: {}", e))?;
+    let json_data =
+        serde_json::to_string_pretty(&settings).map_err(|e| format!("序列化设置失败: {}", e))?;
 
     fs::write(&file_path, json_data).map_err(|e| format!("保存设置文件失败: {}", e))?;
 
@@ -196,7 +199,10 @@ pub fn save_ui_state(
 pub fn update_settings_batch(settings_update: Value) -> Result<String, String> {
     let mut settings = load_app_settings()?;
 
-    if let Some(prevent_auto_hide) = settings_update.get("preventAutoHide").and_then(|v| v.as_bool()) {
+    if let Some(prevent_auto_hide) = settings_update
+        .get("preventAutoHide")
+        .and_then(|v| v.as_bool())
+    {
         settings.prevent_auto_hide = prevent_auto_hide;
     }
     if let Some(window_width) = settings_update.get("windowWidth").and_then(|v| v.as_u64()) {
@@ -214,40 +220,67 @@ pub fn update_settings_batch(settings_update: Value) -> Result<String, String> {
     if let Some(sidebar_width) = settings_update.get("sidebarWidth").and_then(|v| v.as_u64()) {
         settings.sidebar_width = Some(sidebar_width as u32);
     }
-    if let Some(enable_animations) = settings_update.get("enableAnimations").and_then(|v| v.as_bool()) {
+    if let Some(enable_animations) = settings_update
+        .get("enableAnimations")
+        .and_then(|v| v.as_bool())
+    {
         settings.enable_animations = Some(enable_animations);
     }
-    if let Some(animation_speed) = settings_update.get("animationSpeed").and_then(|v| v.as_str()) {
+    if let Some(animation_speed) = settings_update
+        .get("animationSpeed")
+        .and_then(|v| v.as_str())
+    {
         settings.animation_speed = Some(animation_speed.to_string());
     }
-    if let Some(start_with_system) = settings_update.get("startWithSystem").and_then(|v| v.as_bool()) {
+    if let Some(start_with_system) = settings_update
+        .get("startWithSystem")
+        .and_then(|v| v.as_bool())
+    {
         settings.start_with_system = Some(start_with_system);
     }
-    if let Some(start_minimized) = settings_update.get("startMinimized").and_then(|v| v.as_bool()) {
+    if let Some(start_minimized) = settings_update
+        .get("startMinimized")
+        .and_then(|v| v.as_bool())
+    {
         settings.start_minimized = Some(start_minimized);
     }
-    if let Some(auto_hide_after_launch) = settings_update.get("autoHideAfterLaunch").and_then(|v| v.as_bool()) {
+    if let Some(auto_hide_after_launch) = settings_update
+        .get("autoHideAfterLaunch")
+        .and_then(|v| v.as_bool())
+    {
         settings.auto_hide_after_launch = Some(auto_hide_after_launch);
     }
     if let Some(toggle_hotkey) = settings_update.get("toggleHotkey").and_then(|v| v.as_str()) {
         settings.toggle_hotkey = Some(toggle_hotkey.to_string());
     }
-    if let Some(global_hotkey) = settings_update.get("globalHotkey").and_then(|v| v.as_bool()) {
+    if let Some(global_hotkey) = settings_update
+        .get("globalHotkey")
+        .and_then(|v| v.as_bool())
+    {
         settings.global_hotkey = Some(global_hotkey);
     }
     if let Some(fuzzy_search) = settings_update.get("fuzzySearch").and_then(|v| v.as_bool()) {
         settings.fuzzy_search = Some(fuzzy_search);
     }
-    if let Some(search_in_path) = settings_update.get("searchInPath").and_then(|v| v.as_bool()) {
+    if let Some(search_in_path) = settings_update
+        .get("searchInPath")
+        .and_then(|v| v.as_bool())
+    {
         settings.search_in_path = Some(search_in_path);
     }
-    if let Some(max_search_results) = settings_update.get("maxSearchResults").and_then(|v| v.as_u64()) {
+    if let Some(max_search_results) = settings_update
+        .get("maxSearchResults")
+        .and_then(|v| v.as_u64())
+    {
         settings.max_search_results = Some(max_search_results as u32);
     }
     if let Some(auto_backup) = settings_update.get("autoBackup").and_then(|v| v.as_bool()) {
         settings.auto_backup = Some(auto_backup);
     }
-    if let Some(backup_interval) = settings_update.get("backupInterval").and_then(|v| v.as_str()) {
+    if let Some(backup_interval) = settings_update
+        .get("backupInterval")
+        .and_then(|v| v.as_str())
+    {
         settings.backup_interval = Some(backup_interval.to_string());
     }
 
@@ -332,7 +365,8 @@ pub fn export_app_data_to_file(file_path: String) -> Result<String, String> {
         "version": env!("CARGO_PKG_VERSION")
     });
 
-    let json_data = serde_json::to_string_pretty(&export_data).map_err(|e| format!("序列化导出数据失败: {}", e))?;
+    let json_data = serde_json::to_string_pretty(&export_data)
+        .map_err(|e| format!("序列化导出数据失败: {}", e))?;
     fs::write(&file_path, json_data).map_err(|e| format!("写入导出文件失败: {}", e))?;
 
     Ok("数据导出成功".to_string())
@@ -340,17 +374,21 @@ pub fn export_app_data_to_file(file_path: String) -> Result<String, String> {
 
 #[tauri::command]
 pub fn import_app_data_from_file(file_path: String) -> Result<String, String> {
-    let json_data = fs::read_to_string(&file_path).map_err(|e| format!("读取导入文件失败: {}", e))?;
+    let json_data =
+        fs::read_to_string(&file_path).map_err(|e| format!("读取导入文件失败: {}", e))?;
 
-    let import_data: Value = serde_json::from_str(&json_data).map_err(|e| format!("解析导入数据失败: {}", e))?;
+    let import_data: Value =
+        serde_json::from_str(&json_data).map_err(|e| format!("解析导入数据失败: {}", e))?;
 
     if let Some(storage_data) = import_data.get("storage") {
-        let storage: AppStorage = serde_json::from_value(storage_data.clone()).map_err(|e| format!("解析存储数据失败: {}", e))?;
+        let storage: AppStorage = serde_json::from_value(storage_data.clone())
+            .map_err(|e| format!("解析存储数据失败: {}", e))?;
         save_app_data(storage.apps, storage.categories, storage.selected_category)?;
     }
 
     if let Some(settings_data) = import_data.get("settings") {
-        let settings: AppSettings = serde_json::from_value(settings_data.clone()).map_err(|e| format!("解析设置数据失败: {}", e))?;
+        let settings: AppSettings = serde_json::from_value(settings_data.clone())
+            .map_err(|e| format!("解析设置数据失败: {}", e))?;
         save_app_settings(settings)?;
     }
 
@@ -359,8 +397,16 @@ pub fn import_app_data_from_file(file_path: String) -> Result<String, String> {
 
 #[tauri::command]
 pub fn clear_all_data() -> Result<String, String> {
-    let empty_storage = AppStorage { apps: vec![], categories: vec![], selected_category: Some("all".to_string()) };
-    save_app_data(empty_storage.apps, empty_storage.categories, empty_storage.selected_category)?;
+    let empty_storage = AppStorage {
+        apps: vec![],
+        categories: vec![],
+        selected_category: Some("all".to_string()),
+    };
+    save_app_data(
+        empty_storage.apps,
+        empty_storage.categories,
+        empty_storage.selected_category,
+    )?;
     let default_settings = get_default_settings();
     save_app_settings(default_settings)?;
     Ok("所有数据已清空".to_string())

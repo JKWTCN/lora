@@ -15,7 +15,9 @@ mod window_manager;
 mod windows;
 use crate::backup::BackupManager;
 use crate::models::AppState;
-use crate::system_integration::{create_global_shortcut_handler, initialize_global_shortcuts, initialize_tray};
+use crate::system_integration::{
+    create_global_shortcut_handler, initialize_global_shortcuts, initialize_tray,
+};
 
 // 引入编译时生成的构建信息
 include!(concat!(env!("OUT_DIR"), "/build_info.rs"));
@@ -25,7 +27,6 @@ include!(concat!(env!("OUT_DIR"), "/build_info.rs"));
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
-
 
 // 获取应用版本号
 #[tauri::command]
@@ -92,10 +93,10 @@ pub fn run() {
         .setup(|app| {
             // 初始化系统托盘
             initialize_tray(&app.handle())?;
-            
+
             // 初始化全局快捷键
             initialize_global_shortcuts(&app.handle())?;
-            
+
             // 设置主窗口隐藏任务栏图标
             if let Some(main_window) = app.get_webview_window("main") {
                 let _ = main_window.set_skip_taskbar(true);
@@ -104,15 +105,20 @@ pub fn run() {
                 if let Ok(settings) = crate::data::load_app_settings() {
                     if let (Some(w), Some(h)) = (settings.window_width, settings.window_height) {
                         // 使用逻辑像素设置窗口大小
-                        use tauri::Size;
                         use tauri::LogicalSize;
-                        let _ = main_window.set_size(Size::Logical(LogicalSize::new(w as f64, h as f64)));
+                        use tauri::Size;
+                        let _ = main_window
+                            .set_size(Size::Logical(LogicalSize::new(w as f64, h as f64)));
                     }
                     // 如果保存了窗口位置，也尝试恢复
-                    if let (Some(x), Some(y)) = (settings.window_position_x, settings.window_position_y) {
-                        use tauri::Position;
+                    if let (Some(x), Some(y)) =
+                        (settings.window_position_x, settings.window_position_y)
+                    {
                         use tauri::LogicalPosition;
-                        let _ = main_window.set_position(Position::Logical(LogicalPosition::new(x as f64, y as f64)));
+                        use tauri::Position;
+                        let _ = main_window.set_position(Position::Logical(LogicalPosition::new(
+                            x as f64, y as f64,
+                        )));
                     }
                 }
             }
@@ -203,4 +209,3 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-

@@ -1,5 +1,5 @@
 //! 系统集成模块
-//! 
+//!
 //! 此模块包含与操作系统集成的功能，包括：
 //! - Windows 开机自启动设置
 //! - 系统托盘管理
@@ -28,10 +28,7 @@ pub fn set_auto_start_windows(enable: bool) -> Result<(), String> {
 
 /// 更新托盘菜单项
 #[tauri::command]
-pub async fn update_tray_menu(
-    app: AppHandle,
-    prevent_auto_hide: bool,
-) -> Result<String, String> {
+pub async fn update_tray_menu(app: AppHandle, prevent_auto_hide: bool) -> Result<String, String> {
     // 重新创建菜单项
     let prevent_auto_hide_text = if prevent_auto_hide {
         "✓ 阻止自动隐藏"
@@ -107,8 +104,7 @@ fn handle_tray_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     match event.id().as_ref() {
         "prevent_auto_hide" => {
             // 切换阻止自动隐藏设置
-            let current_settings =
-                load_app_settings().unwrap_or_else(|_| get_default_settings());
+            let current_settings = load_app_settings().unwrap_or_else(|_| get_default_settings());
 
             let new_value = !current_settings.prevent_auto_hide;
 
@@ -128,24 +124,14 @@ fn handle_tray_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
                 "○ 阻止自动隐藏"
             };
 
-            if let Ok(prevent_auto_hide_item) = MenuItemBuilder::with_id(
-                "prevent_auto_hide",
-                prevent_auto_hide_text,
-            )
-            .build(app)
+            if let Ok(prevent_auto_hide_item) =
+                MenuItemBuilder::with_id("prevent_auto_hide", prevent_auto_hide_text).build(app)
             {
-                if let Ok(settings_item) =
-                    MenuItemBuilder::with_id("settings", "设置").build(app)
+                if let Ok(settings_item) = MenuItemBuilder::with_id("settings", "设置").build(app)
                 {
-                    if let Ok(quit_item) =
-                        MenuItemBuilder::with_id("quit", "退出").build(app)
-                    {
+                    if let Ok(quit_item) = MenuItemBuilder::with_id("quit", "退出").build(app) {
                         if let Ok(menu) = MenuBuilder::new(app)
-                            .items(&[
-                                &prevent_auto_hide_item,
-                                &settings_item,
-                                &quit_item,
-                            ])
+                            .items(&[&prevent_auto_hide_item, &settings_item, &quit_item])
                             .build()
                         {
                             if let Some(tray) = app.tray_by_id("main_tray") {
@@ -210,9 +196,7 @@ fn handle_tray_icon_event(tray: &tauri::tray::TrayIcon, event: tauri::tray::Tray
             if button == tauri::tray::MouseButton::Left {
                 println!("托盘图标左键点击");
                 // 左键点击只显示窗口，不隐藏（与设置菜单行为一致）
-                if let Some(main_window) =
-                    tray.app_handle().get_webview_window("main")
-                {
+                if let Some(main_window) = tray.app_handle().get_webview_window("main") {
                     println!("找到主窗口，显示并聚焦");
                     if let Err(e) = main_window.show() {
                         eprintln!("显示主窗口失败: {}", e);
@@ -261,7 +245,8 @@ pub fn initialize_global_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::e
 }
 
 /// 创建全局快捷键处理器
-pub fn create_global_shortcut_handler() -> impl Fn(&AppHandle, &Shortcut, tauri_plugin_global_shortcut::ShortcutEvent) {
+pub fn create_global_shortcut_handler(
+) -> impl Fn(&AppHandle, &Shortcut, tauri_plugin_global_shortcut::ShortcutEvent) {
     |app, shortcut, event| {
         // 只处理按键按下事件，忽略松开事件
         if event.state() != ShortcutState::Pressed {

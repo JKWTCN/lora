@@ -54,16 +54,13 @@ pub fn is_auto_start_enabled(app_name: &str) -> Result<bool, String> {
     use winapi::shared::minwindef::HKEY;
     use winapi::shared::winerror::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
     use winapi::um::winnt::KEY_READ;
-    use winapi::um::winreg::{
-        RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY_CURRENT_USER,
-    };
+    use winapi::um::winreg::{RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY_CURRENT_USER};
 
     let sub_key = to_wide("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run");
     let value_name = to_wide(app_name);
     let mut key: HKEY = ptr::null_mut();
-    let open_result = unsafe {
-        RegOpenKeyExW(HKEY_CURRENT_USER, sub_key.as_ptr(), 0, KEY_READ, &mut key)
-    };
+    let open_result =
+        unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, sub_key.as_ptr(), 0, KEY_READ, &mut key) };
 
     if open_result != ERROR_SUCCESS as i32 {
         return Ok(false);
@@ -119,7 +116,10 @@ pub fn set_auto_start(app_name: &str, exe_path: &str, enable: bool) -> Result<()
     };
 
     if create_result != ERROR_SUCCESS as i32 {
-        return Err(format!("打开开机自启动注册表项失败，错误码: {}", create_result));
+        return Err(format!(
+            "打开开机自启动注册表项失败，错误码: {}",
+            create_result
+        ));
     }
 
     let result = if enable {
@@ -177,7 +177,7 @@ fn build_filter(filters: &[(String, Vec<String>)]) -> Vec<u16> {
 #[cfg(target_os = "windows")]
 pub fn open_file_dialog(title: &str, filters: &[(String, Vec<String>)]) -> Result<String, String> {
     use winapi::um::commdlg::{
-        GetOpenFileNameW, OPENFILENAMEW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_PATHMUSTEXIST,
+        GetOpenFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_PATHMUSTEXIST, OPENFILENAMEW,
     };
 
     let title_w = to_wide(title);
@@ -207,7 +207,7 @@ pub fn save_file_dialog(
     file_name: &str,
 ) -> Result<String, String> {
     use winapi::um::commdlg::{
-        GetSaveFileNameW, OPENFILENAMEW, OFN_EXPLORER, OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST,
+        GetSaveFileNameW, OFN_EXPLORER, OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
     };
 
     let title_w = to_wide(title);

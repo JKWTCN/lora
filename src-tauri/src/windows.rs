@@ -19,7 +19,11 @@ pub fn run_as_admin(app_path: String) -> Result<String, String> {
 #[tauri::command]
 pub fn open_file_location(file_path: String) -> Result<String, String> {
     let path = Path::new(&file_path);
-    let dir_path = path.parent().ok_or("无法获取文件目录")?.to_str().ok_or("路径包含无效字符")?;
+    let dir_path = path
+        .parent()
+        .ok_or("无法获取文件目录")?
+        .to_str()
+        .ok_or("路径包含无效字符")?;
     crate::win_native::shell_execute(dir_path, None, None, Some("open"))
         .map(|_| "已打开文件所在目录".to_string())
         .map_err(|e| format!("打开目录失败: {}", e))

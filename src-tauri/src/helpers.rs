@@ -1,8 +1,7 @@
+use base64::Engine as _Base64Engine;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 use url::Url;
-use base64::Engine as _Base64Engine;
 
 // 解析快捷方式目标路径
 pub fn resolve_shortcut_target(shortcut_path: &str) -> Option<String> {
@@ -123,13 +122,18 @@ pub fn fetch_favicon(page_url: &str) -> Result<String, String> {
         return Err(format!("页面返回错误状态: {}", resp.status()));
     }
 
-    let body = resp.text().map_err(|e| format!("读取页面内容失败: {}", e))?;
+    let body = resp
+        .text()
+        .map_err(|e| format!("读取页面内容失败: {}", e))?;
 
     // 查找可能的 favicon 链接（rel=icon, shortcut icon）
     let mut favicon_url: Option<String> = None;
     for line in body.lines() {
         let lower = line.to_lowercase();
-        if lower.contains("rel=\"icon\"") || lower.contains("rel=\'icon\'") || lower.contains("rel=\"shortcut icon\"") {
+        if lower.contains("rel=\"icon\"")
+            || lower.contains("rel=\'icon\'")
+            || lower.contains("rel=\"shortcut icon\"")
+        {
             // 简单解析 href
             if let Some(href_pos) = lower.find("href=") {
                 let rest = &line[href_pos + 5..];
@@ -191,75 +195,276 @@ pub fn extract_icon_from_exe(exe_path: &str) -> Result<String, String> {
     use base64::Engine;
     use image::ImageEncoder;
 
-    let temp_dir = format!(
-        "temp_icons_{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis()
-    );
+    let pe_data = fs::read(exe_path).map_err(|e| format!("读取 exe 文件失败: {}", e))?;
+    let ico_data = extract_ico_from_pe_resources(&pe_data)?;
+    let img = image::load_from_memory_with_format(&ico_data, image::ImageFormat::Ico)
+        .map_err(|e| format!("加载 ico 资源失败: {}", e))?;
 
-    if !Path::new(&temp_dir).exists() {
-        fs::create_dir(&temp_dir).map_err(|e| format!("创建临时目录失败: {}", e))?;
-    }
+    let img_buffer = img.to_rgba8();
+    let mut png_bytes: Vec<u8> = Vec::new();
+    let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
+    encoder
+        .write_image(
+            img_buffer.as_raw(),
+            img_buffer.width(),
+            img_buffer.height(),
+            image::ColorType::Rgba8,
+        )
+        .map_err(|e| format!("转换 ico 为 PNG 失败: {}", e))?;
 
-    let output = Command::new("7z")
-        .args(&["e", exe_path, &format!("-o{}", temp_dir)])
-        .output()
-        .map_err(|e| format!("执行 7z 失败: {}", e))?;
+    let base64_encoded = general_purpose::STANDARD.encode(&png_bytes);
+    Ok(format!("data:image/png;base64,{}", base64_encoded))
+}
 
-    if !output.status.success() {
-        let _ = fs::remove_dir_all(&temp_dir);
-        return Err("7z 提取失败".to_string());
-    }
+#[derive(Clone, Copy)]
+struct PeSection {
+    virtual_address: u32,
+    virtual_size: u32,
+    raw_offset: u32,
+    raw_size: u32,
+}
 
-    let mut ico_files = Vec::new();
-    if let Ok(entries) = fs::read_dir(&temp_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if let Some(extension) = path.extension() {
-                if extension == "ico" {
-                    if let Ok(metadata) = fs::metadata(&path) {
-                        ico_files.push((path, metadata.len()));
-                    }
-                }
-            }
-        }
-    }
+#[derive(Clone, Copy)]
+struct ResourceData {
+    id: u16,
+    offset: usize,
+    size: usize,
+}
 
-    let ico_path = ico_files
+fn extract_ico_from_pe_resources(data: &[u8]) -> Result<Vec<u8>, String> {
+    const RT_ICON: u16 = 3;
+    const RT_GROUP_ICON: u16 = 14;
+
+    let pe = parse_pe(data)?;
+    let icon_resources = pe.resource_entries(RT_ICON)?;
+    let group_resources = pe.resource_entries(RT_GROUP_ICON)?;
+
+    let group = group_resources
         .into_iter()
-        .max_by_key(|&(_, size)| size)
-        .map(|(path, _)| path);
+        .max_by_key(|resource| resource.size)
+        .ok_or_else(|| "未找到 GROUP_ICON 资源".to_string())?;
 
-    let result = if let Some(ico_path) = ico_path {
-        match image::open(&ico_path) {
-            Ok(img) => {
-                let img_buffer = img.to_rgba8();
-                let mut png_bytes: Vec<u8> = Vec::new();
-                let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
-                if encoder
-                    .write_image(
-                        img_buffer.as_raw(),
-                        img_buffer.width(),
-                        img_buffer.height(),
-                        image::ColorType::Rgba8,
-                    )
-                    .is_ok()
-                {
-                    let base64_encoded = general_purpose::STANDARD.encode(&png_bytes);
-                    Ok(format!("data:image/png;base64,{}", base64_encoded))
-                } else {
-                    Err("转换 ico 为 PNG 失败".to_string())
-                }
-            }
-            Err(e) => Err(format!("加载 ico 文件失败: {}", e)),
-        }
-    } else {
-        Err("未找到 ico 文件".to_string())
+    let group_data = data
+        .get(group.offset..group.offset + group.size)
+        .ok_or_else(|| "GROUP_ICON 资源范围无效".to_string())?;
+
+    build_ico_from_group_icon(group_data, &icon_resources, data)
+}
+
+fn build_ico_from_group_icon(
+    group_data: &[u8],
+    icon_resources: &[ResourceData],
+    pe_data: &[u8],
+) -> Result<Vec<u8>, String> {
+    if group_data.len() < 6 {
+        return Err("GROUP_ICON 资源太短".to_string());
+    }
+
+    let icon_type = read_u16(group_data, 2)?;
+    let count = read_u16(group_data, 4)? as usize;
+    if icon_type != 1 || count == 0 {
+        return Err("GROUP_ICON 格式无效".to_string());
+    }
+
+    let entries_size = count
+        .checked_mul(14)
+        .ok_or_else(|| "GROUP_ICON 条目数量无效".to_string())?;
+    if group_data.len() < 6 + entries_size {
+        return Err("GROUP_ICON 条目不完整".to_string());
+    }
+
+    let mut icon_images: Vec<Vec<u8>> = Vec::with_capacity(count);
+    let mut ico = Vec::with_capacity(6 + count * 16);
+    ico.extend_from_slice(&group_data[0..6]);
+
+    let mut image_offset = 6 + count * 16;
+    for index in 0..count {
+        let entry_offset = 6 + index * 14;
+        let image_id = read_u16(group_data, entry_offset + 12)?;
+        let resource = icon_resources
+            .iter()
+            .find(|resource| resource.id == image_id)
+            .ok_or_else(|| format!("未找到 ICON 资源: {}", image_id))?;
+
+        let image = pe_data
+            .get(resource.offset..resource.offset + resource.size)
+            .ok_or_else(|| format!("ICON 资源范围无效: {}", image_id))?;
+
+        ico.extend_from_slice(&group_data[entry_offset..entry_offset + 8]);
+        ico.extend_from_slice(&(image.len() as u32).to_le_bytes());
+        ico.extend_from_slice(&(image_offset as u32).to_le_bytes());
+        icon_images.push(image.to_vec());
+        image_offset = image_offset
+            .checked_add(image.len())
+            .ok_or_else(|| "ICO 文件偏移溢出".to_string())?;
+    }
+
+    for image in icon_images {
+        ico.extend_from_slice(&image);
+    }
+
+    Ok(ico)
+}
+
+struct ParsedPe<'a> {
+    data: &'a [u8],
+    resource_root_offset: usize,
+    sections: Vec<PeSection>,
+}
+
+fn parse_pe(data: &[u8]) -> Result<ParsedPe<'_>, String> {
+    if data.get(0..2) != Some(b"MZ") {
+        return Err("不是有效的 Windows PE 文件".to_string());
+    }
+
+    let pe_offset = read_u32(data, 0x3c)? as usize;
+    if data.get(pe_offset..pe_offset + 4) != Some(b"PE\0\0") {
+        return Err("PE 文件头无效".to_string());
+    }
+
+    let number_of_sections = read_u16(data, pe_offset + 6)? as usize;
+    let optional_header_size = read_u16(data, pe_offset + 20)? as usize;
+    let optional_header_offset = pe_offset + 24;
+    let magic = read_u16(data, optional_header_offset)?;
+    let data_directory_offset = match magic {
+        0x10b => optional_header_offset + 96,
+        0x20b => optional_header_offset + 112,
+        _ => return Err("不支持的 PE optional header 格式".to_string()),
     };
 
-    let _ = fs::remove_dir_all(&temp_dir);
+    let resource_rva = read_u32(data, data_directory_offset + 16)?;
+    if resource_rva == 0 {
+        return Err("PE 文件不包含资源表".to_string());
+    }
 
-    result
+    let section_table_offset = optional_header_offset + optional_header_size;
+    let mut sections = Vec::with_capacity(number_of_sections);
+    for index in 0..number_of_sections {
+        let section_offset = section_table_offset + index * 40;
+        sections.push(PeSection {
+            virtual_size: read_u32(data, section_offset + 8)?,
+            virtual_address: read_u32(data, section_offset + 12)?,
+            raw_size: read_u32(data, section_offset + 16)?,
+            raw_offset: read_u32(data, section_offset + 20)?,
+        });
+    }
+
+    let resource_root_offset =
+        rva_to_offset(resource_rva, &sections).ok_or_else(|| "无法定位 PE 资源表".to_string())?;
+
+    Ok(ParsedPe {
+        data,
+        resource_root_offset,
+        sections,
+    })
+}
+
+impl ParsedPe<'_> {
+    fn resource_entries(&self, resource_type: u16) -> Result<Vec<ResourceData>, String> {
+        let Some(type_directory) = self.find_resource_directory(0, resource_type)? else {
+            return Ok(Vec::new());
+        };
+
+        let mut resources = Vec::new();
+        for name_entry in self.resource_directory_entries(type_directory)? {
+            if !name_entry.is_directory {
+                continue;
+            }
+
+            for language_entry in self.resource_directory_entries(name_entry.target_offset)? {
+                if language_entry.is_directory {
+                    continue;
+                }
+
+                let data_entry_offset = self.resource_root_offset + language_entry.target_offset;
+                let data_rva = read_u32(self.data, data_entry_offset)?;
+                let data_size = read_u32(self.data, data_entry_offset + 4)? as usize;
+                if let Some(data_offset) = rva_to_offset(data_rva, &self.sections) {
+                    resources.push(ResourceData {
+                        id: name_entry.id,
+                        offset: data_offset,
+                        size: data_size,
+                    });
+                }
+            }
+        }
+
+        Ok(resources)
+    }
+
+    fn find_resource_directory(
+        &self,
+        directory_offset: usize,
+        id: u16,
+    ) -> Result<Option<usize>, String> {
+        for entry in self.resource_directory_entries(directory_offset)? {
+            if entry.id == id && entry.is_directory {
+                return Ok(Some(entry.target_offset));
+            }
+        }
+
+        Ok(None)
+    }
+
+    fn resource_directory_entries(
+        &self,
+        directory_offset: usize,
+    ) -> Result<Vec<ResourceDirectoryEntry>, String> {
+        let absolute_directory_offset = self.resource_root_offset + directory_offset;
+        let named_count = read_u16(self.data, absolute_directory_offset + 12)? as usize;
+        let id_count = read_u16(self.data, absolute_directory_offset + 14)? as usize;
+        let total_count = named_count
+            .checked_add(id_count)
+            .ok_or_else(|| "资源目录条目数量无效".to_string())?;
+
+        let mut entries = Vec::with_capacity(total_count);
+        for index in 0..total_count {
+            let entry_offset = absolute_directory_offset + 16 + index * 8;
+            let name = read_u32(self.data, entry_offset)?;
+            let offset_to_data = read_u32(self.data, entry_offset + 4)?;
+            let is_directory = (offset_to_data & 0x8000_0000) != 0;
+            entries.push(ResourceDirectoryEntry {
+                id: (name & 0xffff) as u16,
+                is_directory,
+                target_offset: (offset_to_data & 0x7fff_ffff) as usize,
+            });
+        }
+
+        Ok(entries)
+    }
+}
+
+struct ResourceDirectoryEntry {
+    id: u16,
+    is_directory: bool,
+    target_offset: usize,
+}
+
+fn rva_to_offset(rva: u32, sections: &[PeSection]) -> Option<usize> {
+    sections.iter().find_map(|section| {
+        let section_size = section.virtual_size.max(section.raw_size);
+        let section_end = section.virtual_address.checked_add(section_size)?;
+        if rva >= section.virtual_address && rva < section_end {
+            let offset = section
+                .raw_offset
+                .checked_add(rva - section.virtual_address)?;
+            Some(offset as usize)
+        } else {
+            None
+        }
+    })
+}
+
+fn read_u16(data: &[u8], offset: usize) -> Result<u16, String> {
+    let bytes = data
+        .get(offset..offset + 2)
+        .ok_or_else(|| "读取 u16 超出文件范围".to_string())?;
+    Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
+}
+
+fn read_u32(data: &[u8], offset: usize) -> Result<u32, String> {
+    let bytes = data
+        .get(offset..offset + 4)
+        .ok_or_else(|| "读取 u32 超出文件范围".to_string())?;
+    Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }

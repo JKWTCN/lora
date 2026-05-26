@@ -5,9 +5,7 @@ use std::path::Path;
 
 fn main() {
     // 获取当前 UTC 日期
-    let build_date = chrono::Utc::now()
-        .format("%Y-%m-%d")
-        .to_string();
+    let build_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
     // 生成包含编译日期的 Rust 代码
     let out_dir = env::var("OUT_DIR").unwrap();

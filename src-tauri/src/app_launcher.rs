@@ -60,7 +60,10 @@ pub fn get_file_info(file_path: String) -> Result<serde_json::Value, String> {
     // 获取文件名（不包含扩展名）
     // 如果是快捷方式，应返回快捷方式文件本身的名字，而不是它指向的目标名字
     let name = if is_shortcut {
-        path.file_stem().and_then(|s| s.to_str()).unwrap_or("未知应用").to_string()
+        path.file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("未知应用")
+            .to_string()
     } else {
         actual_path_obj
             .file_stem()
@@ -149,10 +152,10 @@ pub fn launch_app(app_path: String, launch_args: Option<String>) -> Result<Strin
             app_path.clone()
         };
 
-        let work_dir = Path::new(&actual_path)
-            .parent()
-            .and_then(|p| p.to_str());
-        let params = launch_args.as_deref().filter(|args| !args.trim().is_empty());
+        let work_dir = Path::new(&actual_path).parent().and_then(|p| p.to_str());
+        let params = launch_args
+            .as_deref()
+            .filter(|args| !args.trim().is_empty());
         crate::win_native::shell_execute(&actual_path, params, work_dir, Some("open"))
             .map(|_| "应用启动成功".to_string())
             .map_err(|e| format!("启动应用失败: {}", e))
@@ -224,13 +227,16 @@ pub fn get_app_icon(file_path: String) -> Result<String, String> {
                 return Ok(fav);
             }
         }
-        // 优先尝试解压 exe 方法
-        println!("优先尝试解压 exe 文件");
+        // 优先尝试用 Rust 解析 PE 资源中的图标
+        println!("优先尝试 Rust PE 资源解析 exe 图标");
         match extract_icon_from_exe(&file_path) {
             Ok(icon_data) => Ok(icon_data),
-            Err(_) => {
-                // 如果解压失败，尝试使用 Windows API 方法
-                println!("解压失败，尝试使用 Windows API 方法");
+            Err(err) => {
+                // 如果 PE 资源解析失败，尝试使用 Windows API 方法
+                println!(
+                    "Rust PE 资源解析图标失败: {}，尝试使用 Windows API 方法",
+                    err
+                );
                 use base64::engine::general_purpose;
                 use base64::Engine;
                 use image::{ImageBuffer, Rgba};
@@ -246,8 +252,9 @@ pub fn get_app_icon(file_path: String) -> Result<String, String> {
                     .encode_wide()
                     .chain(Some(0))
                     .collect();
-                let icon_count =
-                    unsafe { ExtractIconExW(wide_path.as_ptr(), -1, ptr::null_mut(), ptr::null_mut(), 0) };
+                let icon_count = unsafe {
+                    ExtractIconExW(wide_path.as_ptr(), -1, ptr::null_mut(), ptr::null_mut(), 0)
+                };
                 let mut success = false;
                 let mut result_str = String::new();
                 if icon_count > 0 {
@@ -305,7 +312,8 @@ pub fn get_app_icon(file_path: String) -> Result<String, String> {
                                                     rgba_data.push(buffer[offset + 2]); // R
                                                     rgba_data.push(buffer[offset + 1]); // G
                                                     rgba_data.push(buffer[offset + 0]); // B
-                                                    rgba_data.push(buffer[offset + 3]); // A
+                                                    rgba_data.push(buffer[offset + 3]);
+                                                    // A
                                                 }
                                             }
                                         }
@@ -318,8 +326,9 @@ pub fn get_app_icon(file_path: String) -> Result<String, String> {
                                             {
                                                 use image::ImageEncoder;
 
-                                                let encoder =
-                                                    image::codecs::png::PngEncoder::new(&mut png_bytes);
+                                                let encoder = image::codecs::png::PngEncoder::new(
+                                                    &mut png_bytes,
+                                                );
                                                 if encoder
                                                     .write_image(
                                                         &img,
@@ -329,10 +338,12 @@ pub fn get_app_icon(file_path: String) -> Result<String, String> {
                                                     )
                                                     .is_ok()
                                                 {
-                                                    let base64_str =
-                                                        general_purpose::STANDARD.encode(&png_bytes);
-                                                    result_str =
-                                                        format!("data:image/png;base64,{}", base64_str);
+                                                    let base64_str = general_purpose::STANDARD
+                                                        .encode(&png_bytes);
+                                                    result_str = format!(
+                                                        "data:image/png;base64,{}",
+                                                        base64_str
+                                                    );
                                                     success = true;
                                                 }
                                             }

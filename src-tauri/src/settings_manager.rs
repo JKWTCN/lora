@@ -1,5 +1,5 @@
 //! 设置管理模块
-//! 
+//!
 //! 此模块包含所有与应用设置相关的功能，包括：
 //! - 外观设置（主题、图标大小、侧栏宽度等）
 //! - 启动设置（开机自启动、启动最小化等）
@@ -7,10 +7,10 @@
 //! - 搜索设置（模糊搜索、路径搜索等）
 //! - 数据管理设置（自动备份、备份间隔等）
 
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use crate::data::{load_app_settings, save_app_settings};
 use crate::models::AppSettings;
 use crate::system_integration::set_auto_start_windows;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 /// 更新阻止自动隐藏设置
 #[tauri::command]
