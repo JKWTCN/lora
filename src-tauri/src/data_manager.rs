@@ -3,8 +3,6 @@
 //! 此模块负责处理应用数据的导入、导出和重置功能。
 //! 提供了用户界面友好的数据备份和恢复操作。
 
-use std::os::windows::process::CommandExt;
-use std::process::Command;
 use crate::data;
 use crate::system::open_file_dialog;
 
@@ -17,38 +15,16 @@ pub fn export_data() -> Result<String, String> {
     // 打开文件保存对话框
     #[cfg(target_os = "windows")]
     {
-        let script = r#"
-            Add-Type -AssemblyName System.Windows.Forms
-            $saveFileDialog = New-Object System.Windows.Forms.SaveFileDialog
-            $saveFileDialog.Title = '导出数据'
-            $saveFileDialog.Filter = 'JSON文件|*.json|所有文件|*.*'
-            $saveFileDialog.DefaultExt = 'json'
-            $saveFileDialog.FileName = "lora_backup_$(Get-Date -Format 'yyyyMMdd_HHmmss').json"
-            $result = $saveFileDialog.ShowDialog()
-            if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
-                Write-Output $saveFileDialog.FileName
-            } else {
-                Write-Output ""
-            }
-        "#;
-
-        let output = Command::new("powershell")
-            .args([
-                "-WindowStyle",
-                "Hidden",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                &script,
-            ])
-            .creation_flags(0x08000000)
-            .output()
-            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
-
-        let file_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if file_path.is_empty() {
-            return Err("用户取消了导出操作".to_string());
-        }
+        let filters = vec![
+            ("JSON文件".to_string(), vec!["json".to_string()]),
+            ("所有文件".to_string(), vec!["*".to_string()]),
+        ];
+        let file_name = format!(
+            "lora_backup_{}.json",
+            chrono::Local::now().format("%Y%m%d_%H%M%S")
+        );
+        let file_path =
+            crate::win_native::save_file_dialog("导出数据", &filters, "json", &file_name)?;
 
         data::export_app_data_to_file(file_path)
     }

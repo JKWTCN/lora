@@ -7,8 +7,8 @@
 //! - 提取应用图标
 
 use std::fs;
-use std::os::windows::process::CommandExt;
 use std::path::Path;
+#[cfg(not(target_os = "windows"))]
 use std::process::Command;
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
@@ -123,17 +123,6 @@ pub fn launch_app(app_path: String, launch_args: Option<String>) -> Result<Strin
 
     #[cfg(target_os = "windows")]
     {
-        // 如果 launch_args 不存在或者为 ""
-        if launch_args.is_none() || launch_args.as_ref().unwrap().trim().is_empty() {
-            // 使用 start 命令启动，会自动设置正确的工作目录
-            let work_dir = Path::new(&app_path).parent().unwrap_or(Path::new("."));
-            Command::new("cmd")
-                .args(["/c", "start", "", "/D", &work_dir.to_string_lossy(), &app_path])
-                .creation_flags(0x08000000) // CREATE_NO_WINDOW - 隐藏命令行窗口
-                .spawn()
-                .map_err(|e| format!("启动应用失败: {}", e))?;
-            return Ok("应用启动成功".to_string());
-        }
         // 检查文件扩展名，如果是快捷方式(.lnk)，解析目标路径
         let extension = path
             .extension()
@@ -160,55 +149,13 @@ pub fn launch_app(app_path: String, launch_args: Option<String>) -> Result<Strin
             app_path.clone()
         };
 
-        // 使用解析后的路径启动应用
-        if let Some(args_str) = launch_args {
-            if !args_str.trim().is_empty() {
-                use std::os::windows::process::CommandExt;
-
-                let split_args: Vec<String> =
-                    args_str.split_whitespace().map(|s| s.to_string()).collect();
-
-                // 使用更安全的进程创建方式，直接启动应用而不是通过cmd
-                let result = Command::new(&actual_path)
-                    .creation_flags(0x00000008 | 0x08000000) // DETACHED_PROCESS | CREATE_NO_WINDOW
-                    .args(&split_args)
-                    .current_dir(Path::new(&actual_path).parent().unwrap_or(Path::new(".")))
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .spawn();
-
-                match result {
-                    Ok(_) => Ok("应用启动成功".to_string()),
-                    Err(e) => Err(format!("启动应用失败: {}", e)),
-                }
-            } else {
-                // 使用更安全的进程创建方式
-                let result = Command::new(&actual_path)
-                    .creation_flags(0x00000008 | 0x08000000) // DETACHED_PROCESS | CREATE_NO_WINDOW
-                    .current_dir(Path::new(&actual_path).parent().unwrap_or(Path::new(".")))
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .spawn();
-
-                match result {
-                    Ok(_) => Ok("应用启动成功".to_string()),
-                    Err(e) => Err(format!("启动应用失败: {}", e)),
-                }
-            }
-        } else {
-            // 使用更安全的进程创建方式
-            let result = Command::new(&actual_path)
-                .creation_flags(0x00000008 | 0x08000000) // DETACHED_PROCESS | CREATE_NO_WINDOW
-                .current_dir(Path::new(&actual_path).parent().unwrap_or(Path::new(".")))
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .spawn();
-
-            match result {
-                Ok(_) => Ok("应用启动成功".to_string()),
-                Err(e) => Err(format!("启动应用失败: {}", e)),
-            }
-        }
+        let work_dir = Path::new(&actual_path)
+            .parent()
+            .and_then(|p| p.to_str());
+        let params = launch_args.as_deref().filter(|args| !args.trim().is_empty());
+        crate::win_native::shell_execute(&actual_path, params, work_dir, Some("open"))
+            .map(|_| "应用启动成功".to_string())
+            .map_err(|e| format!("启动应用失败: {}", e))
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -399,52 +346,7 @@ pub fn get_app_icon(file_path: String) -> Result<String, String> {
                 if success {
                     Ok(result_str)
                 } else {
-                    // 最后回退到 PowerShell 方法
-                    println!("Windows API 方法也失败，尝试使用 PowerShell 方法");
-                    let script = format!(
-                        r#"
-                        try {{
-                            Add-Type -AssemblyName System.Drawing
-                            $icon = [System.Drawing.Icon]::ExtractAssociatedIcon('{}')
-                            if ($icon) {{
-                                $bitmap = $icon.ToBitmap()
-                                $stream = New-Object System.IO.MemoryStream
-                                $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
-                                $bytes = $stream.ToArray()
-                                $base64 = [System.Convert]::ToBase64String($bytes)
-                                $stream.Dispose()
-                                $bitmap.Dispose()
-                                $icon.Dispose()
-                                Write-Output "data:image/png;base64,$base64"
-                            }} else {{
-                                Write-Output ""
-                            }}
-                        }} catch {{
-                            Write-Output ""
-                        }}
-                        "#,
-                        file_path.replace("'", "''")
-                    );
-
-                    let output = std::process::Command::new("powershell")
-                        .args([
-                            "-WindowStyle",
-                            "Hidden",
-                            "-ExecutionPolicy",
-                            "Bypass",
-                            "-Command",
-                            &script,
-                        ])
-                        .creation_flags(0x08000000)
-                        .output()
-                        .map_err(|e| format!("PowerShell执行失败: {}", e))?;
-
-                    let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                    if !result.is_empty() && result.starts_with("data:image/png;base64,") {
-                        Ok(result)
-                    } else {
-                        Err("无法提取图标".to_string())
-                    }
+                    Err("无法提取图标".to_string())
                 }
             }
         }

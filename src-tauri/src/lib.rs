@@ -10,6 +10,7 @@ mod models;
 mod settings_manager;
 mod system;
 mod system_integration;
+mod win_native;
 mod window_manager;
 mod windows;
 use crate::backup::BackupManager;

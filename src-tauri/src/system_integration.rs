@@ -6,8 +6,6 @@
 //! - 全局快捷键处理
 //! - 系统事件处理
 
-use std::process::Command;
-use std::os::windows::process::CommandExt;
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
@@ -25,79 +23,7 @@ pub fn set_auto_start_windows(enable: bool) -> Result<(), String> {
     let exe_path = std::env::current_exe().map_err(|e| format!("获取可执行文件路径失败: {}", e))?;
     let exe_path_str = exe_path.to_str().ok_or("可执行文件路径包含无效字符")?;
 
-    // 注册表键路径
-    let reg_key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
-    let app_name = "Lora";
-
-    if enable {
-        // 添加到注册表
-        let script = format!(
-            r#"
-            try {{
-                New-ItemProperty -Path "HKCU:\{}" -Name "{}" -Value '"{}"' -PropertyType String -Force
-                Write-Output "SUCCESS"
-            }} catch {{
-                Write-Error $_.Exception.Message
-                exit 1
-            }}
-            "#,
-            reg_key,
-            app_name,
-            exe_path_str.replace("'", "''")
-        );
-
-        let output = Command::new("powershell")
-            .args([
-                "-WindowStyle",
-                "Hidden",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                &script,
-            ])
-            .creation_flags(0x08000000)
-            .output()
-            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("设置开机自启动失败: {}", stderr));
-        }
-    } else {
-        // 从注册表中删除
-        let script = format!(
-            r#"
-            try {{
-                Remove-ItemProperty -Path "HKCU:\{}" -Name "{}" -ErrorAction SilentlyContinue
-                Write-Output "SUCCESS"
-            }} catch {{
-                Write-Error $_.Exception.Message
-                exit 1
-            }}
-            "#,
-            reg_key, app_name
-        );
-
-        let output = Command::new("powershell")
-            .args([
-                "-WindowStyle",
-                "Hidden",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                &script,
-            ])
-            .creation_flags(0x08000000)
-            .output()
-            .map_err(|e| format!("PowerShell执行失败: {}", e))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("取消开机自启动失败: {}", stderr));
-        }
-    }
-
-    Ok(())
+    crate::win_native::set_auto_start("Lora", exe_path_str, enable)
 }
 
 /// 更新托盘菜单项
