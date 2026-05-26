@@ -19,7 +19,7 @@
         "height": 600,
         "decorations": false,
         "transparent": false,
-        "dragDropEnabled": false,
+        "dragDropEnabled": true,
         "skipTaskbar": true
       }
     ],

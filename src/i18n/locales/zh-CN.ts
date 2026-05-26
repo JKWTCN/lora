@@ -49,7 +49,8 @@ export default {
   // 应用标题
   app: {
     title: 'Lora',
-    loading: '正在启动 Lora...'
+    loading: '正在启动 Lora...',
+    cannotAddFile: '无法添加文件 {path}'
   },
 
   // 主窗口
