@@ -857,7 +857,28 @@ watch(filteredApps, currentApps => {
 
 const getSelectedApp = () => filteredApps.value.find(app => app.id === selectedAppId.value) || filteredApps.value[0]
 
-const moveSelectedApp = (direction: 1 | -1) => {
+const getAppGridColumnCount = () => {
+  const grid = document.querySelector('.app-grid') as HTMLElement | null
+  if (!grid) {
+    return 1
+  }
+
+  const computedStyle = window.getComputedStyle(grid)
+  const renderedColumns = computedStyle.gridTemplateColumns
+    .split(' ')
+    .filter(column => column && column !== 'none')
+    .length
+
+  if (renderedColumns > 0) {
+    return renderedColumns
+  }
+
+  const gap = parseFloat(computedStyle.columnGap || computedStyle.gap || '0') || 0
+  const cellSize = clampGridCellSize(appSettings.value.gridCellSize)
+  return Math.max(1, Math.floor((grid.clientWidth + gap) / (cellSize + gap)))
+}
+
+const moveSelectedApp = (offset: number) => {
   const currentApps = filteredApps.value
   if (currentApps.length === 0) {
     selectedAppId.value = null
@@ -865,7 +886,7 @@ const moveSelectedApp = (direction: 1 | -1) => {
   }
 
   const currentIndex = Math.max(0, currentApps.findIndex(app => app.id === selectedAppId.value))
-  const nextIndex = Math.min(currentApps.length - 1, Math.max(0, currentIndex + direction))
+  const nextIndex = Math.min(currentApps.length - 1, Math.max(0, currentIndex + offset))
   selectedAppId.value = currentApps[nextIndex].id
 }
 
@@ -2244,14 +2265,26 @@ const handleGlobalKeydown = (event: KeyboardEvent) => {
     return
   }
 
-  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+  if (event.key === 'ArrowRight') {
     moveSelectedApp(1)
     event.preventDefault()
     return
   }
 
-  if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+  if (event.key === 'ArrowLeft') {
     moveSelectedApp(-1)
+    event.preventDefault()
+    return
+  }
+
+  if (event.key === 'ArrowDown') {
+    moveSelectedApp(getAppGridColumnCount())
+    event.preventDefault()
+    return
+  }
+
+  if (event.key === 'ArrowUp') {
+    moveSelectedApp(-getAppGridColumnCount())
     event.preventDefault()
     return
   }
@@ -2464,12 +2497,20 @@ const handleSearchKeydown = (event: KeyboardEvent) => {
     }
     event.preventDefault()
   }
-  if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+  if (event.key === 'ArrowRight') {
     moveSelectedApp(1)
     event.preventDefault()
   }
-  if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+  if (event.key === 'ArrowLeft') {
     moveSelectedApp(-1)
+    event.preventDefault()
+  }
+  if (event.key === 'ArrowDown') {
+    moveSelectedApp(getAppGridColumnCount())
+    event.preventDefault()
+  }
+  if (event.key === 'ArrowUp') {
+    moveSelectedApp(-getAppGridColumnCount())
     event.preventDefault()
   }
 }
