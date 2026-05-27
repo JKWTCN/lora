@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-0.1.7-blue.svg)
+![Version](https://img.shields.io/badge/version-0.1.12-blue.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-v2-orange.svg)
 ![Vue](https://img.shields.io/badge/Vue-3-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
