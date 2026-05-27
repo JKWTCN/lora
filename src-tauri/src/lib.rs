@@ -22,12 +22,6 @@ use crate::system_integration::{
 // 引入编译时生成的构建信息
 include!(concat!(env!("OUT_DIR"), "/build_info.rs"));
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 // 获取应用版本号
 #[tauri::command]
 fn get_app_version() -> String {
@@ -212,7 +206,6 @@ pub fn run() {
             data_manager::export_data,
             data_manager::import_data,
             data_manager::reset_data,
-            greet,
             notify_main_window_refresh
         ])
         .run(tauri::generate_context!())

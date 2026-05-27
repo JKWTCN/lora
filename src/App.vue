@@ -2357,9 +2357,6 @@ const setupTauriFileDrop = async () => {
 // 处理单个文件拖拽的函数
 const handleFileDrop = async (filePath: string) => {
   console.log('处理文件:', filePath)
-  console.log("调用自定义命令")
-  //await invoke('my_custom_command');
-
   try {
     // 检查 invoke 函数是否可用
     console.log('检查 invoke 函数可用性...')
