@@ -2,6 +2,7 @@ import { createApp } from "vue";
 import App from "./App.vue";
 import "./assets/global.css";
 import "./assets/icons.css";
+import "./assets/context-menu.css";
 import i18n from "./i18n";
 import { installCustomDialogs } from "./utils/customDialog";
 

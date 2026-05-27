@@ -21,6 +21,19 @@
         "transparent": false,
         "dragDropEnabled": true,
         "skipTaskbar": true
+      },
+      {
+        "label": "tray-menu",
+        "title": "Lora Tray Menu",
+        "url": "tray-menu.html",
+        "width": 164,
+        "height": 112,
+        "decorations": false,
+        "transparent": true,
+        "resizable": false,
+        "visible": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true
       }
     ],
     "security": {

@@ -17,7 +17,8 @@ export default defineConfig(async () => ({
         main: path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'index.html'),
         settings: path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'settings.html'),
         'new-project': path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'new-project.html'),
-        'edit-project': path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'edit-project.html')
+        'edit-project': path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'edit-project.html'),
+        'tray-menu': path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'tray-menu.html')
       }
     }
   },

@@ -7,13 +7,12 @@
 //! - 系统事件处理
 
 use tauri::{
-    menu::{MenuBuilder, MenuItemBuilder},
-    tray::TrayIconBuilder,
-    AppHandle, Emitter, Manager,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder},
+    AppHandle, Emitter, Manager, PhysicalPosition, Position,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-use crate::data::{load_app_settings, save_app_settings};
+use crate::data::load_app_settings;
 use crate::models::AppSettings;
 
 /// Windows 开机自启动实现
@@ -28,69 +27,18 @@ pub fn set_auto_start_windows(enable: bool) -> Result<(), String> {
 
 /// 更新托盘菜单项
 #[tauri::command]
-pub async fn update_tray_menu(app: AppHandle, prevent_auto_hide: bool) -> Result<String, String> {
-    // 重新创建菜单项
-    let prevent_auto_hide_text = if prevent_auto_hide {
-        "✓ 阻止自动隐藏"
-    } else {
-        "○ 阻止自动隐藏"
-    };
-
-    let prevent_auto_hide_item =
-        MenuItemBuilder::with_id("prevent_auto_hide", prevent_auto_hide_text)
-            .build(&app)
-            .map_err(|e| format!("创建菜单项失败: {}", e))?;
-    let settings_item = MenuItemBuilder::with_id("settings", "设置")
-        .build(&app)
-        .map_err(|e| format!("创建菜单项失败: {}", e))?;
-    let quit_item = MenuItemBuilder::with_id("quit", "退出")
-        .build(&app)
-        .map_err(|e| format!("创建菜单项失败: {}", e))?;
-
-    let menu = MenuBuilder::new(&app)
-        .items(&[&prevent_auto_hide_item, &settings_item, &quit_item])
-        .build()
-        .map_err(|e| format!("创建菜单失败: {}", e))?;
-
-    // 更新托盘菜单
-    if let Some(tray) = app.tray_by_id("main_tray") {
-        tray.set_menu(Some(menu))
-            .map_err(|e| format!("更新托盘菜单失败: {}", e))?;
-    }
-
+pub async fn update_tray_menu(_app: AppHandle, _prevent_auto_hide: bool) -> Result<String, String> {
+    // 托盘菜单已改为前端自绘窗口，状态由 tray-menu 页面直接读取设置。
     Ok("托盘菜单已更新".to_string())
 }
 
 /// 初始化系统托盘
 pub fn initialize_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    // 先加载设置以获取当前状态
-    let settings = load_app_settings().unwrap_or_else(|_| get_default_settings());
-
-    // 创建托盘菜单
-    let prevent_auto_hide_text = if settings.prevent_auto_hide {
-        "✓ 阻止自动隐藏"
-    } else {
-        "○ 阻止自动隐藏"
-    };
-
-    let prevent_auto_hide =
-        MenuItemBuilder::with_id("prevent_auto_hide", prevent_auto_hide_text).build(app)?;
-    let settings_item = MenuItemBuilder::with_id("settings", "设置").build(app)?;
-    let quit = MenuItemBuilder::with_id("quit", "退出").build(app)?;
-
-    let menu = MenuBuilder::new(app)
-        .items(&[&prevent_auto_hide, &settings_item, &quit])
-        .build()?;
-
     // 创建托盘图标
     let _tray = TrayIconBuilder::with_id("main_tray")
         .icon(app.default_window_icon().unwrap().clone())
-        .menu(&menu)
         .show_menu_on_left_click(false)
         .tooltip("Lora Launcher")
-        .on_menu_event(move |app, event| {
-            handle_tray_menu_event(app, event);
-        })
         .on_tray_icon_event(|tray, event| {
             handle_tray_icon_event(tray, event);
         })
@@ -99,101 +47,20 @@ pub fn initialize_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
-/// 处理托盘菜单事件
-fn handle_tray_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
-    match event.id().as_ref() {
-        "prevent_auto_hide" => {
-            // 切换阻止自动隐藏设置
-            let current_settings = load_app_settings().unwrap_or_else(|_| get_default_settings());
-
-            let new_value = !current_settings.prevent_auto_hide;
-
-            // 更新设置
-            let mut updated_settings = current_settings;
-            updated_settings.prevent_auto_hide = new_value;
-
-            if let Err(e) = save_app_settings(updated_settings) {
-                eprintln!("保存设置失败: {}", e);
-                return;
-            }
-
-            // 更新托盘菜单
-            let prevent_auto_hide_text = if new_value {
-                "✓ 阻止自动隐藏"
-            } else {
-                "○ 阻止自动隐藏"
-            };
-
-            if let Ok(prevent_auto_hide_item) =
-                MenuItemBuilder::with_id("prevent_auto_hide", prevent_auto_hide_text).build(app)
-            {
-                if let Ok(settings_item) = MenuItemBuilder::with_id("settings", "设置").build(app)
-                {
-                    if let Ok(quit_item) = MenuItemBuilder::with_id("quit", "退出").build(app) {
-                        if let Ok(menu) = MenuBuilder::new(app)
-                            .items(&[&prevent_auto_hide_item, &settings_item, &quit_item])
-                            .build()
-                        {
-                            if let Some(tray) = app.tray_by_id("main_tray") {
-                                let _ = tray.set_menu(Some(menu));
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 通知前端更新状态
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.emit("prevent-auto-hide-changed", new_value);
-            }
-        }
-        "settings" => {
-            println!("托盘菜单：设置按钮被点击");
-            // 显示设置窗口
-            match app.get_webview_window("settings") {
-                Some(settings_window) => {
-                    println!("找到设置窗口，显示并聚焦");
-                    if let Err(e) = settings_window.show() {
-                        eprintln!("显示设置窗口失败: {}", e);
-                    } else if let Err(e) = settings_window.set_focus() {
-                        eprintln!("聚焦设置窗口失败: {}", e);
-                    }
-                }
-                None => {
-                    println!("设置窗口不存在，尝试创建新的设置窗口");
-                    // 如果设置窗口不存在，尝试创建一个
-                    // 这里我们不能直接调用 open_settings_window，因为需要 AppState
-                    // 所以改为显示主窗口作为后备方案
-                    if let Some(main_window) = app.get_webview_window("main") {
-                        println!("显示主窗口作为后备方案");
-                        if let Err(e) = main_window.show() {
-                            eprintln!("显示主窗口失败: {}", e);
-                        } else if let Err(e) = main_window.set_focus() {
-                            eprintln!("聚焦主窗口失败: {}", e);
-                        } else {
-                            // 窗口显示时，隐藏任务栏图标
-                            if let Err(e) = main_window.set_skip_taskbar(true) {
-                                eprintln!("设置隐藏任务栏图标失败: {}", e);
-                            }
-                        }
-                    } else {
-                        eprintln!("无法找到主窗口");
-                    }
-                }
-            }
-        }
-        "quit" => {
-            app.exit(0);
-        }
-        _ => {}
-    }
-}
-
 /// 处理托盘图标事件
 fn handle_tray_icon_event(tray: &tauri::tray::TrayIcon, event: tauri::tray::TrayIconEvent) {
     match event {
-        tauri::tray::TrayIconEvent::Click { button, .. } => {
-            if button == tauri::tray::MouseButton::Left {
+        tauri::tray::TrayIconEvent::Click {
+            button,
+            button_state,
+            position,
+            ..
+        } => {
+            if button_state != MouseButtonState::Down {
+                return;
+            }
+
+            if button == MouseButton::Left {
                 println!("托盘图标左键点击");
                 // 左键点击只显示窗口，不隐藏（与设置菜单行为一致）
                 if let Some(main_window) = tray.app_handle().get_webview_window("main") {
@@ -213,9 +80,44 @@ fn handle_tray_icon_event(tray: &tauri::tray::TrayIcon, event: tauri::tray::Tray
                 } else {
                     eprintln!("托盘左键点击：无法找到主窗口");
                 }
+            } else if button == MouseButton::Right {
+                show_custom_tray_menu(tray.app_handle(), position);
             }
         }
         _ => {}
+    }
+}
+
+fn show_custom_tray_menu(app: &AppHandle, position: PhysicalPosition<f64>) {
+    let Some(menu_window) = app.get_webview_window("tray-menu") else {
+        eprintln!("托盘菜单窗口不存在");
+        return;
+    };
+
+    const MENU_WIDTH: i32 = 164;
+    const MENU_HEIGHT: i32 = 112;
+    const GAP: i32 = 8;
+
+    let mut x = position.x.round() as i32 - MENU_WIDTH + 20;
+    let mut y = position.y.round() as i32 - MENU_HEIGHT - GAP;
+
+    if let Ok(Some(monitor)) = menu_window.monitor_from_point(position.x, position.y) {
+        let work_area = monitor.work_area();
+        let min_x = work_area.position.x;
+        let min_y = work_area.position.y;
+        let max_x = work_area.position.x + work_area.size.width as i32 - MENU_WIDTH;
+        let max_y = work_area.position.y + work_area.size.height as i32 - MENU_HEIGHT;
+
+        x = x.clamp(min_x, max_x);
+        y = y.clamp(min_y, max_y);
+    }
+
+    let _ = menu_window.set_position(Position::Physical(PhysicalPosition::new(x, y)));
+    let _ = menu_window.emit("tray-menu-refresh", {});
+    if let Err(e) = menu_window.show() {
+        eprintln!("显示托盘菜单失败: {}", e);
+    } else if let Err(e) = menu_window.set_focus() {
+        eprintln!("聚焦托盘菜单失败: {}", e);
     }
 }
 

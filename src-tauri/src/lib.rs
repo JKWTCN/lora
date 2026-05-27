@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Manager, WindowEvent};
 
 mod app_launcher;
 mod backup;
@@ -121,6 +121,15 @@ pub fn run() {
                         )));
                     }
                 }
+            }
+
+            if let Some(tray_menu_window) = app.get_webview_window("tray-menu") {
+                let tray_menu_window_for_event = tray_menu_window.clone();
+                tray_menu_window.on_window_event(move |event| {
+                    if let WindowEvent::Focused(false) = event {
+                        let _ = tray_menu_window_for_event.hide();
+                    }
+                });
             }
 
             // 启动定时备份任务
