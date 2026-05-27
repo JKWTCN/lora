@@ -132,3 +132,31 @@ body {
 .custom-dialog-primary:hover {
     background: #1d4ed8;
 }
+
+body.lora-theme-dark {
+    background: #111827;
+}
+
+body.lora-theme-dark .custom-dialog-overlay {
+    background: rgba(2, 6, 23, 0.58);
+}
+
+body.lora-theme-dark .custom-dialog {
+    border-color: #2b3748;
+    background: #172033;
+    color: #e5edf7;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+}
+
+body.lora-theme-dark .custom-dialog-message {
+    color: #94a3b8;
+}
+
+body.lora-theme-dark .custom-dialog-secondary {
+    background: #1f2937;
+    color: #cbd5e1;
+}
+
+body.lora-theme-dark .custom-dialog-secondary:hover {
+    background: #334155;
+}

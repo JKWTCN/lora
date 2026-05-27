@@ -1,5 +1,5 @@
 <template>
-    <div class="settings-app">
+    <div class="settings-app" :class="settingsAppClasses">
         <!-- 设置内容 -->
         <div class="settings-content">
             <!-- 左侧导航 -->
@@ -278,6 +278,7 @@ const activeTab = ref('about')
 const isSaving = ref(false)
 const lastSaved = ref(false)
 let unlistenSettingsUpdated = null
+let removeThemePreferenceListener = null
 
 // 应用版本号
 const appVersion = ref('')
@@ -318,10 +319,31 @@ const saveStatusText = computed(() => {
     return ''
 })
 
+const resolvedTheme = computed(() => {
+    if (localSettings.theme === 'auto') {
+        return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    }
+
+    return localSettings.theme === 'dark' ? 'dark' : 'light'
+})
+
+const settingsAppClasses = computed(() => ({
+    'theme-dark': resolvedTheme.value === 'dark',
+    'theme-light': resolvedTheme.value === 'light'
+}))
+
+const applyRuntimeTheme = () => {
+    const body = document.body
+    body.classList.toggle('lora-theme-dark', resolvedTheme.value === 'dark')
+    body.classList.toggle('lora-theme-light', resolvedTheme.value === 'light')
+}
+
 // 监听设置变化
 watch(localSettings, () => {
     lastSaved.value = false
 }, { deep: true })
+
+watch(resolvedTheme, applyRuntimeTheme)
 
 // 方法
 const markSaved = () => {
@@ -602,6 +624,15 @@ const loadSettings = async () => {
 
 // 初始化
 onMounted(async () => {
+    const themePreference = window.matchMedia?.('(prefers-color-scheme: dark)')
+    if (themePreference) {
+        const handleThemePreferenceChange = () => applyRuntimeTheme()
+        themePreference.addEventListener('change', handleThemePreferenceChange)
+        removeThemePreferenceListener = () => {
+            themePreference.removeEventListener('change', handleThemePreferenceChange)
+        }
+    }
+
     // 获取应用版本号和更新日期
     try {
         appVersion.value = await invoke('get_app_version')
@@ -613,9 +644,11 @@ onMounted(async () => {
     }
 
     await loadSettings()
+    applyRuntimeTheme()
 
     unlistenSettingsUpdated = await listen('settings-updated', async () => {
         await loadSettings()
+        applyRuntimeTheme()
     })
 })
 
@@ -623,6 +656,11 @@ onUnmounted(() => {
     if (unlistenSettingsUpdated) {
         unlistenSettingsUpdated()
         unlistenSettingsUpdated = null
+    }
+
+    if (removeThemePreferenceListener) {
+        removeThemePreferenceListener()
+        removeThemePreferenceListener = null
     }
 })
 </script>
@@ -636,6 +674,13 @@ onUnmounted(() => {
     background: #f6f8fb;
     color: #172033;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color-scheme: light;
+}
+
+.settings-app.theme-dark {
+    background: #111827;
+    color: #e5edf7;
+    color-scheme: dark;
 }
 
 .settings-content {
@@ -649,6 +694,11 @@ onUnmounted(() => {
     background: #243447;
     border-right: 1px solid #1d2b3a;
     padding: 10px 0;
+}
+
+.settings-app.theme-dark .settings-nav {
+    background: #0f172a;
+    border-right-color: #1f2937;
 }
 
 .nav-item {
@@ -690,6 +740,10 @@ onUnmounted(() => {
     background: #f6f8fb;
 }
 
+.settings-app.theme-dark .settings-panel {
+    background: #111827;
+}
+
 .panel-content {
     width: min(560px, 100%);
     padding: 20px 22px 28px;
@@ -713,6 +767,16 @@ onUnmounted(() => {
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
+.settings-app.theme-dark .app-info,
+.settings-app.theme-dark .info-grid,
+.settings-app.theme-dark .links-section,
+.settings-app.theme-dark .settings-group,
+.settings-app.theme-dark .settings-footer {
+    border-color: #2b3748;
+    background: #172033;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
 .app-icon img {
     width: 52px;
     height: 52px;
@@ -726,6 +790,12 @@ onUnmounted(() => {
     color: #172033;
 }
 
+.settings-app.theme-dark .app-details h3,
+.settings-app.theme-dark .settings-group h3,
+.settings-app.theme-dark .info-item span {
+    color: #e5edf7;
+}
+
 .version {
     color: #64748b;
     margin: 0 0 8px 0;
@@ -737,6 +807,17 @@ onUnmounted(() => {
     margin: 0;
     line-height: 1.55;
     font-size: 13px;
+}
+
+.settings-app.theme-dark .version,
+.settings-app.theme-dark .description,
+.settings-app.theme-dark .info-item label,
+.settings-app.theme-dark .setting-description,
+.settings-app.theme-dark .setting-note p,
+.settings-app.theme-dark .unit,
+.settings-app.theme-dark .slider-value,
+.settings-app.theme-dark .save-status {
+    color: #94a3b8;
 }
 
 .info-grid {
@@ -761,8 +842,17 @@ onUnmounted(() => {
     background: #ffffff;
 }
 
+.settings-app.theme-dark .info-item {
+    background: #172033;
+    border-bottom-color: #253246;
+}
+
 .info-item:nth-child(odd) {
     border-right: 1px solid #edf1f5;
+}
+
+.settings-app.theme-dark .info-item:nth-child(odd) {
+    border-right-color: #253246;
 }
 
 .info-item:nth-last-child(-n + 2) {
@@ -809,10 +899,28 @@ onUnmounted(() => {
     font-weight: 600;
 }
 
+.settings-app.theme-dark .link-button,
+.settings-app.theme-dark .clear-button,
+.settings-app.theme-dark .action-button,
+.settings-app.theme-dark .footer-button.secondary {
+    background: #1f2937;
+    border-color: #334155;
+    color: #cbd5e1;
+}
+
 .link-button:hover {
     background: #eef6ff;
     border-color: #2f9ae0;
     color: #1269a8;
+}
+
+.settings-app.theme-dark .link-button:hover,
+.settings-app.theme-dark .clear-button:hover,
+.settings-app.theme-dark .action-button:hover,
+.settings-app.theme-dark .footer-button.secondary:hover {
+    background: #22364d;
+    border-color: #38bdf8;
+    color: #e0f2fe;
 }
 
 /* 设置组样式 */
@@ -834,6 +942,10 @@ onUnmounted(() => {
     padding-bottom: 10px;
 }
 
+.settings-app.theme-dark .settings-group h3 {
+    border-bottom-color: #253246;
+}
+
 .setting-item {
     display: grid;
     grid-template-columns: minmax(150px, 190px) minmax(0, 1fr);
@@ -851,6 +963,10 @@ onUnmounted(() => {
     align-items: center;
     gap: 8px;
     font-size: 14px;
+}
+
+.settings-app.theme-dark .setting-item label {
+    color: #d8e2ef;
 }
 
 .setting-item input[type="checkbox"] {
@@ -871,6 +987,14 @@ onUnmounted(() => {
     color: #172033;
     font-size: 13px;
     transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.settings-app.theme-dark .setting-item input[type="number"],
+.settings-app.theme-dark .setting-item input[type="text"],
+.settings-app.theme-dark .setting-item select {
+    background: #111827;
+    border-color: #334155;
+    color: #e5edf7;
 }
 
 .setting-item input:focus,
@@ -995,9 +1119,21 @@ onUnmounted(() => {
     color: #dc2626;
 }
 
+.settings-app.theme-dark .action-button.danger {
+    background: #2a1b22;
+    border-color: #7f1d1d;
+    color: #fca5a5;
+}
+
 .action-button.danger:hover {
     background: #fef2f2;
     border-color: #f87171;
+}
+
+.settings-app.theme-dark .action-button.danger:hover {
+    background: #3b1d25;
+    border-color: #ef4444;
+    color: #fecaca;
 }
 
 .settings-footer {
@@ -1010,6 +1146,10 @@ onUnmounted(() => {
     padding: 12px 20px;
     border-top: 1px solid #d9e1ea;
     background: #ffffff;
+}
+
+.settings-app.theme-dark .settings-footer {
+    border-top-color: #2b3748;
 }
 
 .save-status {
