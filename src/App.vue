@@ -459,6 +459,7 @@ const GRID_CELL_SIZE_DEFAULT = 88
 const GRID_CELL_SIZE_MIN = 56
 const GRID_CELL_SIZE_MAX = 144
 const GRID_CELL_SIZE_STEP = 4
+const SIDEBAR_WIDTH_MIN = 72
 
 const clampGridCellSize = (value: unknown) => {
   const numericValue = Number(value)
@@ -751,10 +752,12 @@ const appContainerClasses = computed(() => ({
 const appContainerStyle = computed(() => {
   const cellSize = clampGridCellSize(appSettings.value.gridCellSize)
   const iconSize = Math.min(84, Math.max(32, Math.round(cellSize * 0.58)))
+  const cellHeight = Math.max(cellSize, iconSize + 30)
 
   return {
     '--app-icon-size': `${iconSize}px`,
     '--app-cell-size': `${cellSize}px`,
+    '--app-cell-height': `${cellHeight}px`,
   }
 })
 
@@ -1826,7 +1829,7 @@ const resize = (e: MouseEvent) => {
   if (!isResizing.value) return
 
   const newWidth = e.clientX
-  if (newWidth > 80 && newWidth < 200) {
+  if (newWidth > SIDEBAR_WIDTH_MIN && newWidth < 200) {
     sidebarWidth.value = newWidth
   }
 }
@@ -2117,7 +2120,7 @@ onMounted(async () => {
       // 先让侧栏自适应，然后获取其实际宽度
         sidebar.style.width = 'auto'
         const rect = sidebar.getBoundingClientRect()
-        sidebarWidth.value = Math.max(rect.width, 80) // 确保最小宽度为80px
+        sidebarWidth.value = Math.max(rect.width, SIDEBAR_WIDTH_MIN)
       }
     }
 
@@ -3046,7 +3049,7 @@ const clearDragState = () => {
   background: var(--sidebar-bg);
   color: white;
   width: auto;
-  min-width: 100px;
+  min-width: 72px;
   max-width: 200px;
   display: flex;
   flex-direction: column;
@@ -3103,7 +3106,7 @@ const clearDragState = () => {
 /* 拖拽分隔线 */
 .resizer {
   width: 4px;
-  background: #bdc3c7;
+  background: transparent;
   cursor: col-resize;
   transition: background-color var(--transition-speed) ease;
 }
@@ -3185,11 +3188,13 @@ const clearDragState = () => {
   overflow-y: auto;
   overflow-x: hidden;
   display: grid;
-  grid-template-columns: repeat(auto-fill, var(--app-cell-size, 88px));
+  grid-template-columns: repeat(auto-fill, minmax(var(--app-cell-size, 88px), 1fr));
   gap: 8px;
   align-content: start;
   justify-content: start;
   min-width: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .app-item {
@@ -3197,12 +3202,11 @@ const clearDragState = () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: var(--app-cell-size, 88px);
-  height: var(--app-cell-size, 88px);
-  aspect-ratio: 1;
+  width: 100%;
+  height: var(--app-cell-height, var(--app-cell-size, 88px));
   min-width: 0;
   overflow: hidden;
-  padding: 8px 6px;
+  padding: 6px;
   background: var(--surface-bg);
   border-radius: 6px;
   cursor: pointer;
@@ -3249,7 +3253,7 @@ const clearDragState = () => {
   width: var(--app-icon-size, 51px);
   height: var(--app-icon-size, 51px);
   flex: 0 0 auto;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3300,7 +3304,9 @@ const clearDragState = () => {
 
 /* 滚动条样式 */
 .app-grid::-webkit-scrollbar {
-  width: 6px;
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .app-grid::-webkit-scrollbar-track {
