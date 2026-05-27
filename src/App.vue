@@ -93,6 +93,10 @@
             <span>{{ $t('main.contextMenu.moveTo') }}</span>
             <span class="arrow-right">▶</span>
           </div>
+          <div class="context-menu-item" @click="showCopyToSubmenu">
+            <span>{{ $t('main.contextMenu.copyTo') }}</span>
+            <span class="arrow-right">▶</span>
+          </div>
           <div class="context-menu-divider"></div>
           <div class="context-menu-item" @click="editApp">
             <span>{{ $t('main.contextMenu.editApp') }}</span>
@@ -122,6 +126,17 @@
           :style="{ left: moveToSubmenu.x + 'px', top: moveToSubmenu.y + 'px' }" @click.stop>
           <div v-for="category in categories.filter(cat => cat.id !== selectedCategory)" :key="category.id"
             class="context-menu-item" @click="moveAppToCategory(category.id)">
+            <span>{{ category.name }}</span>
+          </div>
+        </div>
+      </Teleport>
+
+      <!-- 复制到子菜单 -->
+      <Teleport to="body">
+        <div v-if="copyToSubmenu.visible" class="context-menu submenu"
+          :style="{ left: copyToSubmenu.x + 'px', top: copyToSubmenu.y + 'px' }" @click.stop>
+          <div v-for="category in categories.filter(cat => cat.id !== selectedCategory)" :key="category.id"
+            class="context-menu-item" @click="copyAppToCategory(category.id)">
             <span>{{ category.name }}</span>
           </div>
         </div>
@@ -395,6 +410,17 @@ const appContextMenu = ref<{
 
 // 移动到子菜单
 const moveToSubmenu = ref<{
+  visible: boolean;
+  x: number;
+  y: number;
+}>({
+  visible: false,
+  x: 0,
+  y: 0
+})
+
+// 复制到子菜单
+const copyToSubmenu = ref<{
   visible: boolean;
   x: number;
   y: number;
@@ -803,6 +829,7 @@ const showContextMenu = (e: MouseEvent, category: any) => {
   // 隐藏其他所有菜单
   hideAppContextMenu()
   hideMoveToSubmenu()
+  hideCopyToSubmenu()
 
   // 获取屏幕坐标
   const x = e.clientX
@@ -846,6 +873,7 @@ const hideContextMenu = () => {
   contextMenu.value.visible = false
   // 同时隐藏子菜单
   hideMoveToSubmenu()
+  hideCopyToSubmenu()
 }
 
 // 应用右键菜单相关方法
@@ -853,6 +881,7 @@ const showAppContextMenu = (e: MouseEvent, app: any) => {
   // 隐藏其他所有菜单
   hideContextMenu()
   hideMoveToSubmenu()
+  hideCopyToSubmenu()
 
   // 获取屏幕坐标
   const x = e.clientX
@@ -896,6 +925,7 @@ const hideAppContextMenu = () => {
   appContextMenu.value.visible = false
   // 同时隐藏子菜单
   hideMoveToSubmenu()
+  hideCopyToSubmenu()
 }
 
 // 网格右键菜单相关方法
@@ -910,6 +940,7 @@ const showGridContextMenu = (e: MouseEvent) => {
   hideContextMenu()
   hideAppContextMenu()
   hideMoveToSubmenu()
+  hideCopyToSubmenu()
 
   // 获取屏幕坐标
   const x = e.clientX
@@ -958,6 +989,7 @@ const showMainMenu = (e: MouseEvent) => {
   hideContextMenu()
   hideAppContextMenu()
   hideMoveToSubmenu()
+  hideCopyToSubmenu()
   hideGridContextMenu()
 
   // 获取按钮位置
@@ -1126,6 +1158,8 @@ const copyFullPath = async () => {
 }
 
 const showMoveToSubmenu = () => {
+  hideCopyToSubmenu()
+
   // 计算子菜单位置，紧贴主菜单
   let submenuX = appContextMenu.value.x + 120 // 紧贴主菜单右侧
   let submenuY = appContextMenu.value.y
@@ -1157,6 +1191,40 @@ const hideMoveToSubmenu = () => {
   moveToSubmenu.value.visible = false
 }
 
+const showCopyToSubmenu = () => {
+  hideMoveToSubmenu()
+
+  // 计算子菜单位置，紧贴主菜单
+  let submenuX = appContextMenu.value.x + 120 // 紧贴主菜单右侧
+  let submenuY = appContextMenu.value.y
+
+  // 智能定位：确保子菜单不超出屏幕边界
+  const submenuWidth = 100
+  const submenuHeight = 150 // 估算子菜单高度
+  const screenWidth = window.innerWidth
+  const screenHeight = window.innerHeight
+
+  // 如果子菜单会超出右边界，则显示在主菜单左侧
+  if (submenuX + submenuWidth > screenWidth) {
+    submenuX = appContextMenu.value.x - submenuWidth
+  }
+
+  // 如果子菜单会超出下边界，则向上偏移
+  if (submenuY + submenuHeight > screenHeight) {
+    submenuY = screenHeight - submenuHeight - 10
+  }
+
+  copyToSubmenu.value = {
+    visible: true,
+    x: submenuX,
+    y: submenuY
+  }
+}
+
+const hideCopyToSubmenu = () => {
+  copyToSubmenu.value.visible = false
+}
+
 const moveAppToCategory = async (categoryId: string) => {
   if (appContextMenu.value.app) {
     const appIndex = apps.value.findIndex(app => app.id === appContextMenu.value.app.id)
@@ -1169,6 +1237,38 @@ const moveAppToCategory = async (categoryId: string) => {
     }
   }
   hideMoveToSubmenu()
+  hideAppContextMenu()
+}
+
+const createUniqueAppId = () => {
+  let id = Date.now() + Math.floor(Math.random() * 1000)
+
+  while (apps.value.some(app => app.id === id)) {
+    id += 1
+  }
+
+  return id
+}
+
+const copyAppToCategory = async (categoryId: string) => {
+  if (appContextMenu.value.app) {
+    const targetApps = apps.value.filter(app => app.category === categoryId)
+    const maxOrder = targetApps.reduce((max, app) => Math.max(max, app.order ?? -1), -1)
+    const copiedApp: AppData = {
+      ...appContextMenu.value.app,
+      id: createUniqueAppId(),
+      category: categoryId,
+      order: maxOrder + 1
+    }
+
+    apps.value.push(copiedApp)
+    console.log(`已将 ${appContextMenu.value.app.name} 复制到分类: ${categoryId}`)
+
+    // 保存数据
+    await saveAppData()
+  }
+
+  hideCopyToSubmenu()
   hideAppContextMenu()
 }
 
@@ -1845,6 +1945,9 @@ onMounted(async () => {
         if (moveToSubmenu.value.visible) {
           hideMoveToSubmenu()
         }
+        if (copyToSubmenu.value.visible) {
+          hideCopyToSubmenu()
+        }
         if (gridContextMenu.value.visible) {
           hideGridContextMenu()
         }
@@ -1909,6 +2012,7 @@ const handleGlobalKeydown = (event: KeyboardEvent) => {
     contextMenu.value.visible ||
     appContextMenu.value.visible ||
     moveToSubmenu.value.visible ||
+    copyToSubmenu.value.visible ||
     gridContextMenu.value.visible
 
   // 如果正在编辑，不处理

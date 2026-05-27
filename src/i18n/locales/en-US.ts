@@ -73,6 +73,7 @@ export default {
       openFileLocation: 'Open File Location',
       copyFullPath: 'Copy Full Path',
       moveTo: 'Move To',
+      copyTo: 'Copy To',
       editApp: 'Edit App',
       deleteApp: 'Delete App',
       deleteAllApps: 'Delete All'

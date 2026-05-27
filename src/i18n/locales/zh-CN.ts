@@ -73,6 +73,7 @@ export default {
       openFileLocation: '打开文件位置',
       copyFullPath: '复制完整路径',
       moveTo: '移动到',
+      copyTo: '复制到',
       editApp: '编辑应用',
       deleteApp: '删除应用',
       deleteAllApps: '删除全部'
