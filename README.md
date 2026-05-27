@@ -1,4 +1,4 @@
-# LORA - Modern App Launcher
+# LORA - 现代化应用启动器
 
 <div align="center">
 
@@ -8,119 +8,119 @@
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-[English](./README.md) | [简体中文](./README.zh-CN.md)
+[English](./README_EN.md) | [简体中文](./README.md)
 
 </div>
 
-> **LORA** is a modern, lightweight application launcher built with **Tauri v2** and **Vue 3**. It helps you organize your desktop applications into categories, search them instantly, and launch them with a single click. Designed for efficiency and aesthetics.
+> **LORA** 是一款基于 **Tauri v2** 和 **Vue 3** 构建的现代化、轻量级应用启动器。它可以帮助你将桌面应用分类管理，支持即时搜索和一键启动，专为提升效率和美观而设计。
 
-## 🖼️ Preview
+## 🖼️ 预览
 
-![1779887506764](image/README/1779887506764.png)
+![1779887495059](image/README.zh-CN/1779887495059.png)
 
-## ✨ Key Features
+## ✨ 核心功能
 
-- **📂 Drag & Drop Management**: Simply drag `.exe` or `.lnk` files into the window to add them.
-- **🗂️ Smart Categorization**: Create custom groups to organize your apps (e.g., "Work", "Games", "Tools").
-- **🚀 Quick Launch**: Launch apps instantly. Right-click for "Run as Administrator".
-- **🔍 Instant Search**: Press `Ctrl+F` to focus the search bar and find apps by name.
-- **🌍 Multi-language Support**: Fully localized in English and Simplified Chinese.
-- **💾 Data Backup**: Built-in backup and restore functionality to keep your configuration safe.
-- **🎨 Modern UI**: Clean, responsive interface with smooth animations and custom title bar.
-- **⚡ Lightweight**: Powered by Rust and Tauri, ensuring minimal resource usage.
+- **📂 拖拽管理**: 直接将 `.exe` 或 `.lnk` 快捷方式拖入窗口即可添加应用。
+- **🗂️ 智能分类**: 创建自定义分组（如“办公”、“游戏”、“工具”）来整理你的应用库。
+- **🚀 快速启动**: 单击或双击启动应用。右键菜单支持“以管理员身份运行”。
+- **🔍 即时搜索**: 按下 `Ctrl+F` 聚焦搜索框，快速定位应用。
+- **🌍 多语言支持**: 内置简体中文和英文界面，可随心切换。
+- **💾 数据备份**: 提供数据备份与恢复功能，保障配置安全不丢失。
+- **🎨 现代界面**: 简洁响应式设计，流畅动画，自定义标题栏。
+- **⚡ 轻量高效**: 基于 Rust 和 Tauri 构建，资源占用极低，启动迅速。
 
-## 📥 Download
+## 📥 下载安装
 
-Download the latest version from the [Releases Page](https://github.com/JKWTCN/lora/releases).
+请前往 [Releases 页面](https://github.com/JKWTCN/lora/releases) 下载最新版本。
 
-## 🛠️ Tech Stack
+## 🛠️ 技术栈
 
-- **Frontend**: Vue 3, TypeScript, Vite
-- **Backend**: Rust, Tauri v2
-- **State Management**: Reactive Vue Store
-- **I18n**: vue-i18n
-- **Styling**: Native CSS Variables, Flexbox/Grid
+- **前端**: Vue 3, TypeScript, Vite
+- **后端**: Rust, Tauri v2
+- **状态管理**: Reactive Vue Store
+- **国际化**: vue-i18n
+- **样式**: Native CSS Variables, Flexbox/Grid
 
-## 📦 Development
+## 📦 开发指南
 
-### Prerequisites
+### 环境要求
 
 - **Node.js** >= 18
 - **pnpm** >= 8
 - **Rust** >= 1.70
-- **Visual Studio Code** (Recommended) with Tauri + Rust Analyzer extensions
+- **Visual Studio Code** (推荐) 配合 Tauri + Rust Analyzer 插件
 
-### Setup
+### 本地运行
 
-1. **Clone the repository**
+1. **克隆仓库**
 
    ```bash
    git clone https://github.com/JKWTCN/lora.git
    cd lora
    ```
-2. **Install dependencies**
+2. **安装依赖**
 
    ```bash
    pnpm install
    ```
-3. **Run in development mode**
+3. **启动开发模式**
 
    ```bash
    pnpm tauri dev
    ```
 
-   This will start the Vite dev server and the Tauri application window.
+   此命令将同时启动 Vite 开发服务器和 Tauri 应用窗口。
 
-### Build
+### 构建打包
 
-To build the application for production:
+构建生产环境版本：
 
 ```bash
 pnpm tauri build
 ```
 
-The output installer/executable will be located in `src-tauri/target/release/bundle/`.
+打包后的安装包/可执行文件将位于 `src-tauri/target/release/bundle/` 目录下。
 
-## 🎯 Usage Guide
+## 🎯 使用说明
 
-1. **Add Apps**: Drag and drop any executable or shortcut onto the main area.
-2. **Edit Info**: Right-click an app card to rename, change icon, or delete.
-3. **Manage Categories**: Right-click the sidebar to add, rename, or delete categories.
-4. **Settings**: Click the gear icon to access settings (Language, Backup, etc.).
+1. **添加应用**: 拖拽任何可执行文件或快捷方式到主界面区域。
+2. **编辑信息**: 右键点击应用卡片可进行重命名、更换图标或删除操作。
+3. **分类管理**: 右键点击侧边栏可添加、重命名或删除分类。
+4. **设置**: 点击右上角齿轮图标进入设置（切换语言、备份数据等）。
 
-## ⌨️ Shortcuts
+## ⌨️ 快捷键
 
-| Shortcut     | Action                      |
-| ------------ | --------------------------- |
-| `Ctrl + F` | Focus Search Bar            |
-| `Esc`      | Clear Search / Close Modals |
-| `Enter`    | Launch Selected App         |
-| `Delete`   | Remove Selected App         |
+| 快捷键       | 功能                |
+| ------------ | ------------------- |
+| `Ctrl + F` | 聚焦搜索框          |
+| `Esc`      | 清除搜索 / 关闭弹窗 |
+| `Enter`    | 启动选中应用        |
+| `Delete`   | 删除选中应用        |
 
-## 📁 Project Structure
+## 📁 项目结构
 
 ```
 lora/
-├── src/                 # Frontend (Vue 3)
-│   ├── components/      # UI Components
-│   ├── i18n/            # Localization files
-│   ├── assets/          # Styles and static images
+├── src/                 # 前端源码 (Vue 3)
+│   ├── components/      # UI 组件
+│   ├── i18n/            # 国际化文件
+│   ├── assets/          # 样式和静态资源
 │   └── ...
-├── src-tauri/           # Backend (Rust)
-│   ├── src/             # Rust source code (Commands, Models)
-│   ├── icons/           # App icons
-│   └── tauri.conf.json  # Tauri configuration
+├── src-tauri/           # 后端源码 (Rust)
+│   ├── src/             # Rust 源代码 (Commands, Models)
+│   ├── icons/           # 应用图标
+│   └── tauri.conf.json  # Tauri 配置文件
 └── ...
 ```
 
-## 🙏 Acknowledgements
+## 🙏 鸣谢
 
-- [Tauri](https://tauri.app/) - Build smaller, faster, and more secure desktop applications with a web frontend.
-- [Vue.js](https://vuejs.org/) - The Progressive JavaScript Framework.
-- [Vite](https://vitejs.dev/) - Next Generation Frontend Tooling.
+- [Tauri](https://tauri.app/) - 构建更小、更快、更安全的桌面应用。
+- [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架。
+- [Vite](https://vitejs.dev/) - 下一代前端开发与构建工具。
 
-## 📄 License
+## 📄 开源协议
 
-This project is licensed under the MIT License.
+本项目基于 MIT 协议开源。
 
 Copyright (c) 2025 JKWTCN.
