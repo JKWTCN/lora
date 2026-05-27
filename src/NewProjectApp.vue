@@ -189,7 +189,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from 'vue-i18n'
 import { alertDialog } from './utils/customDialog'
@@ -198,6 +198,8 @@ const { t } = useI18n()
 
 const isSaving = ref(false)
 const lastSaved = ref(false)
+let iconFetchTimer = null
+let iconFetchRequestId = 0
 
 // 分类数据
 const categories = ref([])
@@ -235,6 +237,7 @@ watch(projectData, () => {
 const handleTargetTypeChange = () => {
     // 当目标类型改变时，清空路径
     projectData.targetPath = ''
+    clearPendingIconFetch()
 }
 
 const browseTarget = async () => {
@@ -265,7 +268,7 @@ const browseTarget = async () => {
             // 自动检测目标类型
             await detectTargetType()
             // 自动获取图标
-            await handlePathChange()
+            await fetchTargetIcon()
         }
     } catch (error) {
         console.error('浏览文件失败:', error)
@@ -292,8 +295,43 @@ const detectTargetType = async () => {
     }
 }
 
+const clearPendingIconFetch = () => {
+    if (iconFetchTimer) {
+        clearTimeout(iconFetchTimer)
+        iconFetchTimer = null
+    }
+}
+
+const isValidHttpUrl = (value) => {
+    try {
+        const url = new URL(value)
+        return url.protocol === 'http:' || url.protocol === 'https:'
+    } catch {
+        return false
+    }
+}
+
 // 处理路径变化，自动获取图标
-const handlePathChange = async () => {
+const handlePathChange = () => {
+    clearPendingIconFetch()
+
+    const targetPath = projectData.targetPath.trim()
+    if (!targetPath) {
+        return
+    }
+
+    if (projectData.targetType === 'url' && !isValidHttpUrl(targetPath)) {
+        return
+    }
+
+    const delay = projectData.targetType === 'url' ? 800 : 300
+    iconFetchTimer = setTimeout(() => {
+        iconFetchTimer = null
+        fetchTargetIcon()
+    }, delay)
+}
+
+const fetchTargetIcon = async () => {
     if (!projectData.targetPath.trim()) {
         return
     }
@@ -303,14 +341,21 @@ const handlePathChange = async () => {
         return
     }
 
+    if (projectData.targetType === 'url' && !isValidHttpUrl(projectData.targetPath.trim())) {
+        return
+    }
+
+    const requestId = ++iconFetchRequestId
+    const targetPath = projectData.targetPath.trim()
+
     try {
         // 尝试获取应用图标
-        console.log('尝试获取应用图标:', projectData.targetPath)
+        console.log('尝试获取应用图标:', targetPath)
         const iconBase64 = await invoke('get_app_icon', {
-            filePath: projectData.targetPath
+            filePath: targetPath
         })
         
-        if (iconBase64 && iconBase64.startsWith('data:image/')) {
+        if (requestId === iconFetchRequestId && iconBase64 && iconBase64.startsWith('data:image/')) {
             // 成功获取到图标，更新图标字段
             projectData.icon = iconBase64
             console.log('成功获取应用图标')
@@ -477,6 +522,11 @@ const loadCategories = async () => {
 // 初始化
 onMounted(async () => {
     await loadCategories()
+})
+
+onBeforeUnmount(() => {
+    clearPendingIconFetch()
+    iconFetchRequestId++
 })
 </script>
 

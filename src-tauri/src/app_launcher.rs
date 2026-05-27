@@ -223,10 +223,13 @@ pub fn get_app_icon(file_path: String) -> Result<String, String> {
     {
         // 如果传入的是 URL（网站），尝试使用 helpers::fetch_favicon
         if file_path.starts_with("http://") || file_path.starts_with("https://") {
-            if let Ok(fav) = crate::helpers::fetch_favicon(&file_path) {
-                return Ok(fav);
-            }
+            return crate::helpers::fetch_favicon(&file_path);
         }
+
+        if !Path::new(&file_path).exists() {
+            return Err("文件不存在，无法提取图标".to_string());
+        }
+
         // 优先尝试用 Rust 解析 PE 资源中的图标
         println!("优先尝试 Rust PE 资源解析 exe 图标");
         match extract_icon_from_exe(&file_path) {

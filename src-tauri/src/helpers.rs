@@ -1,6 +1,7 @@
 use base64::Engine as _Base64Engine;
 use std::fs;
 use std::path::Path;
+use std::time::Duration;
 use url::Url;
 
 // 解析快捷方式目标路径
@@ -107,60 +108,26 @@ pub fn fetch_favicon(page_url: &str) -> Result<String, String> {
     // 尝试解析 URL
     let parsed = Url::parse(page_url).map_err(|e| format!("无效 URL: {}", e))?;
 
-    // 首先尝试访问页面 HTML，以查找 <link rel="icon" ...>
     let client = reqwest::blocking::Client::builder()
         .user_agent("lora-favicon-fetcher/1.0")
+        .timeout(Duration::from_secs(3))
         .build()
         .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
 
-    let resp = client
-        .get(page_url)
-        .send()
-        .map_err(|e| format!("请求页面失败: {}", e))?;
-
-    if !resp.status().is_success() {
-        return Err(format!("页面返回错误状态: {}", resp.status()));
-    }
-
-    let body = resp
-        .text()
-        .map_err(|e| format!("读取页面内容失败: {}", e))?;
-
-    // 查找可能的 favicon 链接（rel=icon, shortcut icon）
-    let mut favicon_url: Option<String> = None;
-    for line in body.lines() {
-        let lower = line.to_lowercase();
-        if lower.contains("rel=\"icon\"")
-            || lower.contains("rel=\'icon\'")
-            || lower.contains("rel=\"shortcut icon\"")
-        {
-            // 简单解析 href
-            if let Some(href_pos) = lower.find("href=") {
-                let rest = &line[href_pos + 5..];
-                // 提取引号内的值
-                if let Some(start_quote) = rest.find('"') {
-                    if let Some(end_quote) = rest[start_quote + 1..].find('"') {
-                        let href = &rest[start_quote + 1..start_quote + 1 + end_quote];
-                        favicon_url = Some(href.to_string());
-                        break;
-                    }
-                } else if let Some(start_quote) = rest.find('\'') {
-                    if let Some(end_quote) = rest[start_quote + 1..].find('\'') {
-                        let href = &rest[start_quote + 1..start_quote + 1 + end_quote];
-                        favicon_url = Some(href.to_string());
-                        break;
-                    }
-                }
+    let mut favicon_candidates = Vec::new();
+    if let Ok(resp) = client.get(page_url).send() {
+        if resp.status().is_success() {
+            if let Ok(body) = resp.text() {
+                favicon_candidates.extend(extract_favicon_candidates(&body));
             }
         }
     }
 
-    // 如果未在 HTML 中找到 favicon 链接，尝试 /favicon.ico
-    let favicon_candidates = if let Some(fav) = favicon_url {
-        vec![fav]
-    } else {
-        vec!["/favicon.ico".to_string()]
-    };
+    favicon_candidates.extend([
+        "/favicon.ico".to_string(),
+        "/favicon.png".to_string(),
+        "/apple-touch-icon.png".to_string(),
+    ]);
 
     for candidate in favicon_candidates {
         // 解析相对 URL
@@ -178,7 +145,8 @@ pub fn fetch_favicon(page_url: &str) -> Result<String, String> {
                     let mut buf: Vec<u8> = Vec::new();
                     if r.copy_to(&mut buf).is_ok() {
                         let encoded = base64::engine::general_purpose::STANDARD.encode(&buf);
-                        return Ok(format!("data:image/x-icon;base64,{}", encoded));
+                        let mime_type = favicon_mime_type(fav_url.path());
+                        return Ok(format!("data:{};base64,{}", mime_type, encoded));
                     }
                 }
             }
@@ -187,6 +155,105 @@ pub fn fetch_favicon(page_url: &str) -> Result<String, String> {
     }
 
     Err("未能获取 favicon".to_string())
+}
+
+fn extract_favicon_candidates(html: &str) -> Vec<String> {
+    let mut candidates = Vec::new();
+    let mut rest = html;
+
+    while let Some(tag_start) = rest.find("<link") {
+        rest = &rest[tag_start + 5..];
+        let Some(tag_end) = rest.find('>') else {
+            break;
+        };
+
+        let tag = &rest[..tag_end];
+        let rel = extract_html_attr(tag, "rel").unwrap_or_default().to_lowercase();
+        if rel.split_whitespace().any(|value| {
+            matches!(
+                value,
+                "icon" | "shortcut" | "apple-touch-icon" | "mask-icon" | "fluid-icon"
+            )
+        }) {
+            if let Some(href) = extract_html_attr(tag, "href") {
+                if !href.trim().is_empty() {
+                    candidates.push(href);
+                }
+            }
+        }
+
+        rest = &rest[tag_end + 1..];
+    }
+
+    candidates
+}
+
+fn extract_html_attr(tag: &str, attr_name: &str) -> Option<String> {
+    let mut rest = tag.trim();
+
+    while !rest.is_empty() {
+        rest = rest.trim_start();
+        let name_end = rest
+            .find(|ch: char| ch.is_whitespace() || ch == '=')
+            .unwrap_or(rest.len());
+        if name_end == 0 {
+            break;
+        }
+
+        let name = &rest[..name_end];
+        rest = rest[name_end..].trim_start();
+        if !rest.starts_with('=') {
+            continue;
+        }
+
+        rest = rest[1..].trim_start();
+        let (value, remaining) = if let Some(quote) = rest.chars().next().filter(|ch| {
+            *ch == '"' || *ch == '\''
+        }) {
+            let value_start = quote.len_utf8();
+            if let Some(value_end) = rest[value_start..].find(quote) {
+                (
+                    rest[value_start..value_start + value_end].to_string(),
+                    &rest[value_start + value_end + quote.len_utf8()..],
+                )
+            } else {
+                (rest[value_start..].to_string(), "")
+            }
+        } else {
+            let value_end = rest
+                .find(|ch: char| ch.is_whitespace())
+                .unwrap_or(rest.len());
+            (
+                rest[..value_end].trim_end_matches('/').to_string(),
+                &rest[value_end..],
+            )
+        };
+
+        if name.eq_ignore_ascii_case(attr_name) {
+            return Some(value);
+        }
+
+        rest = remaining;
+    }
+
+    None
+}
+
+fn favicon_mime_type(path: &str) -> &'static str {
+    match Path::new(path)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or("")
+        .to_lowercase()
+        .as_str()
+    {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "webp" => "image/webp",
+        _ => "image/x-icon",
+    }
 }
 
 // extract_icon_from_exe retained for potential use by get_app_icon
