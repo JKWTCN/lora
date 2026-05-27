@@ -16,7 +16,7 @@
 
 ## 🖼️ Preview
 
-![1765596627735](image/README/1765596627735.png)
+![1779887506764](image/README/1779887506764.png)
 
 ## ✨ Key Features
 
