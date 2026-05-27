@@ -71,24 +71,6 @@
                         <h3>{{ $t('settings.ui.window.title') }}</h3>
 
                         <div class="setting-item">
-                            <label>{{ $t('settings.ui.window.width') }}</label>
-                            <div class="input-group">
-                                <input type="number" v-model.number="localSettings.windowWidth" min="400" max="1920"
-                                    @change="updateWindowSize" />
-                                <span class="unit">px</span>
-                            </div>
-                        </div>
-
-                        <div class="setting-item">
-                            <label>{{ $t('settings.ui.window.height') }}</label>
-                            <div class="input-group">
-                                <input type="number" v-model.number="localSettings.windowHeight" min="300" max="1080"
-                                    @change="updateWindowSize" />
-                                <span class="unit">px</span>
-                            </div>
-                        </div>
-
-                        <div class="setting-item">
                             <label>
                                 <input type="checkbox" v-model="localSettings.preventAutoHide"
                                     @change="updatePreventAutoHide" />
@@ -112,46 +94,8 @@
                             </select>
                         </div>
 
-                        <div class="setting-item">
-                            <label>{{ $t('settings.ui.appearance.iconSize') }}</label>
-                            <div class="slider-group">
-                                <input type="range" v-model.number="localSettings.iconSize" min="48" max="128" step="8"
-                                    @input="updateIconSize" />
-                                <span class="slider-value">{{ localSettings.iconSize }}px</span>
-                            </div>
-                        </div>
-
-                        <div class="setting-item">
-                            <label>{{ $t('settings.ui.appearance.sidebarWidth') }}</label>
-                            <div class="slider-group">
-                                <input type="range" v-model.number="localSettings.sidebarWidth" min="120" max="300"
-                                    step="10" @input="updateSidebarWidth" />
-                                <span class="slider-value">{{ localSettings.sidebarWidth }}px</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="settings-group">
-                        <h3>{{ $t('settings.ui.animation.title') }}</h3>
-
-                        <div class="setting-item">
-                            <label>
-                                <input type="checkbox" v-model="localSettings.enableAnimations"
-                                    @change="updateAnimations" />
-                                {{ $t('settings.ui.animation.enableAnimations') }}
-                            </label>
-                            <p class="setting-description">
-                                {{ $t('settings.ui.animation.enableAnimationsDesc') }}
-                            </p>
-                        </div>
-
-                        <div class="setting-item" v-if="localSettings.enableAnimations">
-                            <label>{{ $t('settings.ui.animation.speed') }}</label>
-                            <select v-model="localSettings.animationSpeed" @change="updateAnimationSpeed">
-                                <option value="slow">{{ $t('settings.ui.animation.slow') }}</option>
-                                <option value="normal">{{ $t('settings.ui.animation.normal') }}</option>
-                                <option value="fast">{{ $t('settings.ui.animation.fast') }}</option>
-                            </select>
+                        <div class="setting-item setting-note">
+                            <p>{{ $t('settings.ui.appearance.gridCellSizeHint') }}</p>
                         </div>
                     </div>
                 </div>
@@ -309,17 +253,15 @@
                 <button @click="resetToDefaults" class="footer-button secondary">
                     {{ $t('settings.footer.restoreDefaults') }}
                 </button>
-                <button @click="saveSettings" class="footer-button primary">
-                    {{ $t('settings.footer.saveSettings') }}
-                </button>
             </div>
         </div>
     </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { emit, emitTo, listen } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
 import { alertDialog, confirmDialog } from './utils/customDialog'
 
@@ -335,6 +277,7 @@ const tabs = computed(() => [
 const activeTab = ref('about')
 const isSaving = ref(false)
 const lastSaved = ref(false)
+let unlistenSettingsUpdated = null
 
 // 应用版本号
 const appVersion = ref('')
@@ -344,16 +287,10 @@ const appUpdateDate = ref('')
 // 本地设置状态
 const localSettings = reactive({
     // 窗口设置
-    windowWidth: 800,
-    windowHeight: 600,
     preventAutoHide: false,
 
     // 外观设置
     theme: 'auto',
-    iconSize: 64,
-    sidebarWidth: 180,
-    enableAnimations: true,
-    animationSpeed: 'normal',
 
     // 启动设置
     startWithSystem: false,
@@ -387,39 +324,19 @@ watch(localSettings, () => {
 }, { deep: true })
 
 // 方法
-const updateWindowSize = async () => {
-    try {
-        // 保存窗口大小到设置
-        await invoke('save_window_size', {
-            width: localSettings.windowWidth,
-            height: localSettings.windowHeight
-        })
-        
-        // 立即应用到主窗口
-        const { WebviewWindow } = await import('@tauri-apps/api/window')
-        const { LogicalSize } = await import('@tauri-apps/api/dpi')
-        
-        // 获取主窗口（不是设置窗口）
-        try {
-            const mainWindow = new WebviewWindow('main')
-            await mainWindow.setSize(new LogicalSize(
-                localSettings.windowWidth,
-                localSettings.windowHeight
-            ))
-            console.log(`主窗口大小已更新: ${localSettings.windowWidth}x${localSettings.windowHeight}`)
-        } catch (error) {
-            console.error('无法获取主窗口:', error)
-            // 如果无法获取主窗口，尝试通过后端获取窗口大小来验证主窗口是否存在
-            try {
-                await invoke('get_main_window_size')
-                console.log('主窗口存在但无法直接操作')
-            } catch (backendError) {
-                console.error('主窗口不存在:', backendError)
-            }
-        }
-    } catch (error) {
-        console.error('更新窗口大小失败:', error)
-    }
+const markSaved = () => {
+    lastSaved.value = true
+    setTimeout(() => {
+        lastSaved.value = false
+    }, 1500)
+}
+
+const notifySettingsUpdated = async () => {
+    await Promise.allSettled([
+        invoke('notify_main_settings_updated'),
+        emitTo('main', 'settings-updated'),
+        emit('settings-updated')
+    ])
 }
 
 const updatePreventAutoHide = async () => {
@@ -427,6 +344,8 @@ const updatePreventAutoHide = async () => {
         await invoke('update_prevent_auto_hide', {
             preventAutoHide: localSettings.preventAutoHide
         })
+        await notifySettingsUpdated()
+        markSaved()
     } catch (error) {
         console.error('更新阻止自动隐藏设置失败:', error)
     }
@@ -435,51 +354,18 @@ const updatePreventAutoHide = async () => {
 const updateTheme = async () => {
     try {
         await invoke('update_theme', { theme: localSettings.theme })
+        await notifySettingsUpdated()
+        markSaved()
         console.log('主题设置已更新')
     } catch (error) {
         console.error('更新主题设置失败:', error)
     }
 }
 
-const updateIconSize = async () => {
-    try {
-        await invoke('update_icon_size', { iconSize: localSettings.iconSize })
-        console.log('图标大小已更新')
-    } catch (error) {
-        console.error('更新图标大小失败:', error)
-    }
-}
-
-const updateSidebarWidth = async () => {
-    try {
-        await invoke('update_sidebar_width', { sidebarWidth: localSettings.sidebarWidth })
-        console.log('侧栏宽度已更新')
-    } catch (error) {
-        console.error('更新侧栏宽度失败:', error)
-    }
-}
-
-const updateAnimations = async () => {
-    try {
-        await invoke('update_animations', { enableAnimations: localSettings.enableAnimations })
-        console.log('动画设置已更新')
-    } catch (error) {
-        console.error('更新动画设置失败:', error)
-    }
-}
-
-const updateAnimationSpeed = async () => {
-    try {
-        await invoke('update_animation_speed', { animationSpeed: localSettings.animationSpeed })
-        console.log('动画速度已更新')
-    } catch (error) {
-        console.error('更新动画速度失败:', error)
-    }
-}
-
 const updateStartWithSystem = async () => {
     try {
         await invoke('update_start_with_system', { startWithSystem: localSettings.startWithSystem })
+        markSaved()
         console.log('开机自启动设置已更新')
     } catch (error) {
         console.error('更新开机自启动设置失败:', error)
@@ -489,6 +375,7 @@ const updateStartWithSystem = async () => {
 const updateStartMinimized = async () => {
     try {
         await invoke('update_start_minimized', { startMinimized: localSettings.startMinimized })
+        markSaved()
         console.log('启动最小化设置已更新')
     } catch (error) {
         console.error('更新启动最小化设置失败:', error)
@@ -498,6 +385,8 @@ const updateStartMinimized = async () => {
 const updateAutoHideAfterLaunch = async () => {
     try {
         await invoke('update_auto_hide_after_launch', { autoHideAfterLaunch: localSettings.autoHideAfterLaunch })
+        await notifySettingsUpdated()
+        markSaved()
         console.log('运行应用后自动隐藏设置已更新')
     } catch (error) {
         console.error('更新运行应用后自动隐藏设置失败:', error)
@@ -532,6 +421,7 @@ const clearHotkey = () => {
 const updateToggleHotkey = async () => {
     try {
         await invoke('update_toggle_hotkey', { toggleHotkey: localSettings.toggleHotkey })
+        markSaved()
         console.log('快捷键设置已更新')
     } catch (error) {
         console.error('更新快捷键设置失败:', error)
@@ -541,6 +431,7 @@ const updateToggleHotkey = async () => {
 const updateGlobalHotkey = async () => {
     try {
         await invoke('update_global_hotkey', { globalHotkey: localSettings.globalHotkey })
+        markSaved()
         console.log('全局快捷键设置已更新')
     } catch (error) {
         console.error('更新全局快捷键设置失败:', error)
@@ -550,6 +441,8 @@ const updateGlobalHotkey = async () => {
 const updateFuzzySearch = async () => {
     try {
         await invoke('update_fuzzy_search', { fuzzySearch: localSettings.fuzzySearch })
+        await notifySettingsUpdated()
+        markSaved()
         console.log('模糊搜索设置已更新')
     } catch (error) {
         console.error('更新模糊搜索设置失败:', error)
@@ -559,6 +452,8 @@ const updateFuzzySearch = async () => {
 const updateSearchInPath = async () => {
     try {
         await invoke('update_search_in_path', { searchInPath: localSettings.searchInPath })
+        await notifySettingsUpdated()
+        markSaved()
         console.log('路径搜索设置已更新')
     } catch (error) {
         console.error('更新路径搜索设置失败:', error)
@@ -568,6 +463,8 @@ const updateSearchInPath = async () => {
 const updateMaxSearchResults = async () => {
     try {
         await invoke('update_max_search_results', { maxSearchResults: localSettings.maxSearchResults })
+        await notifySettingsUpdated()
+        markSaved()
         console.log('最大搜索结果设置已更新')
     } catch (error) {
         console.error('更新最大搜索结果设置失败:', error)
@@ -577,6 +474,7 @@ const updateMaxSearchResults = async () => {
 const updateAutoBackup = async () => {
     try {
         await invoke('update_auto_backup', { autoBackup: localSettings.autoBackup })
+        markSaved()
         console.log('自动备份设置已更新')
     } catch (error) {
         console.error('更新自动备份设置失败:', error)
@@ -586,6 +484,7 @@ const updateAutoBackup = async () => {
 const updateBackupInterval = async () => {
     try {
         await invoke('update_backup_interval', { backupInterval: localSettings.backupInterval })
+        markSaved()
         console.log('备份间隔设置已更新')
     } catch (error) {
         console.error('更新备份间隔设置失败:', error)
@@ -614,6 +513,7 @@ const importData = async () => {
         await alertDialog(t('settings.alert.importSuccess'), { type: 'success' })
         // 重新加载设置
         await loadSettings()
+        await notifySettingsUpdated()
     } catch (error) {
         console.error('导入数据失败:', error)
         await alertDialog(t('settings.alert.importFailed', { error: String(error) }), { type: 'error' })
@@ -631,6 +531,7 @@ const resetData = async () => {
             await alertDialog(t('settings.alert.resetSuccess'), { type: 'success' })
             // 重新加载设置
             await loadSettings()
+            await notifySettingsUpdated()
         } catch (error) {
             console.error('重置数据失败:', error)
             await alertDialog(t('settings.alert.resetFailed', { error: String(error) }), { type: 'error' })
@@ -655,6 +556,7 @@ const resetToDefaults = async () => {
             await invoke('reset_settings_to_default')
             // 重新加载设置
             await loadSettings()
+            await notifySettingsUpdated()
             await alertDialog(t('settings.alert.restoreDefaultsSuccess'), { type: 'success' })
         } catch (error) {
             console.error('恢复默认设置失败:', error)
@@ -665,33 +567,14 @@ const resetToDefaults = async () => {
     }
 }
 
-const saveSettings = async () => {
-    await saveAllSettings()
-
-    // 延迟一秒后关闭设置窗口
-    setTimeout(async () => {
-        try {
-            await invoke('close_settings_window')
-        } catch (error) {
-            console.error('关闭设置窗口失败:', error)
-        }
-    }, 1000)
-}
-
 // 加载设置
 const loadSettings = async () => {
     try {
         const settings = await invoke('load_app_settings')
 
         // 将后端设置映射到前端本地设置
-        localSettings.windowWidth = settings.window_width || 800
-        localSettings.windowHeight = settings.window_height || 600
         localSettings.preventAutoHide = settings.prevent_auto_hide || false
         localSettings.theme = settings.theme || 'auto'
-        localSettings.iconSize = settings.icon_size || 64
-        localSettings.sidebarWidth = settings.sidebar_width || 180
-        localSettings.enableAnimations = settings.enable_animations !== false
-        localSettings.animationSpeed = settings.animation_speed || 'normal'
         localSettings.startMinimized = settings.start_minimized || false
         localSettings.autoHideAfterLaunch = settings.auto_hide_after_launch || false
         localSettings.toggleHotkey = settings.toggle_hotkey || 'Ctrl+Space'
@@ -717,47 +600,6 @@ const loadSettings = async () => {
     }
 }
 
-// 批量保存所有设置
-const saveAllSettings = async () => {
-    isSaving.value = true
-    try {
-        // 构建设置对象（驼峰命名转换为下划线）
-        const settingsToSave = {
-            preventAutoHide: localSettings.preventAutoHide,
-            windowWidth: localSettings.windowWidth,
-            windowHeight: localSettings.windowHeight,
-            theme: localSettings.theme,
-            iconSize: localSettings.iconSize,
-            sidebarWidth: localSettings.sidebarWidth,
-            enableAnimations: localSettings.enableAnimations,
-            animationSpeed: localSettings.animationSpeed,
-            startWithSystem: localSettings.startWithSystem,
-            startMinimized: localSettings.startMinimized,
-            autoHideAfterLaunch: localSettings.autoHideAfterLaunch,
-            toggleHotkey: localSettings.toggleHotkey,
-            globalHotkey: localSettings.globalHotkey,
-            fuzzySearch: localSettings.fuzzySearch,
-            searchInPath: localSettings.searchInPath,
-            maxSearchResults: localSettings.maxSearchResults,
-            autoBackup: localSettings.autoBackup,
-            backupInterval: localSettings.backupInterval
-        }
-
-        await invoke('update_settings_batch', { settingsUpdate: settingsToSave })
-
-        lastSaved.value = true
-        setTimeout(() => {
-            lastSaved.value = false
-        }, 2000)
-
-        console.log('所有设置保存成功')
-    } catch (error) {
-        console.error('保存设置失败:', error)
-    } finally {
-        isSaving.value = false
-    }
-}
-
 // 初始化
 onMounted(async () => {
     // 获取应用版本号和更新日期
@@ -771,6 +613,17 @@ onMounted(async () => {
     }
 
     await loadSettings()
+
+    unlistenSettingsUpdated = await listen('settings-updated', async () => {
+        await loadSettings()
+    })
+})
+
+onUnmounted(() => {
+    if (unlistenSettingsUpdated) {
+        unlistenSettingsUpdated()
+        unlistenSettingsUpdated = null
+    }
 })
 </script>
 
@@ -1033,6 +886,18 @@ onMounted(async () => {
     color: #64748b;
     margin: 0;
     line-height: 1.45;
+}
+
+.setting-note {
+    display: block;
+    min-height: 0;
+}
+
+.setting-note p {
+    margin: 0;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.5;
 }
 
 .input-group {

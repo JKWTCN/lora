@@ -171,6 +171,10 @@ export default {
         light: 'Light',
         dark: 'Dark',
         iconSize: 'Application Icon Size',
+        gridCellSizeHint: 'Hold Ctrl and use the mouse wheel in the launcher window to adjust grid size.',
+        small: 'Small',
+        medium: 'Medium',
+        large: 'Large',
         sidebarWidth: 'Sidebar Width'
       },
       animation: {

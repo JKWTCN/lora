@@ -12,6 +12,34 @@ use tauri::{Manager, State};
 
 use crate::models::AppState;
 
+fn remember_settings_window_size(window: &tauri::WebviewWindow) {
+    let Ok(size) = window.inner_size() else {
+        return;
+    };
+    let scale_factor = window.scale_factor().unwrap_or(1.0);
+    let logical_size = size.to_logical::<u32>(scale_factor);
+
+    if logical_size.width < 600 || logical_size.height < 450 {
+        return;
+    }
+
+    match crate::data::load_app_settings() {
+        Ok(mut settings) => {
+            settings.settings_window_width = Some(logical_size.width);
+            settings.settings_window_height = Some(logical_size.height);
+            if let Err(error) = crate::data::save_app_settings(settings) {
+                eprintln!("保存设置窗口大小失败: {}", error);
+            } else {
+                println!(
+                    "设置窗口大小已保存: {}x{}",
+                    logical_size.width, logical_size.height
+                );
+            }
+        }
+        Err(error) => eprintln!("加载设置以保存设置窗口大小失败: {}", error),
+    }
+}
+
 /// 显示/隐藏主窗口
 #[tauri::command]
 pub async fn toggle_window_visibility(app: tauri::AppHandle) -> Result<String, String> {
@@ -147,6 +175,16 @@ pub async fn open_settings_window(
         }
     }
 
+    let (settings_width, settings_height) = crate::data::load_app_settings()
+        .ok()
+        .map(|settings| {
+            (
+                settings.settings_window_width.unwrap_or(800) as f64,
+                settings.settings_window_height.unwrap_or(600) as f64,
+            )
+        })
+        .unwrap_or((800.0, 600.0));
+
     // 克隆状态以便在闭包中使用
     let state_clone = state.settings_window_open.clone();
 
@@ -158,7 +196,7 @@ pub async fn open_settings_window(
         tauri::WebviewUrl::App("settings.html".into()),
     )
     .title("设置")
-    .inner_size(800.0, 600.0)
+    .inner_size(settings_width, settings_height)
     .min_inner_size(600.0, 450.0)
     .center()
     .resizable(true)
@@ -169,9 +207,11 @@ pub async fn open_settings_window(
 
     println!("open_settings_window: 设置窗口创建成功，设置事件监听器");
     // 监听窗口关闭事件
+    let settings_window_for_event = settings_window.clone();
     settings_window.on_window_event(move |event| {
         if let tauri::WindowEvent::CloseRequested { .. } = event {
             println!("open_settings_window: 设置窗口关闭事件触发");
+            remember_settings_window_size(&settings_window_for_event);
             // 窗口关闭时更新状态
             if let Ok(mut settings_open) = state_clone.lock() {
                 *settings_open = false;
@@ -203,6 +243,7 @@ pub async fn close_settings_window(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     if let Some(settings_window) = app.get_webview_window("settings") {
+        remember_settings_window_size(&settings_window);
         settings_window
             .close()
             .map_err(|e| format!("关闭设置窗口失败: {}", e))?;

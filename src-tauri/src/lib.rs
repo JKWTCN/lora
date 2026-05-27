@@ -51,6 +51,15 @@ async fn notify_main_window_refresh(app: tauri::AppHandle) -> Result<String, Str
     Ok("通知已发送".to_string())
 }
 
+// 通知主窗口设置已更新
+#[tauri::command]
+async fn notify_main_settings_updated(app: tauri::AppHandle) -> Result<String, String> {
+    if let Some(main_window) = app.get_webview_window("main") {
+        let _ = main_window.emit("settings-updated", {});
+    }
+    Ok("设置更新通知已发送".to_string())
+}
+
 /// 主库文件
 ///
 /// 此文件是 Tauri 应用程序的主入口点，负责：
@@ -114,6 +123,11 @@ pub fn run() {
                             x as f64, y as f64,
                         )));
                     }
+
+                    if settings.start_minimized.unwrap_or(false) {
+                        let _ = main_window.hide();
+                        let _ = main_window.set_skip_taskbar(false);
+                    }
                 }
             }
 
@@ -144,6 +158,7 @@ pub fn run() {
             data::save_app_settings,
             data::load_app_settings,
             data::save_window_size,
+            data::save_settings_window_size,
             window_manager::get_main_window_size,
             settings_manager::update_prevent_auto_hide,
             system_integration::update_tray_menu,
@@ -206,7 +221,8 @@ pub fn run() {
             data_manager::export_data,
             data_manager::import_data,
             data_manager::reset_data,
-            notify_main_window_refresh
+            notify_main_window_refresh,
+            notify_main_settings_updated
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

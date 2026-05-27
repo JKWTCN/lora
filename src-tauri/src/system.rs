@@ -29,10 +29,13 @@ pub fn detect_target_type(target_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn open_url(url: String, _launch_args: Option<String>) -> Result<String, String> {
+pub fn open_url(url: String, launch_args: Option<String>) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        return crate::win_native::shell_execute(&url, None, None, Some("open"))
+        let params = launch_args
+            .as_deref()
+            .filter(|args| !args.trim().is_empty());
+        return crate::win_native::shell_execute(&url, params, None, Some("open"))
             .map(|_| "网址打开成功".to_string())
             .map_err(|e| format!("打开网址失败: {}", e));
     }
@@ -78,7 +81,7 @@ pub fn open_url(url: String, _launch_args: Option<String>) -> Result<String, Str
 }
 
 #[tauri::command]
-pub fn open_folder(folder_path: String, _launch_args: Option<String>) -> Result<String, String> {
+pub fn open_folder(folder_path: String, launch_args: Option<String>) -> Result<String, String> {
     let path = Path::new(&folder_path);
     if !path.exists() {
         return Err("文件夹不存在".to_string());
@@ -89,7 +92,10 @@ pub fn open_folder(folder_path: String, _launch_args: Option<String>) -> Result<
 
     #[cfg(target_os = "windows")]
     {
-        return crate::win_native::shell_execute(&folder_path, None, None, Some("open"))
+        let params = launch_args
+            .as_deref()
+            .filter(|args| !args.trim().is_empty());
+        return crate::win_native::shell_execute(&folder_path, params, None, Some("open"))
             .map(|_| "文件夹打开成功".to_string())
             .map_err(|e| format!("打开文件夹失败: {}", e));
     }

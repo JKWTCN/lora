@@ -116,9 +116,11 @@ pub fn get_default_settings() -> AppSettings {
         prevent_auto_hide: false,
         window_width: Some(800),
         window_height: Some(600),
+        settings_window_width: Some(800),
+        settings_window_height: Some(600),
         theme: Some("auto".to_string()),
-        icon_size: Some(64),
-        sidebar_width: Some(180),
+        icon_size: Some(88),
+        sidebar_width: Some(0),
         enable_animations: Some(true),
         animation_speed: Some("normal".to_string()),
         start_with_system: Some(false),
@@ -151,6 +153,15 @@ pub fn save_window_size(width: u32, height: u32) -> Result<String, String> {
     settings.window_height = Some(height);
     save_app_settings(settings)?;
     Ok("窗口大小保存成功".to_string())
+}
+
+#[tauri::command]
+pub fn save_settings_window_size(width: u32, height: u32) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.settings_window_width = Some(width);
+    settings.settings_window_height = Some(height);
+    save_app_settings(settings)?;
+    Ok("设置窗口大小保存成功".to_string())
 }
 
 #[tauri::command]

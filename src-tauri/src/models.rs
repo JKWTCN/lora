@@ -31,6 +31,8 @@ pub struct AppSettings {
     pub prevent_auto_hide: bool,
     pub window_width: Option<u32>,
     pub window_height: Option<u32>,
+    pub settings_window_width: Option<u32>,
+    pub settings_window_height: Option<u32>,
     // 外观设置
     pub theme: Option<String>,
     pub icon_size: Option<u32>,

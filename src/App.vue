@@ -1,5 +1,6 @@
-在`<template>
-  <div class="app-container" @mouseenter="isMouseInWindow = true" @mouseleave="isMouseInWindow = false">
+<template>
+  <div class="app-container" :class="appContainerClasses" :style="appContainerStyle"
+    @mouseenter="isMouseInWindow = true" @mouseleave="isMouseInWindow = false">
     <!-- 加载指示器 -->
     <div v-if="isLoading" class="loading-overlay">
       <div class="loading-content">
@@ -78,11 +79,11 @@
       <Teleport to="body">
         <div v-if="appContextMenu.visible" class="context-menu"
           :style="{ left: appContextMenu.x + 'px', top: appContextMenu.y + 'px' }" @click.stop>
-          <div class="context-menu-item" @click="runAsAdmin">
+          <div v-if="appContextMenu.app?.target_type !== 'url'" class="context-menu-item" @click="runAsAdmin">
             <span>{{ $t('main.contextMenu.runAsAdmin') }}</span>
           </div>
-          <div class="context-menu-divider"></div>
-          <div class="context-menu-item" @click="openFileLocation">
+          <div v-if="appContextMenu.app?.target_type !== 'url'" class="context-menu-divider"></div>
+          <div v-if="appContextMenu.app?.target_type !== 'url'" class="context-menu-item" @click="openFileLocation">
             <span>{{ $t('main.contextMenu.openFileLocation') }}</span>
           </div>
           <div class="context-menu-item" @click="copyFullPath">
@@ -277,12 +278,12 @@
           </div>
         </div>
 
-        <div class="app-grid" @contextmenu.prevent="showGridContextMenu($event)">
+        <div class="app-grid" @wheel="handleLauncherWheel" @contextmenu.prevent="showGridContextMenu($event)">
           <div
             v-for="(app, index) in filteredApps"
             :key="app.id"
             class="app-item"
-            :class="{}"
+            :class="{ selected: selectedAppId === app.id }"
             :data-app-id="app.id"
             :data-app-index="index"
             @click="handleAppClick($event, app)"
@@ -355,11 +356,13 @@ interface CategoryData {
 
 // 响应式数据
 const sidebarWidth = ref(0) // 初始化为0，将通过自适应计算
+const windowWidth = ref(window.innerWidth)
 const isResizing = ref(false)
 const selectedCategory = ref('all')
 const searchQuery = ref('')
 const showSearchBox = ref(false) // 控制搜索框显示状态
 const isLoading = ref(true) // 加载状态
+const selectedAppId = ref<number | null>(null)
 // 设置相关状态已移除，现在使用独立设置窗口
 
 // 拖拽相关状态
@@ -452,14 +455,28 @@ const mainMenu = ref<{
   y: 0
 })
 
+const GRID_CELL_SIZE_DEFAULT = 88
+const GRID_CELL_SIZE_MIN = 56
+const GRID_CELL_SIZE_MAX = 144
+const GRID_CELL_SIZE_STEP = 4
+
+const clampGridCellSize = (value: unknown) => {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return GRID_CELL_SIZE_DEFAULT
+  }
+
+  return Math.min(GRID_CELL_SIZE_MAX, Math.max(GRID_CELL_SIZE_MIN, Math.round(numericValue)))
+}
+
 // 应用设置
 const appSettings = ref({
   preventAutoHide: false, // 阻止自动隐藏
   windowWidth: undefined as number | undefined, // 窗口宽度
   windowHeight: undefined as number | undefined, // 窗口高度
   theme: 'auto' as string, // 主题
-  iconSize: 64 as number, // 图标大小
-  sidebarWidth: 180 as number, // 侧栏宽度
+  gridCellSize: GRID_CELL_SIZE_DEFAULT as number, // 启动器格子大小
+  sidebarWidth: 0 as number, // 侧栏宽度，0 表示自动
   enableAnimations: true as boolean, // 启用动画
   animationSpeed: 'normal' as string, // 动画速度
   gridViewEnabled: false as boolean, // 网格视图
@@ -468,6 +485,7 @@ const appSettings = ref({
   fuzzySearch: true as boolean, // 模糊搜索
   searchInPath: false as boolean, // 搜索路径
   maxSearchResults: 20 as number, // 最大搜索结果
+  autoHideAfterLaunch: false as boolean, // 启动后自动隐藏
 })
 
 // 重命名对话框相关
@@ -646,8 +664,8 @@ const loadAppSettings = async () => {
       windowWidth: settings.window_width,
       windowHeight: settings.window_height,
       theme: settings.theme || 'auto',
-      iconSize: settings.icon_size || 64,
-      sidebarWidth: settings.sidebar_width || 180,
+      gridCellSize: clampGridCellSize(settings.icon_size ?? GRID_CELL_SIZE_DEFAULT),
+      sidebarWidth: settings.sidebar_width ?? 0,
       enableAnimations: settings.enable_animations !== false,
       animationSpeed: settings.animation_speed || 'normal',
       gridViewEnabled: settings.grid_view_enabled || false,
@@ -656,6 +674,7 @@ const loadAppSettings = async () => {
       fuzzySearch: settings.fuzzy_search !== false,
       searchInPath: settings.search_in_path || false,
       maxSearchResults: settings.max_search_results || 20,
+      autoHideAfterLaunch: settings.auto_hide_after_launch || false,
     }
 
     // 一次性更新所有设置
@@ -714,6 +733,76 @@ watch(searchQuery, () => {
 })
 
 // 计算属性
+const resolvedTheme = computed(() => {
+  if (appSettings.value.theme === 'auto') {
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  }
+
+  return appSettings.value.theme === 'dark' ? 'dark' : 'light'
+})
+
+const appContainerClasses = computed(() => ({
+  'theme-dark': resolvedTheme.value === 'dark',
+  'theme-light': resolvedTheme.value === 'light',
+  'animations-disabled': !appSettings.value.enableAnimations,
+  [`animation-${appSettings.value.animationSpeed || 'normal'}`]: true,
+}))
+
+const appContainerStyle = computed(() => {
+  const cellSize = clampGridCellSize(appSettings.value.gridCellSize)
+  const iconSize = Math.min(84, Math.max(32, Math.round(cellSize * 0.58)))
+
+  return {
+    '--app-icon-size': `${iconSize}px`,
+    '--app-cell-size': `${cellSize}px`,
+  }
+})
+
+const applyRuntimeSettings = () => {
+  const body = document.body
+  body.classList.toggle('lora-theme-dark', resolvedTheme.value === 'dark')
+  body.classList.toggle('lora-theme-light', resolvedTheme.value === 'light')
+  body.classList.toggle('lora-animations-disabled', !appSettings.value.enableAnimations)
+  body.classList.remove('lora-animation-slow', 'lora-animation-normal', 'lora-animation-fast')
+  body.classList.add(`lora-animation-${appSettings.value.animationSpeed || 'normal'}`)
+}
+
+watch(
+  () => [resolvedTheme.value, appSettings.value.enableAnimations, appSettings.value.animationSpeed],
+  applyRuntimeSettings
+)
+
+const normalizeSearchText = (value?: string) => (value || '').toLowerCase().trim()
+
+const fuzzyIncludes = (target: string, query: string) => {
+  if (!query) return true
+
+  let targetIndex = 0
+  for (const queryChar of query) {
+    targetIndex = target.indexOf(queryChar, targetIndex)
+    if (targetIndex === -1) {
+      return false
+    }
+    targetIndex += 1
+  }
+
+  return true
+}
+
+const matchesSearch = (app: AppData, query: string) => {
+  const values = [app.name]
+  if (appSettings.value.searchInPath) {
+    values.push(app.path || '', app.target_path || '')
+  }
+
+  return values.some(value => {
+    const normalizedValue = normalizeSearchText(value)
+    return appSettings.value.fuzzySearch
+      ? fuzzyIncludes(normalizedValue, query)
+      : normalizedValue.includes(query)
+  })
+}
+
 const filteredApps = computed(() => {
   console.log('计算filteredApps:', {
     totalApps: apps.value.length,
@@ -731,23 +820,51 @@ const filteredApps = computed(() => {
   }
 
   // 按搜索词筛选
-  if (searchQuery.value) {
-    result = result.filter(app =>
-      app.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-    )
+  const normalizedQuery = normalizeSearchText(searchQuery.value)
+  if (normalizedQuery) {
+    result = result.filter(app => matchesSearch(app, normalizedQuery))
     console.log('按搜索词筛选后:', result)
   }
 
   // 按 order 字段排序
-  result.sort((a, b) => {
+  result = [...result].sort((a, b) => {
     const aOrder = a.order ?? Number.MAX_SAFE_INTEGER
     const bOrder = b.order ?? Number.MAX_SAFE_INTEGER
     return aOrder - bOrder
   })
 
+  if (searchQuery.value) {
+    result = result.slice(0, appSettings.value.maxSearchResults || 20)
+  }
+
   console.log('最终结果:', result)
   return result
 })
+
+watch(filteredApps, currentApps => {
+  if (currentApps.length === 0) {
+    selectedAppId.value = null
+    return
+  }
+
+  if (!currentApps.some(app => app.id === selectedAppId.value)) {
+    selectedAppId.value = currentApps[0].id
+  }
+})
+
+const getSelectedApp = () => filteredApps.value.find(app => app.id === selectedAppId.value) || filteredApps.value[0]
+
+const moveSelectedApp = (direction: 1 | -1) => {
+  const currentApps = filteredApps.value
+  if (currentApps.length === 0) {
+    selectedAppId.value = null
+    return
+  }
+
+  const currentIndex = Math.max(0, currentApps.findIndex(app => app.id === selectedAppId.value))
+  const nextIndex = Math.min(currentApps.length - 1, Math.max(0, currentIndex + direction))
+  selectedAppId.value = currentApps[nextIndex].id
+}
 
 // 方法
 const selectCategory = async (categoryId: string) => {
@@ -776,10 +893,26 @@ const showToast = (message: string, type: string = 'info') => {
   }, 3000)
 }
 
+const getLaunchTargetPath = (app: AppData) => app.target_path || app.path
+
+const hideAfterLaunchIfNeeded = async () => {
+  if (!appSettings.value.autoHideAfterLaunch) {
+    return
+  }
+
+  await new Promise(resolve => setTimeout(resolve, 300))
+  try {
+    await getCurrentWindow().hide()
+  } catch (error) {
+    console.error('启动后自动隐藏窗口失败:', error)
+  }
+}
+
 const launchApp = async (app: any) => {
   console.log(`启动应用: ${app.name}`)
 
-  const targetPath = app.target_path || app.path
+  selectedAppId.value = app.id
+  const targetPath = getLaunchTargetPath(app)
   if (!targetPath) {
     console.error('应用路径不存在')
     await alertDialog(t('main.alert.appPathNotExist'), { type: 'warning' })
@@ -807,6 +940,7 @@ const launchApp = async (app: any) => {
         launchArgs: app.launch_args || ''
       })
     }
+    await hideAfterLaunchIfNeeded()
     console.log('启动成功')
   } catch (error) {
     console.error('启动应用失败:', error)
@@ -821,6 +955,7 @@ const handleAppClick = (event: MouseEvent, app: AppData) => {
     return
   }
 
+  selectedAppId.value = app.id
   void launchApp(app)
 }
 
@@ -878,6 +1013,8 @@ const hideContextMenu = () => {
 
 // 应用右键菜单相关方法
 const showAppContextMenu = (e: MouseEvent, app: any) => {
+  selectedAppId.value = app.id
+
   // 隐藏其他所有菜单
   hideContextMenu()
   hideMoveToSubmenu()
@@ -1111,7 +1248,7 @@ const runAsAdmin = async () => {
   if (appContextMenu.value.app) {
     try {
       console.log(`以管理员权限运行: ${appContextMenu.value.app.name}`)
-      const result = await invoke('run_as_admin', { appPath: appContextMenu.value.app.path })
+      const result = await invoke('run_as_admin', { appPath: getLaunchTargetPath(appContextMenu.value.app) })
       console.log('管理员权限运行结果:', result)
     } catch (error) {
       console.error('以管理员权限运行失败:', error)
@@ -1124,8 +1261,9 @@ const runAsAdmin = async () => {
 const openFileLocation = async () => {
   if (appContextMenu.value.app) {
     try {
-      console.log(`打开文件位置: ${appContextMenu.value.app.path}`)
-      const result = await invoke('open_file_location', { filePath: appContextMenu.value.app.path })
+      const targetPath = getLaunchTargetPath(appContextMenu.value.app)
+      console.log(`打开文件位置: ${targetPath}`)
+      const result = await invoke('open_file_location', { filePath: targetPath })
       console.log('打开文件位置结果:', result)
     } catch (error) {
       console.error('打开文件位置失败:', error)
@@ -1315,10 +1453,7 @@ const editApp = async () => {
   hideAppContextMenu()
 }
 
-const deleteApp = async () => {
-  const appToDelete = appContextMenu.value.app
-  hideAppContextMenu()
-
+const deleteSpecificApp = async (appToDelete: AppData | null) => {
   if (appToDelete) {
     if (await confirmDialog(t('main.confirm.deleteApp', { name: appToDelete.name }))) {
       try {
@@ -1327,6 +1462,9 @@ const deleteApp = async () => {
 
         // 从前端数组中移除
         apps.value = apps.value.filter(app => app.id !== appToDelete.id)
+        if (selectedAppId.value === appToDelete.id) {
+          selectedAppId.value = filteredApps.value[0]?.id ?? null
+        }
         console.log(`已删除应用: ${appToDelete.name}`)
       } catch (error) {
         console.error('删除应用失败:', error)
@@ -1334,6 +1472,12 @@ const deleteApp = async () => {
       }
     }
   }
+}
+
+const deleteApp = async () => {
+  const appToDelete = appContextMenu.value.app
+  hideAppContextMenu()
+  await deleteSpecificApp(appToDelete)
 }
 
 const deleteAllApps = async () => {
@@ -1691,6 +1835,8 @@ const stopResize = () => {
   isResizing.value = false
   document.removeEventListener('mousemove', resize)
   document.removeEventListener('mouseup', stopResize)
+  invoke('update_sidebar_width', { sidebarWidth: Math.round(sidebarWidth.value) })
+    .catch(error => console.error('保存侧栏宽度失败:', error))
 }
 
 const processDroppedPaths = async (paths: string[]) => {
@@ -1784,6 +1930,47 @@ const collectDroppedPaths = async (dragEvent: DragEvent) => {
   return uniquePaths
 }
 
+const updateViewportWidth = () => {
+  windowWidth.value = window.innerWidth
+}
+
+let saveGridCellSizeTimer: number | null = null
+
+const saveGridCellSizeThrottled = () => {
+  if (saveGridCellSizeTimer) {
+    clearTimeout(saveGridCellSizeTimer)
+  }
+
+  saveGridCellSizeTimer = setTimeout(async () => {
+    try {
+      await invoke('update_icon_size', { iconSize: appSettings.value.gridCellSize })
+      const { emit } = await import('@tauri-apps/api/event')
+      await emit('settings-updated')
+    } catch (error) {
+      console.error('保存格子大小失败:', error)
+    }
+  }, 250)
+}
+
+const adjustGridCellSize = (delta: number) => {
+  const nextSize = clampGridCellSize(appSettings.value.gridCellSize + delta)
+  if (nextSize === appSettings.value.gridCellSize) {
+    return
+  }
+
+  appSettings.value.gridCellSize = nextSize
+  saveGridCellSizeThrottled()
+}
+
+const handleLauncherWheel = (event: WheelEvent) => {
+  if (!event.ctrlKey) {
+    return
+  }
+
+  event.preventDefault()
+  adjustGridCellSize(event.deltaY < 0 ? GRID_CELL_SIZE_STEP : -GRID_CELL_SIZE_STEP)
+}
+
 // 生命周期
 onMounted(async () => {
   console.log('开始初始化应用...')
@@ -1801,6 +1988,7 @@ onMounted(async () => {
   if (settingsResult.status === 'rejected') {
     console.error('加载应用设置失败:', settingsResult.reason)
   }
+  applyRuntimeSettings()
 
   // 数据加载完成，隐藏加载指示器
   isLoading.value = false
@@ -1850,6 +2038,8 @@ onMounted(async () => {
             console.error('无法从后端获取逻辑窗口尺寸', logicalSize)
             return
           }
+
+          windowWidth.value = Number(lw)
 
           // 防抖处理：清除之前的定时器，设置新的定时器
           if (resizeTimeout) {
@@ -1908,17 +2098,27 @@ onMounted(async () => {
       console.log('收到数据更新通知，重新加载数据')
       loadAppData()
     })
+
+    await listen('settings-updated', async () => {
+      console.log('收到设置更新通知，重新加载设置')
+      await loadAppSettings()
+      applyRuntimeSettings()
+    })
   }, 100) // 延迟100ms执行，让界面先渲染
 
   // 立即计算侧栏宽度和设置事件监听器
   nextTick(() => {
-    // 计算侧栏的自然宽度
-    const sidebar = document.querySelector('.sidebar') as HTMLElement
-    if (sidebar) {
+    if (appSettings.value.sidebarWidth > 0) {
+      sidebarWidth.value = appSettings.value.sidebarWidth
+    } else {
+      // 计算侧栏的自然宽度
+      const sidebar = document.querySelector('.sidebar') as HTMLElement
+      if (sidebar) {
       // 先让侧栏自适应，然后获取其实际宽度
-      sidebar.style.width = 'auto'
-      const rect = sidebar.getBoundingClientRect()
-      sidebarWidth.value = Math.max(rect.width, 80) // 确保最小宽度为80px
+        sidebar.style.width = 'auto'
+        const rect = sidebar.getBoundingClientRect()
+        sidebarWidth.value = Math.max(rect.width, 80) // 确保最小宽度为80px
+      }
     }
 
     // 添加全局点击监听，点击搜索框外部时隐藏搜索框
@@ -1966,6 +2166,9 @@ onMounted(async () => {
 
     // 添加窗口聚焦事件监听器
     window.addEventListener('focus', handleWindowFocus)
+
+    // 跟随窗口宽度变化重新计算网格列数
+    window.addEventListener('resize', updateViewportWidth)
 
     // 添加鼠标移动和离开事件监听器
     document.addEventListener('mousemove', handleMouseMove)
@@ -2035,6 +2238,36 @@ const handleGlobalKeydown = (event: KeyboardEvent) => {
       toggleSearch()
     }
     event.preventDefault()
+    return
+  }
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    moveSelectedApp(1)
+    event.preventDefault()
+    return
+  }
+
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    moveSelectedApp(-1)
+    event.preventDefault()
+    return
+  }
+
+  if (event.key === 'Enter') {
+    const selectedApp = getSelectedApp()
+    if (selectedApp) {
+      void launchApp(selectedApp)
+      event.preventDefault()
+    }
+    return
+  }
+
+  if (event.key === 'Delete') {
+    const selectedApp = getSelectedApp()
+    if (selectedApp) {
+      void deleteSpecificApp(selectedApp)
+      event.preventDefault()
+    }
     return
   }
 
@@ -2180,6 +2413,13 @@ onUnmounted(() => {
   // 清理窗口聚焦监听器
   window.removeEventListener('focus', handleWindowFocus)
 
+  // 清理窗口尺寸监听器
+  window.removeEventListener('resize', updateViewportWidth)
+
+  if (saveGridCellSizeTimer) {
+    clearTimeout(saveGridCellSizeTimer)
+  }
+
   // 清理鼠标事件监听器
   document.removeEventListener('mousemove', handleMouseMove)
   document.removeEventListener('mouseleave', handleMouseLeave)
@@ -2215,13 +2455,20 @@ const handleSearchKeydown = (event: KeyboardEvent) => {
   if (event.key === 'Enter') {
     const firstApp = filteredApps.value[0]
     if (firstApp) {
+      selectedAppId.value = firstApp.id
       launchApp(firstApp)
       hideSearchBox()
     }
     event.preventDefault()
   }
-  // 下箭头键可以考虑添加应用选择功能
-  // 这里暂时不实现，因为需要添加选中状态管理
+  if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+    moveSelectedApp(1)
+    event.preventDefault()
+  }
+  if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+    moveSelectedApp(-1)
+    event.preventDefault()
+  }
 }
 
 const toggleMenu = (e: MouseEvent) => {
@@ -2670,6 +2917,18 @@ const clearDragState = () => {
 
 <style scoped>
 .app-container {
+  --app-bg: #f5f5f5;
+  --surface-bg: #ffffff;
+  --surface-hover: #f8fafc;
+  --text-color: #2c3e50;
+  --muted-text: #7f8c8d;
+  --border-color: #e0e0e0;
+  --accent-color: #3498db;
+  --titlebar-bg: #2c3e50;
+  --sidebar-bg: #2c3e50;
+  --sidebar-hover: #34495e;
+  --shadow-color: rgba(0, 0, 0, 0.12);
+  --transition-speed: 0.2s;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -2678,13 +2937,42 @@ const clearDragState = () => {
   contain: layout;
 }
 
+.app-container.theme-dark {
+  --app-bg: #111827;
+  --surface-bg: #1f2937;
+  --surface-hover: #263244;
+  --text-color: #e5e7eb;
+  --muted-text: #9ca3af;
+  --border-color: #374151;
+  --accent-color: #60a5fa;
+  --titlebar-bg: #0f172a;
+  --sidebar-bg: #111827;
+  --sidebar-hover: #1f2937;
+  --shadow-color: rgba(0, 0, 0, 0.35);
+}
+
+.app-container.animation-slow {
+  --transition-speed: 0.35s;
+}
+
+.app-container.animation-fast {
+  --transition-speed: 0.1s;
+}
+
+.app-container.animations-disabled *,
+.app-container.animations-disabled *::before,
+.app-container.animations-disabled *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
 /* 自定义标题栏样式 */
 .titlebar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   height: 32px;
-  background: #2c3e50;
+  background: var(--titlebar-bg);
   color: white;
   padding: 0 16px;
   user-select: none;
@@ -2723,7 +3011,7 @@ const clearDragState = () => {
   border: none;
   color: white;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color var(--transition-speed) ease;
   font-size: 12px;
   position: relative;
   z-index: 1001;
@@ -2743,7 +3031,7 @@ const clearDragState = () => {
 .launcher-container {
   display: flex;
   flex: 1;
-  background: #f5f5f5;
+  background: var(--app-bg);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   position: relative;
   /* Ensure children with overflow can scroll inside this flex container */
@@ -2755,7 +3043,7 @@ const clearDragState = () => {
 
 /* 侧栏样式 */
 .sidebar {
-  background: #2c3e50;
+  background: var(--sidebar-bg);
   color: white;
   width: auto;
   min-width: 100px;
@@ -2799,11 +3087,11 @@ const clearDragState = () => {
 }
 
 .category-item:hover {
-  background: #34495e;
+  background: var(--sidebar-hover);
 }
 
 .category-item.active {
-  background: #3498db;
+  background: var(--accent-color);
 }
 
 .category-item span {
@@ -2817,11 +3105,11 @@ const clearDragState = () => {
   width: 4px;
   background: #bdc3c7;
   cursor: col-resize;
-  transition: background-color 0.2s ease;
+  transition: background-color var(--transition-speed) ease;
 }
 
 .resizer:hover {
-  background: #3498db;
+  background: var(--accent-color);
 }
 
 /* 主内容区域 */
@@ -2830,26 +3118,27 @@ const clearDragState = () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
   /* Allow flex child (.app-grid) to shrink and produce its own scroll */
   min-height: 0;
 }
 
 .content-header {
-  background: white;
+  background: var(--surface-bg);
   padding: 20px 30px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 60px;
-  transition: all 0.3s ease;
+  transition: all var(--transition-speed) ease;
   animation: slideDownFromTop 0.3s ease-out;
 }
 
 .content-header h1 {
   margin: 0;
   font-size: 24px;
-  color: #2c3e50;
+  color: var(--text-color);
 }
 
 .search-box {
@@ -2862,24 +3151,24 @@ const clearDragState = () => {
 
 .search-input {
   padding: 8px 15px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   border-radius: 20px;
   outline: none;
   font-size: 14px;
   width: 250px;
-  transition: all 0.3s ease;
+  transition: all var(--transition-speed) ease;
   animation: 0.3s ease-out;
 }
 
 .search-input:focus {
-  border-color: #3498db;
+  border-color: var(--accent-color);
 }
 
 /* 搜索信息样式 */
 .search-info {
   margin-top: 8px;
   font-size: 12px;
-  color: #7f8c8d;
+  color: var(--muted-text);
   text-align: center;
 }
 
@@ -2894,27 +3183,42 @@ const clearDragState = () => {
   flex: 1;
   padding: 15px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  grid-template-columns: repeat(auto-fill, var(--app-cell-size, 88px));
   gap: 8px;
   align-content: start;
+  justify-content: start;
+  min-width: 0;
 }
 
 .app-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 6px;
-  background: white;
+  justify-content: center;
+  width: var(--app-cell-size, 88px);
+  height: var(--app-cell-size, 88px);
+  aspect-ratio: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 8px 6px;
+  background: var(--surface-bg);
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-speed) ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .app-item:hover {
   transform: translateY(-1px);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 3px 12px var(--shadow-color);
+}
+
+.app-item.selected {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  background: var(--surface-hover);
 }
 
 /* 拖拽中的应用图标样式 */
@@ -2924,7 +3228,7 @@ const clearDragState = () => {
 }
 
 .app-item.drag-target {
-  outline: 2px solid #3498db;
+  outline: 2px solid var(--accent-color);
   outline-offset: 2px;
 }
 
@@ -2942,9 +3246,10 @@ const clearDragState = () => {
 }
 
 .app-icon {
-  width: 28px;
-  height: 28px;
-  margin-bottom: 4px;
+  width: var(--app-icon-size, 51px);
+  height: var(--app-icon-size, 51px);
+  flex: 0 0 auto;
+  margin-bottom: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2960,13 +3265,13 @@ const clearDragState = () => {
 .default-icon {
   width: 100%;
   height: 100%;
-  background: #3498db;
+  background: var(--accent-color);
   color: white;
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: calc(var(--app-icon-size, 51px) * 0.42);
   font-weight: bold;
 }
 
@@ -2976,17 +3281,21 @@ const clearDragState = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: calc(var(--app-icon-size, 51px) * 0.45);
   border-radius: 4px;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 }
 
 .app-name {
+  width: 100%;
+  min-width: 0;
   text-align: center;
-  font-size: 10px;
-  color: #2c3e50;
-  line-height: 1.2;
-  word-break: break-word;
+  font-size: 12px;
+  color: var(--text-color);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 滚动条样式 */
@@ -3010,7 +3319,6 @@ const clearDragState = () => {
 /* 响应式设计 */
 @media (max-width: 768px) {
   .app-grid {
-    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
     gap: 6px;
     padding: 12px;
   }
@@ -3288,8 +3596,29 @@ textarea,
 /* 确保整个页面容器允许溢出 */
 html,
 body {
-  overflow: visible !important;
+  width: 100%;
+  height: 100%;
+  overflow: hidden !important;
   position: relative;
+}
+
+body.lora-animations-disabled *,
+body.lora-animations-disabled *::before,
+body.lora-animations-disabled *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+body.lora-animation-slow {
+  --lora-global-transition: 0.35s;
+}
+
+body.lora-animation-normal {
+  --lora-global-transition: 0.2s;
+}
+
+body.lora-animation-fast {
+  --lora-global-transition: 0.1s;
 }
 
 /* 拖拽相关样式 */
@@ -3310,7 +3639,7 @@ body {
   justify-content: center;
   z-index: 100;
   backdrop-filter: blur(2px);
-  animation: fadeIn 0.2s ease-out;
+  animation: fadeIn var(--lora-global-transition, 0.2s) ease-out;
 }
 
 .drag-message {
@@ -3348,7 +3677,7 @@ body {
 /* 拖拽时的主内容区域样式 */
 .main-content.drag-over .app-grid {
   opacity: 0.3;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--lora-global-transition, 0.2s) ease;
 }
 
 /* Toast 提示样式 */
@@ -3363,7 +3692,7 @@ body {
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 10000;
-  animation: slideInFromRight 0.3s ease-out;
+  animation: slideInFromRight var(--lora-global-transition, 0.3s) ease-out;
   border-left: 4px solid #3498db;
 }
 

@@ -171,6 +171,10 @@ export default {
         light: '浅色',
         dark: '深色',
         iconSize: '应用图标大小',
+        gridCellSizeHint: '可在启动器窗口中按住 Ctrl 并滚动鼠标滚轮调整格子大小。',
+        small: '小',
+        medium: '中',
+        large: '大',
         sidebarWidth: '侧栏宽度'
       },
       animation: {
