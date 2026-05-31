@@ -105,6 +105,16 @@
                         <div class="setting-item setting-note">
                             <p>{{ $t('settings.ui.appearance.gridCellSizeHint') }}</p>
                         </div>
+
+                        <div class="setting-item">
+                            <label>{{ $t('settings.ui.appearance.projectNamePosition') }}</label>
+                            <select v-model="localSettings.projectNamePosition" @change="updateProjectNamePosition">
+                                <option value="top">{{ $t('settings.ui.appearance.namePositionTop') }}</option>
+                                <option value="bottom">{{ $t('settings.ui.appearance.namePositionBottom') }}</option>
+                                <option value="left">{{ $t('settings.ui.appearance.namePositionLeft') }}</option>
+                                <option value="right">{{ $t('settings.ui.appearance.namePositionRight') }}</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -301,6 +311,7 @@ const localSettings = reactive({
 
     // 外观设置
     theme: 'auto',
+    projectNamePosition: 'bottom',
 
     // 启动设置
     startWithSystem: false,
@@ -401,6 +412,17 @@ const updateWindowLayout = async () => {
         console.log('窗口布局设置已更新')
     } catch (error) {
         console.error('更新窗口布局设置失败:', error)
+    }
+}
+
+const updateProjectNamePosition = async () => {
+    try {
+        await invoke('update_project_name_position', { projectNamePosition: localSettings.projectNamePosition })
+        await notifySettingsUpdated()
+        markSaved()
+        console.log('项目名称显示位置已更新')
+    } catch (error) {
+        console.error('更新项目名称显示位置失败:', error)
     }
 }
 
@@ -618,6 +640,7 @@ const loadSettings = async () => {
         localSettings.preventAutoHide = settings.prevent_auto_hide || false
         localSettings.windowLayout = settings.window_layout || 'horizontal'
         localSettings.theme = settings.theme || 'auto'
+        localSettings.projectNamePosition = settings.project_name_position || 'bottom'
         localSettings.startMinimized = settings.start_minimized || false
         localSettings.autoHideAfterLaunch = settings.auto_hide_after_launch || false
         localSettings.toggleHotkey = settings.toggle_hotkey || 'Ctrl+Space'

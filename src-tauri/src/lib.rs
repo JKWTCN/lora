@@ -201,6 +201,7 @@ pub fn run() {
             settings_manager::update_theme,
             settings_manager::update_window_layout,
             settings_manager::update_icon_size,
+            settings_manager::update_project_name_position,
             settings_manager::update_sidebar_width,
             settings_manager::update_animations,
             settings_manager::update_animation_speed,

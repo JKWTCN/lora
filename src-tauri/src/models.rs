@@ -37,6 +37,7 @@ pub struct AppSettings {
     // 外观设置
     pub theme: Option<String>,
     pub icon_size: Option<u32>,
+    pub project_name_position: Option<String>, // "top", "bottom", "left", "right"
     pub sidebar_width: Option<u32>,
     pub enable_animations: Option<bool>,
     pub animation_speed: Option<String>,

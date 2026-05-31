@@ -36,6 +36,7 @@ pub fn get_default_settings() -> AppSettings {
         window_layout: Some("horizontal".to_string()),
         theme: Some("auto".to_string()),
         icon_size: Some(88),
+        project_name_position: Some("bottom".to_string()),
         sidebar_width: Some(0),
         enable_animations: Some(true),
         animation_speed: Some("normal".to_string()),
@@ -100,6 +101,22 @@ pub fn update_icon_size(icon_size: u32) -> Result<String, String> {
     settings.icon_size = Some(icon_size);
     save_app_settings(settings)?;
     Ok("图标大小设置已更新".to_string())
+}
+
+/// 更新项目名称显示位置
+#[tauri::command]
+pub fn update_project_name_position(project_name_position: String) -> Result<String, String> {
+    if !matches!(
+        project_name_position.as_str(),
+        "top" | "bottom" | "left" | "right"
+    ) {
+        return Err("项目名称显示位置无效".to_string());
+    }
+
+    let mut settings = load_app_settings()?;
+    settings.project_name_position = Some(project_name_position);
+    save_app_settings(settings)?;
+    Ok("项目名称显示位置已更新".to_string())
 }
 
 /// 更新侧栏宽度设置

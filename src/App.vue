@@ -477,6 +477,7 @@ const appSettings = ref({
   windowHeight: undefined as number | undefined, // 窗口高度
   windowLayout: 'horizontal' as string, // 窗口布局
   theme: 'auto' as string, // 主题
+  projectNamePosition: 'bottom' as string, // 项目名称显示位置
   gridCellSize: GRID_CELL_SIZE_DEFAULT as number, // 启动器格子大小
   sidebarWidth: 0 as number, // 侧栏宽度，0 表示自动
   enableAnimations: true as boolean, // 启用动画
@@ -667,6 +668,7 @@ const loadAppSettings = async () => {
       windowHeight: settings.window_height,
       windowLayout: settings.window_layout || 'horizontal',
       theme: settings.theme || 'auto',
+      projectNamePosition: settings.project_name_position || 'bottom',
       gridCellSize: clampGridCellSize(settings.icon_size ?? GRID_CELL_SIZE_DEFAULT),
       sidebarWidth: settings.sidebar_width ?? 0,
       enableAnimations: settings.enable_animations !== false,
@@ -749,6 +751,7 @@ const appContainerClasses = computed(() => ({
   'theme-light': resolvedTheme.value === 'light',
   'layout-horizontal': appSettings.value.windowLayout !== 'vertical',
   'layout-vertical': appSettings.value.windowLayout === 'vertical',
+  [`name-position-${appSettings.value.projectNamePosition || 'bottom'}`]: true,
   'animations-disabled': !appSettings.value.enableAnimations,
   [`animation-${appSettings.value.animationSpeed || 'normal'}`]: true,
 }))
@@ -3350,6 +3353,38 @@ const clearDragState = () => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.name-position-top .app-icon {
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+.name-position-top .app-name {
+  order: -1;
+}
+
+.name-position-left .app-item,
+.name-position-right .app-item {
+  flex-direction: row;
+  gap: 8px;
+}
+
+.name-position-left .app-icon,
+.name-position-right .app-icon {
+  margin-bottom: 0;
+}
+
+.name-position-left .app-name,
+.name-position-right .app-name {
+  flex: 1 1 auto;
+  width: auto;
+  text-align: left;
+}
+
+.name-position-left .app-name {
+  order: -1;
+  text-align: right;
 }
 
 .app-icon img {

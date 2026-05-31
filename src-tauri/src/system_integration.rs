@@ -235,6 +235,7 @@ fn get_default_settings() -> AppSettings {
         window_layout: Some("horizontal".to_string()),
         theme: Some("auto".to_string()),
         icon_size: Some(88),
+        project_name_position: Some("bottom".to_string()),
         sidebar_width: Some(0),
         enable_animations: Some(true),
         animation_speed: Some("normal".to_string()),

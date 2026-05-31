@@ -121,6 +121,7 @@ pub fn get_default_settings() -> AppSettings {
         window_layout: Some("horizontal".to_string()),
         theme: Some("auto".to_string()),
         icon_size: Some(88),
+        project_name_position: Some("bottom".to_string()),
         sidebar_width: Some(0),
         enable_animations: Some(true),
         animation_speed: Some("normal".to_string()),
@@ -231,6 +232,12 @@ pub fn update_settings_batch(settings_update: Value) -> Result<String, String> {
     }
     if let Some(icon_size) = settings_update.get("iconSize").and_then(|v| v.as_u64()) {
         settings.icon_size = Some(icon_size as u32);
+    }
+    if let Some(project_name_position) = settings_update
+        .get("projectNamePosition")
+        .and_then(|v| v.as_str())
+    {
+        settings.project_name_position = Some(project_name_position.to_string());
     }
     if let Some(sidebar_width) = settings_update.get("sidebarWidth").and_then(|v| v.as_u64()) {
         settings.sidebar_width = Some(sidebar_width as u32);
