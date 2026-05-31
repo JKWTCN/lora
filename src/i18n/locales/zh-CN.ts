@@ -64,6 +64,10 @@ export default {
     sidebar: {
       allApps: '全部应用'
     },
+    tooltip: {
+      appInfo: '启动项目：{name}\n使用频率：{count} 次\n上次启动：{lastLaunch}',
+      neverLaunched: '从未启动'
+    },
     contextMenu: {
       newCategory: '新建分组',
       rename: '重命名',

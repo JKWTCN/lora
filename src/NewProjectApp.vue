@@ -460,7 +460,8 @@ const saveProject = async () => {
             is_shortcut: false,
             launch_args: projectData.launchArgs,
             target_type: projectData.targetType,
-            usage_count: 0
+            usage_count: 0,
+            last_launched_at: null
         }
 
         // 调用后端保存应用数据

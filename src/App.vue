@@ -286,6 +286,7 @@
             :class="{ selected: selectedAppId === app.id }"
             :data-app-id="app.id"
             :data-app-index="index"
+            :title="getAppHoverInfo(app)"
             @click="handleAppClick($event, app)"
             @dblclick="handleAppClick($event, app)"
             @contextmenu.prevent="showAppContextMenu($event, app)"
@@ -346,6 +347,7 @@ interface AppData {
   target_type?: 'file' | 'folder' | 'url' // 目标类型
   order?: number // 排序字段，用于图标拖拽排序
   usage_count?: number // 使用次数
+  last_launched_at?: number | null // 上次启动时间戳
 }
 
 interface CategoryData {
@@ -642,7 +644,8 @@ const saveAppData = async () => {
     const appsForBackend = apps.value.map(a => ({
       ...a,
       is_shortcut: a.is_shortcut ?? false,
-      usage_count: a.usage_count ?? 0
+      usage_count: a.usage_count ?? 0,
+      last_launched_at: a.last_launched_at ?? null
     }))
 
     await invoke('save_app_data', {
@@ -888,6 +891,22 @@ watch(filteredApps, currentApps => {
 
 const getSelectedApp = () => filteredApps.value.find(app => app.id === selectedAppId.value) || filteredApps.value[0]
 
+const formatLastLaunchTime = (timestamp?: number | null) => {
+  if (!timestamp) {
+    return t('main.tooltip.neverLaunched')
+  }
+
+  return new Date(timestamp * 1000).toLocaleString()
+}
+
+const getAppHoverInfo = (app: AppData) => {
+  return t('main.tooltip.appInfo', {
+    name: app.name,
+    count: app.usage_count ?? 0,
+    lastLaunch: formatLastLaunchTime(app.last_launched_at)
+  })
+}
+
 const getAppGridColumnCount = () => {
   const grid = document.querySelector('.app-grid') as HTMLElement | null
   if (!grid) {
@@ -996,10 +1015,14 @@ const launchApp = async (app: any) => {
       })
     }
     try {
-      const usageCount = await invoke('increment_app_usage', { appId: app.id }) as number
+      const usageStats = await invoke('increment_app_usage', { appId: app.id }) as {
+        usage_count: number
+        last_launched_at: number
+      }
       const appIndex = apps.value.findIndex(item => item.id === app.id)
       if (appIndex !== -1) {
-        apps.value[appIndex].usage_count = usageCount
+        apps.value[appIndex].usage_count = usageStats.usage_count
+        apps.value[appIndex].last_launched_at = usageStats.last_launched_at
       }
     } catch (error) {
       console.error('更新应用使用次数失败:', error)
@@ -2716,7 +2739,8 @@ const handleFileDrop = async (filePath: string) => {
       is_shortcut: fileInfo.is_shortcut,
       launch_args: '', // 默认无启动参数
       target_type: 'file', // 默认为文件类型
-      usage_count: 0
+      usage_count: 0,
+      last_launched_at: null
     }
 
     console.log('创建新应用项:', newApp)

@@ -360,8 +360,10 @@ pub async fn update_app(app: AppData) -> Result<String, String> {
 
     if let Some(existing_app) = storage.apps.iter_mut().find(|a| a.id == app.id) {
         let usage_count = app.usage_count.or(existing_app.usage_count).or(Some(0));
+        let last_launched_at = app.last_launched_at.or(existing_app.last_launched_at);
         *existing_app = app;
         existing_app.usage_count = usage_count;
+        existing_app.last_launched_at = last_launched_at;
         save_app_data(storage.apps, storage.categories, storage.selected_category)?;
         Ok("应用更新成功".to_string())
     } else {
@@ -370,14 +372,22 @@ pub async fn update_app(app: AppData) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn increment_app_usage(app_id: i64) -> Result<u32, String> {
+pub fn increment_app_usage(app_id: i64) -> Result<serde_json::Value, String> {
     let mut storage = load_app_data()?;
 
     if let Some(app) = storage.apps.iter_mut().find(|app| app.id == app_id) {
         let next_count = app.usage_count.unwrap_or(0).saturating_add(1);
+        let launch_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| format!("获取启动时间失败: {}", e))?
+            .as_secs() as i64;
         app.usage_count = Some(next_count);
+        app.last_launched_at = Some(launch_time);
         save_app_data(storage.apps, storage.categories, storage.selected_category)?;
-        Ok(next_count)
+        Ok(serde_json::json!({
+            "usage_count": next_count,
+            "last_launched_at": launch_time
+        }))
     } else {
         Err("应用不存在".to_string())
     }

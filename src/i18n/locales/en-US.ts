@@ -64,6 +64,10 @@ export default {
     sidebar: {
       allApps: 'All Apps'
     },
+    tooltip: {
+      appInfo: 'Launch item: {name}\nUsage frequency: {count}\nLast launch: {lastLaunch}',
+      neverLaunched: 'Never launched'
+    },
     contextMenu: {
       newCategory: 'New Category',
       rename: 'Rename',
