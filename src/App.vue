@@ -31,7 +31,7 @@
     <!-- 主启动器容器 -->
     <div class="launcher-container">
       <!-- 侧栏 -->
-      <div class="sidebar" :style="sidebarWidth > 0 ? { width: sidebarWidth + 'px' } : {}">
+      <div class="sidebar" :style="sidebarStyle">
         <!-- <div class="sidebar-header">
         <h2>分类</h2>
       </div> -->
@@ -475,6 +475,7 @@ const appSettings = ref({
   preventAutoHide: false, // 阻止自动隐藏
   windowWidth: undefined as number | undefined, // 窗口宽度
   windowHeight: undefined as number | undefined, // 窗口高度
+  windowLayout: 'horizontal' as string, // 窗口布局
   theme: 'auto' as string, // 主题
   gridCellSize: GRID_CELL_SIZE_DEFAULT as number, // 启动器格子大小
   sidebarWidth: 0 as number, // 侧栏宽度，0 表示自动
@@ -664,6 +665,7 @@ const loadAppSettings = async () => {
       preventAutoHide: settings.prevent_auto_hide || false,
       windowWidth: settings.window_width,
       windowHeight: settings.window_height,
+      windowLayout: settings.window_layout || 'horizontal',
       theme: settings.theme || 'auto',
       gridCellSize: clampGridCellSize(settings.icon_size ?? GRID_CELL_SIZE_DEFAULT),
       sidebarWidth: settings.sidebar_width ?? 0,
@@ -745,9 +747,19 @@ const resolvedTheme = computed(() => {
 const appContainerClasses = computed(() => ({
   'theme-dark': resolvedTheme.value === 'dark',
   'theme-light': resolvedTheme.value === 'light',
+  'layout-horizontal': appSettings.value.windowLayout !== 'vertical',
+  'layout-vertical': appSettings.value.windowLayout === 'vertical',
   'animations-disabled': !appSettings.value.enableAnimations,
   [`animation-${appSettings.value.animationSpeed || 'normal'}`]: true,
 }))
+
+const sidebarStyle = computed(() => {
+  if (appSettings.value.windowLayout === 'vertical') {
+    return {}
+  }
+
+  return sidebarWidth.value > 0 ? { width: `${sidebarWidth.value}px` } : {}
+})
 
 const appContainerStyle = computed(() => {
   const cellSize = clampGridCellSize(appSettings.value.gridCellSize)
@@ -1830,6 +1842,10 @@ const deleteAllCategories = async () => {
 
 // 拖拽调整侧栏宽度
 const startResize = (e: MouseEvent) => {
+  if (appSettings.value.windowLayout === 'vertical') {
+    return
+  }
+
   isResizing.value = true
 
   // 如果当前是自适应状态，先获取当前实际宽度
@@ -3085,6 +3101,10 @@ const clearDragState = () => {
   contain: layout;
 }
 
+.layout-vertical .launcher-container {
+  flex-direction: column;
+}
+
 /* 侧栏样式 */
 .sidebar {
   background: var(--sidebar-bg);
@@ -3099,6 +3119,15 @@ const clearDragState = () => {
   /* 优化性能 */
   contain: layout;
   will-change: width;
+}
+
+.layout-vertical .sidebar {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  min-height: 42px;
+  max-height: 120px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .sidebar-header {
@@ -3117,6 +3146,15 @@ const clearDragState = () => {
   padding: 10px 0;
   /* 优化滚动性能 */
   contain: layout style;
+}
+
+.layout-vertical .sidebar-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .category-item {
@@ -3144,6 +3182,16 @@ const clearDragState = () => {
   font-size: 13px;
 }
 
+.layout-vertical .category-item {
+  flex: 0 0 auto;
+  min-height: 30px;
+  border-radius: 4px;
+}
+
+.layout-vertical .category-item span {
+  flex: 0 1 auto;
+}
+
 /* 拖拽分隔线 */
 .resizer {
   width: 4px;
@@ -3154,6 +3202,10 @@ const clearDragState = () => {
 
 .resizer:hover {
   background: var(--accent-color);
+}
+
+.layout-vertical .resizer {
+  display: none;
 }
 
 /* 主内容区域 */

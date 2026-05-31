@@ -118,6 +118,7 @@ pub fn get_default_settings() -> AppSettings {
         window_height: Some(600),
         settings_window_width: Some(800),
         settings_window_height: Some(600),
+        window_layout: Some("horizontal".to_string()),
         theme: Some("auto".to_string()),
         icon_size: Some(88),
         sidebar_width: Some(0),
@@ -221,6 +222,9 @@ pub fn update_settings_batch(settings_update: Value) -> Result<String, String> {
     }
     if let Some(window_height) = settings_update.get("windowHeight").and_then(|v| v.as_u64()) {
         settings.window_height = Some(window_height as u32);
+    }
+    if let Some(window_layout) = settings_update.get("windowLayout").and_then(|v| v.as_str()) {
+        settings.window_layout = Some(window_layout.to_string());
     }
     if let Some(theme) = settings_update.get("theme").and_then(|v| v.as_str()) {
         settings.theme = Some(theme.to_string());

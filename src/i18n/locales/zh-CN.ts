@@ -161,6 +161,9 @@ export default {
         title: '窗口设置',
         width: '窗口宽度',
         height: '窗口高度',
+        layout: '窗口布局',
+        layoutHorizontal: '横向布局',
+        layoutVertical: '竖向布局',
         preventAutoHide: '阻止窗口自动隐藏',
         preventAutoHideDesc: '启用此选项后，窗口失去焦点时不会自动隐藏'
       },

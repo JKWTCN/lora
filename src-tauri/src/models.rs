@@ -33,6 +33,7 @@ pub struct AppSettings {
     pub window_height: Option<u32>,
     pub settings_window_width: Option<u32>,
     pub settings_window_height: Option<u32>,
+    pub window_layout: Option<String>, // "horizontal", "vertical"
     // 外观设置
     pub theme: Option<String>,
     pub icon_size: Option<u32>,

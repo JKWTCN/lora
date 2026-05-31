@@ -232,6 +232,7 @@ fn get_default_settings() -> AppSettings {
         window_height: Some(600),
         settings_window_width: Some(800),
         settings_window_height: Some(600),
+        window_layout: Some("horizontal".to_string()),
         theme: Some("auto".to_string()),
         icon_size: Some(88),
         sidebar_width: Some(0),

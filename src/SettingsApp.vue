@@ -80,6 +80,14 @@
                                 {{ $t('settings.ui.window.preventAutoHideDesc') }}
                             </p>
                         </div>
+
+                        <div class="setting-item">
+                            <label>{{ $t('settings.ui.window.layout') }}</label>
+                            <select v-model="localSettings.windowLayout" @change="updateWindowLayout">
+                                <option value="horizontal">{{ $t('settings.ui.window.layoutHorizontal') }}</option>
+                                <option value="vertical">{{ $t('settings.ui.window.layoutVertical') }}</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="settings-group">
@@ -289,6 +297,7 @@ const appUpdateDate = ref('')
 const localSettings = reactive({
     // 窗口设置
     preventAutoHide: false,
+    windowLayout: 'horizontal',
 
     // 外观设置
     theme: 'auto',
@@ -381,6 +390,17 @@ const updateTheme = async () => {
         console.log('主题设置已更新')
     } catch (error) {
         console.error('更新主题设置失败:', error)
+    }
+}
+
+const updateWindowLayout = async () => {
+    try {
+        await invoke('update_window_layout', { windowLayout: localSettings.windowLayout })
+        await notifySettingsUpdated()
+        markSaved()
+        console.log('窗口布局设置已更新')
+    } catch (error) {
+        console.error('更新窗口布局设置失败:', error)
     }
 }
 
@@ -596,6 +616,7 @@ const loadSettings = async () => {
 
         // 将后端设置映射到前端本地设置
         localSettings.preventAutoHide = settings.prevent_auto_hide || false
+        localSettings.windowLayout = settings.window_layout || 'horizontal'
         localSettings.theme = settings.theme || 'auto'
         localSettings.startMinimized = settings.start_minimized || false
         localSettings.autoHideAfterLaunch = settings.auto_hide_after_launch || false

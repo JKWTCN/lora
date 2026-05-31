@@ -199,6 +199,7 @@ pub fn run() {
             data::clear_all_data,
             data::save_apps_order,
             settings_manager::update_theme,
+            settings_manager::update_window_layout,
             settings_manager::update_icon_size,
             settings_manager::update_sidebar_width,
             settings_manager::update_animations,

@@ -33,6 +33,7 @@ pub fn get_default_settings() -> AppSettings {
         window_height: Some(600),
         settings_window_width: Some(800),
         settings_window_height: Some(600),
+        window_layout: Some("horizontal".to_string()),
         theme: Some("auto".to_string()),
         icon_size: Some(88),
         sidebar_width: Some(0),
@@ -77,6 +78,19 @@ pub fn update_theme(theme: String) -> Result<String, String> {
     settings.theme = Some(theme);
     save_app_settings(settings)?;
     Ok("主题设置已更新".to_string())
+}
+
+/// 更新窗口布局设置
+#[tauri::command]
+pub fn update_window_layout(window_layout: String) -> Result<String, String> {
+    if window_layout != "horizontal" && window_layout != "vertical" {
+        return Err("窗口布局设置无效".to_string());
+    }
+
+    let mut settings = load_app_settings()?;
+    settings.window_layout = Some(window_layout);
+    save_app_settings(settings)?;
+    Ok("窗口布局设置已更新".to_string())
 }
 
 /// 更新图标大小设置

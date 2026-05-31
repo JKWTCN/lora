@@ -161,6 +161,9 @@ export default {
         title: 'Window Settings',
         width: 'Window Width',
         height: 'Window Height',
+        layout: 'Window Layout',
+        layoutHorizontal: 'Horizontal',
+        layoutVertical: 'Vertical',
         preventAutoHide: 'Prevent Window Auto-Hide',
         preventAutoHideDesc: 'When enabled, the window will not auto-hide when it loses focus'
       },
