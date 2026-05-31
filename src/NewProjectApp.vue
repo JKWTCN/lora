@@ -252,6 +252,8 @@ const activeProjectType = ref('custom')
 const appTheme = ref('auto')
 const isLoadingStartMenu = ref(false)
 const startMenuItems = ref([])
+const builtInIconMap = ref({})
+let startMenuIconLoadId = 0
 let iconFetchTimer = null
 let iconFetchRequestId = 0
 
@@ -262,16 +264,16 @@ const projectTypes = computed(() => [
 ])
 
 const builtInPresets = computed(() => [
-    { id: 'computer', name: t('newProject.presets.computer'), icon: '🖥️', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:MyComputerFolder', targetType: 'file', iconType: 'folder' },
-    { id: 'network', name: t('newProject.presets.network'), icon: '🌐', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:NetworkPlacesFolder', targetType: 'file', iconType: 'web' },
-    { id: 'recycleBin', name: t('newProject.presets.recycleBin'), icon: '♻️', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:RecycleBinFolder', targetType: 'file', iconType: 'folder' },
-    { id: 'volumeMixer', name: t('newProject.presets.volumeMixer'), icon: '🔊', targetPath: 'C:\\Windows\\System32\\sndvol.exe', launchArgs: '', targetType: 'file', iconType: 'exe' },
-    { id: 'calculator', name: t('newProject.presets.calculator'), icon: '🧮', targetPath: 'C:\\Windows\\System32\\calc.exe', launchArgs: '', targetType: 'file', iconType: 'exe' },
-    { id: 'registryEditor', name: t('newProject.presets.registryEditor'), icon: '▥', targetPath: 'C:\\Windows\\regedit.exe', launchArgs: '', targetType: 'file', iconType: 'exe' },
-    { id: 'groupPolicy', name: t('newProject.presets.groupPolicy'), icon: '📋', targetPath: 'C:\\Windows\\System32\\gpedit.msc', launchArgs: '', targetType: 'file', iconType: 'shortcut' },
-    { id: 'shutdown', name: t('newProject.presets.shutdown'), icon: '○', targetPath: 'C:\\Windows\\System32\\shutdown.exe', launchArgs: '/s /t 0', targetType: 'file', iconType: 'exe' },
-    { id: 'restart', name: t('newProject.presets.restart'), icon: '○', targetPath: 'C:\\Windows\\System32\\shutdown.exe', launchArgs: '/r /t 0', targetType: 'file', iconType: 'exe' },
-    { id: 'sleep', name: t('newProject.presets.sleep'), icon: '○', targetPath: 'C:\\Windows\\System32\\rundll32.exe', launchArgs: 'powrprof.dll,SetSuspendState 0,1,0', targetType: 'file', iconType: 'exe' }
+    { id: 'computer', name: t('newProject.presets.computer'), icon: builtInIconMap.value.computer || '', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:MyComputerFolder', targetType: 'file', iconType: builtInIconMap.value.computer || '' },
+    { id: 'network', name: t('newProject.presets.network'), icon: builtInIconMap.value.network || '', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:NetworkPlacesFolder', targetType: 'file', iconType: builtInIconMap.value.network || '' },
+    { id: 'recycleBin', name: t('newProject.presets.recycleBin'), icon: builtInIconMap.value.recycleBin || '', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:RecycleBinFolder', targetType: 'file', iconType: builtInIconMap.value.recycleBin || '' },
+    { id: 'volumeMixer', name: t('newProject.presets.volumeMixer'), icon: builtInIconMap.value.volumeMixer || '', targetPath: 'C:\\Windows\\System32\\sndvol.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.volumeMixer || '' },
+    { id: 'calculator', name: t('newProject.presets.calculator'), icon: builtInIconMap.value.calculator || '', targetPath: 'C:\\Windows\\System32\\calc.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.calculator || '' },
+    { id: 'registryEditor', name: t('newProject.presets.registryEditor'), icon: builtInIconMap.value.registryEditor || '', targetPath: 'C:\\Windows\\regedit.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.registryEditor || '' },
+    { id: 'groupPolicy', name: t('newProject.presets.groupPolicy'), icon: builtInIconMap.value.groupPolicy || '', targetPath: 'C:\\Windows\\System32\\gpedit.msc', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.groupPolicy || '' },
+    { id: 'shutdown', name: t('newProject.presets.shutdown'), icon: builtInIconMap.value.shutdown || '', targetPath: 'C:\\Windows\\System32\\shutdown.exe', launchArgs: '/s /t 0', targetType: 'file', iconType: builtInIconMap.value.shutdown || '' },
+    { id: 'restart', name: t('newProject.presets.restart'), icon: builtInIconMap.value.restart || '', targetPath: 'C:\\Windows\\System32\\shutdown.exe', launchArgs: '/r /t 0', targetType: 'file', iconType: builtInIconMap.value.restart || '' },
+    { id: 'sleep', name: t('newProject.presets.sleep'), icon: builtInIconMap.value.sleep || '', targetPath: 'C:\\Windows\\System32\\rundll32.exe', launchArgs: 'powrprof.dll,SetSuspendState 0,1,0', targetType: 'file', iconType: builtInIconMap.value.sleep || '' }
 ])
 
 const visiblePresets = computed(() => {
@@ -332,6 +334,10 @@ watch(projectData, () => {
 watch(resolvedTheme, applyRuntimeTheme)
 
 watch(activeProjectType, async (type) => {
+    if (type === 'builtIn') {
+        await loadBuiltInIcons()
+    }
+
     if (type === 'startMenu' && startMenuItems.value.length === 0) {
         await loadStartMenuItems()
     }
@@ -605,10 +611,19 @@ const saveProject = async () => {
 }
 
 const createPresetProject = async (preset) => {
+    let icon = preset.iconType || preset.icon || ''
+    if (!icon && preset.targetPath) {
+        try {
+            icon = await invoke('get_shell_file_icon', { filePath: preset.targetPath })
+        } catch (error) {
+            console.error('获取 Shell 图标失败:', error)
+        }
+    }
+
     await createProject({
         name: preset.name,
         category: projectData.category,
-        icon: preset.iconType || preset.icon || '',
+        icon,
         targetPath: preset.targetPath || preset.path,
         launchArgs: preset.launchArgs || '',
         targetType: preset.targetType || 'file'
@@ -646,23 +661,79 @@ const loadCategories = async () => {
 }
 
 const loadStartMenuItems = async () => {
+    const loadId = ++startMenuIconLoadId
     isLoadingStartMenu.value = true
     try {
         const items = await invoke('list_start_menu_items')
         startMenuItems.value = (items || []).map(item => ({
             id: item.id,
             name: item.name,
-            icon: getFileTypeIcon(item.icon || 'shortcut'),
+            icon: '',
             targetPath: item.path,
             launchArgs: item.launch_args || '',
             targetType: item.target_type || 'file',
-            iconType: item.icon || 'shortcut'
+            iconType: ''
         }))
+        loadStartMenuIcons(loadId)
     } catch (error) {
         console.error('加载开始菜单项目失败:', error)
         startMenuItems.value = []
     } finally {
         isLoadingStartMenu.value = false
+    }
+}
+
+const loadBuiltInIcons = async () => {
+    const missingItems = builtInPresets.value.filter(item => !builtInIconMap.value[item.id])
+    if (missingItems.length === 0) {
+        return
+    }
+
+    const icons = await Promise.allSettled(missingItems.map(item => invoke('get_shell_file_icon', {
+        filePath: item.targetPath
+    })))
+
+    const nextIconMap = { ...builtInIconMap.value }
+    icons.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value) {
+            nextIconMap[missingItems[index].id] = result.value
+        }
+    })
+    builtInIconMap.value = nextIconMap
+}
+
+const loadStartMenuIcons = async (loadId) => {
+    const batchSize = 12
+
+    for (let index = 0; index < startMenuItems.value.length; index += batchSize) {
+        if (loadId !== startMenuIconLoadId) {
+            return
+        }
+
+        const batch = startMenuItems.value.slice(index, index + batchSize)
+        const icons = await Promise.allSettled(batch.map(item => invoke('get_shell_file_icon', {
+            filePath: item.targetPath
+        })))
+
+        if (loadId !== startMenuIconLoadId) {
+            return
+        }
+
+        icons.forEach((result, batchIndex) => {
+            if (result.status !== 'fulfilled' || !result.value) {
+                return
+            }
+
+            const item = batch[batchIndex]
+            const itemIndex = startMenuItems.value.findIndex(current => current.id === item.id)
+            if (itemIndex !== -1) {
+                startMenuItems.value[itemIndex] = {
+                    ...startMenuItems.value[itemIndex],
+                    icon: result.value,
+                    iconType: result.value
+                }
+            }
+        })
     }
 }
 
@@ -681,11 +752,13 @@ const loadTheme = async () => {
 onMounted(async () => {
     await loadTheme()
     await loadCategories()
+    await loadBuiltInIcons()
 })
 
 onBeforeUnmount(() => {
     clearPendingIconFetch()
     iconFetchRequestId++
+    startMenuIconLoadId++
 })
 </script>
 

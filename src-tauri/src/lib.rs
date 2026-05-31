@@ -179,6 +179,7 @@ pub fn run() {
             quit_app,
             app_launcher::get_file_info,
             app_launcher::list_start_menu_items,
+            app_launcher::get_shell_file_icon,
             app_launcher::launch_app,
             app_launcher::launch_app_with_auto_hide,
             system::open_url,

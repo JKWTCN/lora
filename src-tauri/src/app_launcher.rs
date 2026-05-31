@@ -15,7 +15,7 @@ use tauri::{AppHandle, Manager};
 
 // 导入项目内部模块
 use crate::data::load_app_settings;
-use crate::helpers::{extract_file_icon, extract_icon_from_exe, resolve_shortcut_target};
+use crate::helpers::{extract_file_icon, resolve_shortcut_target};
 use crate::models::AppSettings;
 
 fn collect_shortcuts(dir: &Path, shortcuts: &mut Vec<String>) {
@@ -67,12 +67,11 @@ pub fn list_start_menu_items() -> Result<Vec<serde_json::Value>, String> {
         .filter_map(|shortcut_path| {
             let path = Path::new(&shortcut_path);
             let name = path.file_stem()?.to_string_lossy().to_string();
-            let icon = extract_file_icon(&shortcut_path).unwrap_or_else(|| "shortcut".to_string());
 
             Some(serde_json::json!({
                 "id": shortcut_path,
                 "name": name,
-                "icon": icon,
+                "icon": "",
                 "path": shortcut_path,
                 "target_path": null,
                 "target_type": "file",
@@ -95,6 +94,131 @@ pub fn list_start_menu_items() -> Result<Vec<serde_json::Value>, String> {
     });
 
     Ok(items)
+}
+
+#[tauri::command]
+pub fn get_shell_file_icon(file_path: String) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use base64::engine::general_purpose;
+        use base64::Engine;
+        use image::{ImageBuffer, ImageEncoder, Rgba};
+        use std::mem;
+        use std::os::windows::ffi::OsStrExt;
+        use winapi::shared::windef::HICON;
+        use winapi::um::shellapi::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON};
+        use winapi::um::wingdi::{DeleteObject, GetBitmapBits, GetObjectW, BITMAP};
+        use winapi::um::winuser::{DestroyIcon, GetIconInfo, ICONINFO};
+
+        let path_w: Vec<u16> = std::ffi::OsStr::new(&file_path)
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        let mut file_info: SHFILEINFOW = unsafe { mem::zeroed() };
+        let result = unsafe {
+            SHGetFileInfoW(
+                path_w.as_ptr(),
+                0,
+                &mut file_info,
+                mem::size_of::<SHFILEINFOW>() as u32,
+                SHGFI_ICON | SHGFI_LARGEICON,
+            )
+        };
+
+        if result == 0 || file_info.hIcon.is_null() {
+            return Err("无法获取 Shell 图标".to_string());
+        }
+
+        let icon: HICON = file_info.hIcon;
+        let icon_result = (|| {
+            let mut icon_info: ICONINFO = unsafe { mem::zeroed() };
+            if unsafe { GetIconInfo(icon, &mut icon_info) } == 0 {
+                return Err("读取图标信息失败".to_string());
+            }
+
+            let mut bitmap: BITMAP = unsafe { mem::zeroed() };
+            if unsafe {
+                GetObjectW(
+                    icon_info.hbmColor as _,
+                    mem::size_of::<BITMAP>() as i32,
+                    &mut bitmap as *mut _ as _,
+                )
+            } == 0
+            {
+                unsafe {
+                    DeleteObject(icon_info.hbmColor as _);
+                    DeleteObject(icon_info.hbmMask as _);
+                }
+                return Err("读取图标位图失败".to_string());
+            }
+
+            let width = bitmap.bmWidth;
+            let height = bitmap.bmHeight;
+            let stride = bitmap.bmWidthBytes as usize;
+            let buffer_size = stride
+                .checked_mul(height as usize)
+                .ok_or_else(|| "图标位图大小无效".to_string())?;
+            let mut buffer = vec![0u8; buffer_size];
+            let copied = unsafe {
+                GetBitmapBits(
+                    icon_info.hbmColor as _,
+                    buffer_size as i32,
+                    buffer.as_mut_ptr() as _,
+                )
+            };
+
+            unsafe {
+                DeleteObject(icon_info.hbmColor as _);
+                DeleteObject(icon_info.hbmMask as _);
+            }
+
+            if copied != buffer_size as i32 {
+                return Err("复制图标位图失败".to_string());
+            }
+
+            let mut rgba_data = Vec::with_capacity((width * height * 4) as usize);
+            for y in 0..height {
+                for x in 0..width {
+                    let offset = (y * stride as i32 + x * 4) as usize;
+                    if offset + 3 < buffer.len() {
+                        rgba_data.push(buffer[offset + 2]);
+                        rgba_data.push(buffer[offset + 1]);
+                        rgba_data.push(buffer[offset]);
+                        rgba_data.push(buffer[offset + 3]);
+                    }
+                }
+            }
+
+            let image = ImageBuffer::<Rgba<u8>, _>::from_raw(width as u32, height as u32, rgba_data)
+                .ok_or_else(|| "构建图标图像失败".to_string())?;
+            let mut png_bytes = Vec::new();
+            let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
+            encoder
+                .write_image(
+                    image.as_raw(),
+                    width as u32,
+                    height as u32,
+                    image::ColorType::Rgba8,
+                )
+                .map_err(|e| format!("编码图标失败: {}", e))?;
+
+            Ok(format!(
+                "data:image/png;base64,{}",
+                general_purpose::STANDARD.encode(png_bytes)
+            ))
+        })();
+
+        unsafe {
+            DestroyIcon(icon);
+        }
+
+        icon_result
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("当前平台不支持 Shell 图标".to_string())
+    }
 }
 
 /// 获取文件信息
@@ -165,12 +289,10 @@ pub fn get_file_info(file_path: String) -> Result<serde_json::Value, String> {
     let metadata = fs::metadata(&path).map_err(|e| format!("获取文件信息失败: {}", e))?;
     let size = metadata.len();
 
-    // 提取文件图标（对于快捷方式，尝试使用目标文件的图标）
-    let icon_base64 = if is_shortcut && target_path.is_some() {
-        extract_file_icon(&actual_path)
-    } else {
-        extract_file_icon(&file_path)
-    };
+    // 使用 Windows Shell 图标缓存获取图标，避免自行解析 PE 资源造成卡顿。
+    let icon_base64 = get_app_icon(file_path.clone())
+        .ok()
+        .or_else(|| extract_file_icon(&file_path));
 
     // 生成唯一ID（使用时间戳）
     let id = std::time::SystemTime::now()
@@ -309,140 +431,7 @@ pub fn get_app_icon(file_path: String) -> Result<String, String> {
             return Err("文件不存在，无法提取图标".to_string());
         }
 
-        // 优先尝试用 Rust 解析 PE 资源中的图标
-        println!("优先尝试 Rust PE 资源解析 exe 图标");
-        match extract_icon_from_exe(&file_path) {
-            Ok(icon_data) => Ok(icon_data),
-            Err(err) => {
-                // 如果 PE 资源解析失败，尝试使用 Windows API 方法
-                println!(
-                    "Rust PE 资源解析图标失败: {}，尝试使用 Windows API 方法",
-                    err
-                );
-                use base64::engine::general_purpose;
-                use base64::Engine;
-                use image::{ImageBuffer, Rgba};
-                use std::ffi::OsStr;
-                use std::os::windows::ffi::OsStrExt;
-                use std::ptr;
-                use winapi::um::shellapi::ExtractIconExW;
-                use winapi::um::wingdi::{GetObjectW, BITMAP};
-                use winapi::um::winuser::ICONINFO;
-
-                // 转换路径为宽字符
-                let wide_path: Vec<u16> = OsStr::new(&file_path)
-                    .encode_wide()
-                    .chain(Some(0))
-                    .collect();
-                let icon_count = unsafe {
-                    ExtractIconExW(wide_path.as_ptr(), -1, ptr::null_mut(), ptr::null_mut(), 0)
-                };
-                let mut success = false;
-                let mut result_str = String::new();
-                if icon_count > 0 {
-                    let mut large_icons: Vec<winapi::shared::windef::HICON> =
-                        vec![ptr::null_mut(); icon_count as usize];
-                    let mut small_icons: Vec<winapi::shared::windef::HICON> =
-                        vec![ptr::null_mut(); icon_count as usize];
-                    let extracted = unsafe {
-                        ExtractIconExW(
-                            wide_path.as_ptr(),
-                            0,
-                            large_icons.as_mut_ptr(),
-                            small_icons.as_mut_ptr(),
-                            icon_count,
-                        )
-                    };
-                    if extracted == icon_count {
-                        let icon = large_icons.get(0).copied().unwrap_or(ptr::null_mut());
-                        if !icon.is_null() {
-                            let mut icon_info: ICONINFO = unsafe { std::mem::zeroed() };
-                            let result = unsafe {
-                                use winapi::um::winuser::GetIconInfo;
-                                GetIconInfo(icon, &mut icon_info)
-                            };
-                            if result != 0 {
-                                let mut bitmap: BITMAP = unsafe { std::mem::zeroed() };
-                                if unsafe {
-                                    GetObjectW(
-                                        icon_info.hbmColor as _,
-                                        std::mem::size_of::<BITMAP>() as i32,
-                                        &mut bitmap as *mut _ as _,
-                                    )
-                                } != 0
-                                {
-                                    let width = bitmap.bmWidth;
-                                    let height = bitmap.bmHeight;
-                                    let stride = bitmap.bmWidthBytes as usize;
-                                    let buffer_size = (stride * height as usize) as u32;
-                                    let mut buffer: Vec<u8> = vec![0; buffer_size as usize];
-                                    let bytes_copied = unsafe {
-                                        use winapi::um::wingdi::GetBitmapBits;
-                                        GetBitmapBits(
-                                            icon_info.hbmColor as _,
-                                            buffer_size as i32,
-                                            buffer.as_mut_ptr() as _,
-                                        )
-                                    };
-                                    if bytes_copied == buffer_size as i32 {
-                                        let mut rgba_data =
-                                            Vec::with_capacity((width * height * 4) as usize);
-                                        for y in 0..height {
-                                            for x in 0..width {
-                                                let offset = (y * stride as i32 + x * 4) as usize;
-                                                if offset + 3 < buffer.len() {
-                                                    rgba_data.push(buffer[offset + 2]); // R
-                                                    rgba_data.push(buffer[offset + 1]); // G
-                                                    rgba_data.push(buffer[offset + 0]); // B
-                                                    rgba_data.push(buffer[offset + 3]);
-                                                    // A
-                                                }
-                                            }
-                                        }
-                                        if let Some(img) = ImageBuffer::<Rgba<u8>, _>::from_raw(
-                                            width as u32,
-                                            height as u32,
-                                            rgba_data,
-                                        ) {
-                                            let mut png_bytes: Vec<u8> = Vec::new();
-                                            {
-                                                use image::ImageEncoder;
-
-                                                let encoder = image::codecs::png::PngEncoder::new(
-                                                    &mut png_bytes,
-                                                );
-                                                if encoder
-                                                    .write_image(
-                                                        &img,
-                                                        width as u32,
-                                                        height as u32,
-                                                        image::ColorType::Rgba8,
-                                                    )
-                                                    .is_ok()
-                                                {
-                                                    let base64_str = general_purpose::STANDARD
-                                                        .encode(&png_bytes);
-                                                    result_str = format!(
-                                                        "data:image/png;base64,{}",
-                                                        base64_str
-                                                    );
-                                                    success = true;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if success {
-                    Ok(result_str)
-                } else {
-                    Err("无法提取图标".to_string())
-                }
-            }
-        }
+        get_shell_file_icon(file_path)
     }
     #[cfg(not(target_os = "windows"))]
     {
