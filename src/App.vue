@@ -18,6 +18,9 @@
         <button class="titlebar-button" @click="toggleSearch" :title="$t('main.search.placeholder')">
           <i class="icon-search"></i>
         </button>
+        <button class="titlebar-button" @click="createNewProject" :title="$t('common.create') + ' ' + $t('newProject.title')">
+          <i class="icon-plus"></i>
+        </button>
         <button class="titlebar-button" @click="toggleMenu" :title="$t('common.settings')">
           <i class="icon-menu"></i>
         </button>

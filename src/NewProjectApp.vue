@@ -1,5 +1,5 @@
 <template>
-    <div class="new-project-app">
+    <div class="new-project-app" :class="newProjectAppClasses">
         <!-- 自定义标题栏 -->
         <!-- <div class="titlebar">
             <div class="titlebar-left" data-tauri-drag-region>
@@ -15,10 +15,52 @@
 
         <!-- 新建项目内容 -->
         <div class="new-project-content">
+            <aside class="project-type-nav">
+                <button
+                    v-for="type in projectTypes"
+                    :key="type.id"
+                    class="project-type-item"
+                    :class="{ active: activeProjectType === type.id }"
+                    type="button"
+                    @click="activeProjectType = type.id">
+                    <span class="project-type-icon">{{ type.icon }}</span>
+                    <span>{{ type.name }}</span>
+                </button>
+            </aside>
+
             <!-- 设置面板 -->
             <div class="new-project-panel">
+                <div v-if="activeProjectType !== 'custom'" class="preset-section">
+                    <div class="preset-grid">
+                        <button
+                            v-for="preset in visiblePresets"
+                            :key="preset.id"
+                            class="preset-item"
+                            :disabled="isSaving"
+                            type="button"
+                            @click="createPresetProject(preset)">
+                            <span class="preset-icon">
+                                <img
+                                    v-if="preset.icon && (preset.icon.startsWith('data:image/') || preset.icon.startsWith('http'))"
+                                    :src="preset.icon"
+                                    :alt="preset.name" />
+                                <span v-else>{{ preset.icon }}</span>
+                            </span>
+                            <span class="preset-name">{{ preset.name }}</span>
+                        </button>
+                    </div>
+
+                    <div v-if="activeProjectType === 'startMenu' && isLoadingStartMenu" class="preset-state">
+                        {{ t('common.loading') }}
+                    </div>
+
+                    <div v-if="activeProjectType === 'startMenu' && !isLoadingStartMenu && visiblePresets.length === 0" class="preset-state">
+                        {{ t('newProject.noStartMenuItems') }}
+                    </div>
+                </div>
+
                 <!-- 统一的项目设置区域 -->
-                <div class="panel-section unified-section">
+                <div v-if="activeProjectType === 'custom'" class="panel-section unified-section">
                     <div class="settings-group">
                         <!-- 第一行：项目名称和所属分组 -->
                         <div class="settings-row">
@@ -165,6 +207,14 @@
         <!-- 底栏 -->
         <div class="new-project-footer">
             <div class="footer-left">
+                <label v-if="activeProjectType !== 'custom'" class="footer-category">
+                    <span>{{ t('newProject.category') }}</span>
+                    <select v-model="projectData.category" class="footer-select">
+                        <option v-for="category in categories.filter(category => category.id !== 'all')" :key="category.id" :value="category.id">
+                            {{ category.name }}
+                        </option>
+                    </select>
+                </label>
                 <!-- <div class="save-status" :class="{ saving: isSaving, saved: lastSaved }">
                     <div class="status-icon">
                         <div v-if="isSaving" class="loading-spinner"></div>
@@ -179,7 +229,7 @@
                     <i class="icon-close"></i>
                     {{ t('common.cancel') }}
                 </button>
-                <button @click="saveProject" class="footer-button primary" :disabled="!canSave">
+                <button v-if="activeProjectType === 'custom'" @click="saveProject" class="footer-button primary" :disabled="!canSave">
                     <i class="icon-check"></i>
                     {{ t('newProject.createProject') }}
                 </button>
@@ -198,8 +248,54 @@ const { t } = useI18n()
 
 const isSaving = ref(false)
 const lastSaved = ref(false)
+const activeProjectType = ref('custom')
+const appTheme = ref('auto')
+const isLoadingStartMenu = ref(false)
+const startMenuItems = ref([])
 let iconFetchTimer = null
 let iconFetchRequestId = 0
+
+const projectTypes = computed(() => [
+    { id: 'custom', name: t('newProject.customProject'), icon: '○' },
+    { id: 'builtIn', name: t('newProject.builtInItems'), icon: '▦' },
+    { id: 'startMenu', name: t('newProject.startMenuItems'), icon: '☰' }
+])
+
+const builtInPresets = computed(() => [
+    { id: 'computer', name: t('newProject.presets.computer'), icon: '🖥️', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:MyComputerFolder', targetType: 'file', iconType: 'folder' },
+    { id: 'network', name: t('newProject.presets.network'), icon: '🌐', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:NetworkPlacesFolder', targetType: 'file', iconType: 'web' },
+    { id: 'recycleBin', name: t('newProject.presets.recycleBin'), icon: '♻️', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:RecycleBinFolder', targetType: 'file', iconType: 'folder' },
+    { id: 'volumeMixer', name: t('newProject.presets.volumeMixer'), icon: '🔊', targetPath: 'C:\\Windows\\System32\\sndvol.exe', launchArgs: '', targetType: 'file', iconType: 'exe' },
+    { id: 'calculator', name: t('newProject.presets.calculator'), icon: '🧮', targetPath: 'C:\\Windows\\System32\\calc.exe', launchArgs: '', targetType: 'file', iconType: 'exe' },
+    { id: 'registryEditor', name: t('newProject.presets.registryEditor'), icon: '▥', targetPath: 'C:\\Windows\\regedit.exe', launchArgs: '', targetType: 'file', iconType: 'exe' },
+    { id: 'groupPolicy', name: t('newProject.presets.groupPolicy'), icon: '📋', targetPath: 'C:\\Windows\\System32\\gpedit.msc', launchArgs: '', targetType: 'file', iconType: 'shortcut' },
+    { id: 'shutdown', name: t('newProject.presets.shutdown'), icon: '○', targetPath: 'C:\\Windows\\System32\\shutdown.exe', launchArgs: '/s /t 0', targetType: 'file', iconType: 'exe' },
+    { id: 'restart', name: t('newProject.presets.restart'), icon: '○', targetPath: 'C:\\Windows\\System32\\shutdown.exe', launchArgs: '/r /t 0', targetType: 'file', iconType: 'exe' },
+    { id: 'sleep', name: t('newProject.presets.sleep'), icon: '○', targetPath: 'C:\\Windows\\System32\\rundll32.exe', launchArgs: 'powrprof.dll,SetSuspendState 0,1,0', targetType: 'file', iconType: 'exe' }
+])
+
+const visiblePresets = computed(() => {
+    return activeProjectType.value === 'builtIn' ? builtInPresets.value : startMenuItems.value
+})
+
+const resolvedTheme = computed(() => {
+    if (appTheme.value === 'auto') {
+        return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    }
+
+    return appTheme.value === 'dark' ? 'dark' : 'light'
+})
+
+const newProjectAppClasses = computed(() => ({
+    'theme-dark': resolvedTheme.value === 'dark',
+    'theme-light': resolvedTheme.value === 'light'
+}))
+
+const applyRuntimeTheme = () => {
+    const body = document.body
+    body.classList.toggle('lora-theme-dark', resolvedTheme.value === 'dark')
+    body.classList.toggle('lora-theme-light', resolvedTheme.value === 'light')
+}
 
 // 分类数据
 const categories = ref([])
@@ -232,6 +328,14 @@ const canSave = computed(() => {
 watch(projectData, () => {
     lastSaved.value = false
 }, { deep: true })
+
+watch(resolvedTheme, applyRuntimeTheme)
+
+watch(activeProjectType, async (type) => {
+    if (type === 'startMenu' && startMenuItems.value.length === 0) {
+        await loadStartMenuItems()
+    }
+})
 
 // 方法
 const handleTargetTypeChange = () => {
@@ -441,8 +545,8 @@ const cancelProject = async () => {
     }
 }
 
-const saveProject = async () => {
-    if (!canSave.value) {
+const createProject = async (data) => {
+    if (!data.name?.trim() || !data.category || !data.targetPath?.trim()) {
         await alertDialog(t('newProject.fillRequiredFields'), { type: 'warning' })
         return
     }
@@ -452,14 +556,14 @@ const saveProject = async () => {
         // 创建新的应用项
         const newApp = {
             id: Date.now(),
-            name: projectData.name.trim(),
-            category: projectData.category,
-            icon: projectData.icon,
-            path: projectData.targetPath,
-            target_path: projectData.targetPath,
+            name: data.name.trim(),
+            category: data.category,
+            icon: data.icon || '',
+            path: data.targetPath,
+            target_path: data.targetPath,
             is_shortcut: false,
-            launch_args: projectData.launchArgs,
-            target_type: projectData.targetType,
+            launch_args: data.launchArgs || '',
+            target_type: data.targetType || 'file',
             usage_count: 0,
             last_launched_at: null
         }
@@ -491,6 +595,26 @@ const saveProject = async () => {
     }
 }
 
+const saveProject = async () => {
+    if (!canSave.value) {
+        await alertDialog(t('newProject.fillRequiredFields'), { type: 'warning' })
+        return
+    }
+
+    await createProject({ ...projectData })
+}
+
+const createPresetProject = async (preset) => {
+    await createProject({
+        name: preset.name,
+        category: projectData.category,
+        icon: preset.iconType || preset.icon || '',
+        targetPath: preset.targetPath || preset.path,
+        launchArgs: preset.launchArgs || '',
+        targetType: preset.targetType || 'file'
+    })
+}
+
 // 加载分类数据
 const loadCategories = async () => {
     try {
@@ -506,7 +630,7 @@ const loadCategories = async () => {
 
         // 确保"全部应用"分组始终存在
         if (!convertedCategories.some(cat => cat.id === 'all')) {
-            convertedCategories.unshift({ id: 'all', name: t('common.allApps'), icon: 'icon-apps', isDefault: true })
+            convertedCategories.unshift({ id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true })
         }
 
         categories.value = convertedCategories
@@ -521,8 +645,41 @@ const loadCategories = async () => {
     }
 }
 
+const loadStartMenuItems = async () => {
+    isLoadingStartMenu.value = true
+    try {
+        const items = await invoke('list_start_menu_items')
+        startMenuItems.value = (items || []).map(item => ({
+            id: item.id,
+            name: item.name,
+            icon: getFileTypeIcon(item.icon || 'shortcut'),
+            targetPath: item.path,
+            launchArgs: item.launch_args || '',
+            targetType: item.target_type || 'file',
+            iconType: item.icon || 'shortcut'
+        }))
+    } catch (error) {
+        console.error('加载开始菜单项目失败:', error)
+        startMenuItems.value = []
+    } finally {
+        isLoadingStartMenu.value = false
+    }
+}
+
+const loadTheme = async () => {
+    try {
+        const settings = await invoke('load_app_settings')
+        appTheme.value = settings.theme || 'auto'
+        applyRuntimeTheme()
+    } catch (error) {
+        console.error('加载主题设置失败:', error)
+        applyRuntimeTheme()
+    }
+}
+
 // 初始化
 onMounted(async () => {
+    await loadTheme()
     await loadCategories()
 })
 
@@ -541,6 +698,14 @@ onBeforeUnmount(() => {
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     overflow: hidden;
+    color: #2c3e50;
+    color-scheme: light;
+}
+
+.new-project-app.theme-dark {
+    background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+    color: #e5e7eb;
+    color-scheme: dark;
 }
 
 /* 自定义标题栏 */
@@ -608,9 +773,48 @@ onBeforeUnmount(() => {
 .new-project-content {
     flex: 1;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     min-height: 0;
     overflow-y: auto;
+}
+
+.project-type-nav {
+    width: 150px;
+    flex: 0 0 150px;
+    padding: 0;
+    background: rgba(222, 222, 222, 0.95);
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.project-type-item {
+    width: 100%;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 18px;
+    border: 0;
+    background: transparent;
+    color: #34495e;
+    text-align: left;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.project-type-item:hover {
+    background: rgba(255, 255, 255, 0.45);
+}
+
+.project-type-item.active {
+    background: rgba(255, 255, 255, 0.65);
+    color: #1f2937;
+}
+
+.project-type-icon {
+    width: 18px;
+    text-align: center;
+    color: #5b6ee1;
 }
 
 /* 设置面板 */
@@ -620,6 +824,74 @@ onBeforeUnmount(() => {
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(5px);
     padding: 16px 0;
+}
+
+.preset-section {
+    padding: 0;
+}
+
+.preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+    gap: 2px 10px;
+    align-content: start;
+    padding: 0 10px 16px;
+}
+
+.preset-item {
+    min-width: 0;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: transparent;
+    color: #2c3e50;
+    text-align: left;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.preset-item:hover {
+    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(0, 0, 0, 0.12);
+}
+
+.preset-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 32px;
+    font-size: 26px;
+}
+
+.preset-icon img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+}
+
+.preset-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.start-menu-actions {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: 14px;
+}
+
+.preset-state {
+    padding: 24px;
+    color: #7f8c8d;
+    font-size: 14px;
 }
 
 /* 面板区域 */
@@ -1038,6 +1310,125 @@ onBeforeUnmount(() => {
     box-shadow: none;
 }
 
+.footer-left {
+    min-width: 0;
+}
+
+.footer-category {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #52616f;
+    font-size: 13px;
+}
+
+.footer-select {
+    min-width: 150px;
+    padding: 7px 28px 7px 10px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #2c3e50;
+    outline: none;
+}
+
+/* 深色模式 */
+.new-project-app.theme-dark .project-type-nav {
+    background: rgba(31, 41, 55, 0.96);
+    border-right-color: rgba(255, 255, 255, 0.08);
+}
+
+.new-project-app.theme-dark .project-type-item {
+    color: #cbd5e1;
+}
+
+.new-project-app.theme-dark .project-type-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.new-project-app.theme-dark .project-type-item.active {
+    background: rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+}
+
+.new-project-app.theme-dark .new-project-panel {
+    background: rgba(17, 24, 39, 0.76);
+}
+
+.new-project-app.theme-dark .preset-item {
+    color: #e5e7eb;
+}
+
+.new-project-app.theme-dark .preset-item:hover {
+    background: rgba(31, 41, 55, 0.9);
+    border-color: rgba(96, 165, 250, 0.35);
+}
+
+.new-project-app.theme-dark .preset-state,
+.new-project-app.theme-dark .footer-category {
+    color: #94a3b8;
+}
+
+.new-project-app.theme-dark .footer-select {
+    background: rgba(15, 23, 42, 0.88);
+    border-color: rgba(148, 163, 184, 0.22);
+    color: #e5e7eb;
+}
+
+.new-project-app.theme-dark .settings-group,
+.new-project-app.theme-dark .new-project-footer {
+    background: rgba(31, 41, 55, 0.88);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+
+.new-project-app.theme-dark .setting-label,
+.new-project-app.theme-dark .section-title {
+    color: #f8fafc;
+}
+
+.new-project-app.theme-dark .label-optional,
+.new-project-app.theme-dark .input-icon,
+.new-project-app.theme-dark .save-status {
+    color: #94a3b8;
+}
+
+.new-project-app.theme-dark .setting-input {
+    background: rgba(15, 23, 42, 0.88);
+    border-color: rgba(148, 163, 184, 0.22);
+    color: #e5e7eb;
+}
+
+.new-project-app.theme-dark .setting-input::placeholder {
+    color: #64748b;
+}
+
+.new-project-app.theme-dark .setting-input:focus {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.16);
+}
+
+.new-project-app.theme-dark .icon-preview {
+    background: rgba(15, 23, 42, 0.88);
+    border-color: rgba(148, 163, 184, 0.28);
+}
+
+.new-project-app.theme-dark .footer-button.secondary {
+    background: rgba(15, 23, 42, 0.84);
+    color: #cbd5e1;
+    border-color: rgba(148, 163, 184, 0.22);
+}
+
+.new-project-app.theme-dark .footer-button.secondary:hover {
+    background: rgba(30, 41, 59, 0.95);
+    color: #f8fafc;
+}
+
+.new-project-app.theme-dark .footer-button:disabled {
+    background: #334155;
+    color: #94a3b8;
+}
+
 /* 动画 */
 @keyframes fadeInUp {
     from {
@@ -1061,8 +1452,29 @@ onBeforeUnmount(() => {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+    .new-project-content {
+        flex-direction: column;
+    }
+
+    .project-type-nav {
+        width: 100%;
+        flex: 0 0 auto;
+        display: flex;
+        border-right: 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .project-type-item {
+        justify-content: center;
+        padding: 0 10px;
+    }
+
     .panel-section {
         padding: 0 16px;
+    }
+
+    .preset-section {
+        padding: 0 16px 16px;
     }
     
     .settings-group {

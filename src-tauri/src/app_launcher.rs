@@ -18,6 +18,85 @@ use crate::data::load_app_settings;
 use crate::helpers::{extract_file_icon, extract_icon_from_exe, resolve_shortcut_target};
 use crate::models::AppSettings;
 
+fn collect_shortcuts(dir: &Path, shortcuts: &mut Vec<String>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_shortcuts(&path, shortcuts);
+            continue;
+        }
+
+        let extension = path
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        if matches!(extension.as_str(), "lnk" | "url") {
+            shortcuts.push(path.to_string_lossy().to_string());
+        }
+    }
+}
+
+#[tauri::command]
+pub fn list_start_menu_items() -> Result<Vec<serde_json::Value>, String> {
+    let mut roots = Vec::new();
+
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        roots.push(Path::new(&appdata).join("Microsoft\\Windows\\Start Menu\\Programs"));
+    }
+
+    if let Ok(program_data) = std::env::var("ProgramData") {
+        roots.push(Path::new(&program_data).join("Microsoft\\Windows\\Start Menu\\Programs"));
+    }
+
+    let mut shortcuts = Vec::new();
+    for root in roots {
+        collect_shortcuts(&root, &mut shortcuts);
+    }
+
+    shortcuts.sort();
+    shortcuts.dedup();
+
+    let mut items: Vec<serde_json::Value> = shortcuts
+        .into_iter()
+        .filter_map(|shortcut_path| {
+            let path = Path::new(&shortcut_path);
+            let name = path.file_stem()?.to_string_lossy().to_string();
+            let icon = extract_file_icon(&shortcut_path).unwrap_or_else(|| "shortcut".to_string());
+
+            Some(serde_json::json!({
+                "id": shortcut_path,
+                "name": name,
+                "icon": icon,
+                "path": shortcut_path,
+                "target_path": null,
+                "target_type": "file",
+                "launch_args": ""
+            }))
+        })
+        .collect();
+
+    items.sort_by(|a, b| {
+        a.get("name")
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+            .to_lowercase()
+            .cmp(
+                &b.get("name")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("")
+                    .to_lowercase(),
+            )
+    });
+
+    Ok(items)
+}
+
 /// 获取文件信息
 ///
 /// 此函数用于获取指定文件的详细信息，包括文件名、扩展名、大小等。
