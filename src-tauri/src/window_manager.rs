@@ -40,6 +40,34 @@ fn remember_settings_window_size(window: &tauri::WebviewWindow) {
     }
 }
 
+fn remember_new_project_window_size(window: &tauri::WebviewWindow) {
+    let Ok(size) = window.inner_size() else {
+        return;
+    };
+    let scale_factor = window.scale_factor().unwrap_or(1.0);
+    let logical_size = size.to_logical::<u32>(scale_factor);
+
+    if logical_size.width < 500 || logical_size.height < 400 {
+        return;
+    }
+
+    match crate::data::load_app_settings() {
+        Ok(mut settings) => {
+            settings.new_project_window_width = Some(logical_size.width);
+            settings.new_project_window_height = Some(logical_size.height);
+            if let Err(error) = crate::data::save_app_settings(settings) {
+                eprintln!("保存新建项目窗口大小失败: {}", error);
+            } else {
+                println!(
+                    "新建项目窗口大小已保存: {}x{}",
+                    logical_size.width, logical_size.height
+                );
+            }
+        }
+        Err(error) => eprintln!("加载设置以保存新建项目窗口大小失败: {}", error),
+    }
+}
+
 /// 显示/隐藏主窗口
 #[tauri::command]
 pub async fn toggle_window_visibility(app: tauri::AppHandle) -> Result<String, String> {
@@ -328,6 +356,15 @@ pub async fn open_new_project_window(
     // 克隆状态以便在闭包中使用
     let state_clone = state.new_project_window_open.clone();
 
+    let (new_project_width, new_project_height) = crate::data::load_app_settings()
+        .map(|settings| {
+            (
+                settings.new_project_window_width.unwrap_or(600) as f64,
+                settings.new_project_window_height.unwrap_or(500) as f64,
+            )
+        })
+        .unwrap_or((600.0, 500.0));
+
     println!("open_new_project_window: 创建新的新建项目窗口...");
     // 创建新的新建项目窗口
     let new_project_window = tauri::WebviewWindowBuilder::new(
@@ -336,7 +373,7 @@ pub async fn open_new_project_window(
         tauri::WebviewUrl::App("new-project.html".into()),
     )
     .title("新建项目")
-    .inner_size(600.0, 500.0)
+    .inner_size(new_project_width, new_project_height)
     .min_inner_size(500.0, 400.0)
     .center()
     .resizable(true)
@@ -347,9 +384,11 @@ pub async fn open_new_project_window(
 
     println!("open_new_project_window: 新建项目窗口创建成功，设置事件监听器");
     // 监听窗口关闭事件
+    let new_project_window_for_event = new_project_window.clone();
     new_project_window.on_window_event(move |event| {
         if let tauri::WindowEvent::CloseRequested { .. } = event {
             println!("open_new_project_window: 新建项目窗口关闭事件触发");
+            remember_new_project_window_size(&new_project_window_for_event);
             // 窗口关闭时更新状态
             if let Ok(mut new_project_open) = state_clone.lock() {
                 *new_project_open = false;
@@ -381,6 +420,7 @@ pub async fn close_new_project_window(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     if let Some(new_project_window) = app.get_webview_window("new_project") {
+        remember_new_project_window_size(&new_project_window);
         new_project_window
             .close()
             .map_err(|e| format!("关闭新建项目窗口失败: {}", e))?;

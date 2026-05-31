@@ -1,5 +1,5 @@
 <template>
-    <div class="new-project-app" :class="newProjectAppClasses">
+    <div class="new-project-app" :class="newProjectAppClasses" @click="hideStartMenuContextMenu">
         <!-- 自定义标题栏 -->
         <!-- <div class="titlebar">
             <div class="titlebar-left" data-tauri-drag-region>
@@ -31,14 +31,24 @@
             <!-- 设置面板 -->
             <div class="new-project-panel">
                 <div v-if="activeProjectType !== 'custom'" class="preset-section">
+                    <div v-if="activeProjectType === 'startMenu'" class="start-menu-search">
+                        <input
+                            v-model="startMenuSearchQuery"
+                            type="text"
+                            class="start-menu-search-input"
+                            :placeholder="t('newProject.searchStartMenuPlaceholder')" />
+                    </div>
+
                     <div class="preset-grid">
                         <button
                             v-for="preset in visiblePresets"
                             :key="preset.id"
                             class="preset-item"
                             :disabled="isSaving"
+                            :title="getPresetTitle(preset)"
                             type="button"
-                            @click="createPresetProject(preset)">
+                            @click.stop="createPresetProject(preset)"
+                            @contextmenu.prevent.stop="showStartMenuContextMenu($event, preset)">
                             <span class="preset-icon">
                                 <img
                                     v-if="preset.icon && (preset.icon.startsWith('data:image/') || preset.icon.startsWith('http'))"
@@ -204,6 +214,18 @@
             </div>
         </div>
 
+        <Teleport to="body">
+            <div
+                v-if="startMenuContextMenu.visible"
+                class="new-project-context-menu"
+                :style="{ left: startMenuContextMenu.x + 'px', top: startMenuContextMenu.y + 'px' }"
+                @click.stop>
+                <button class="context-menu-item" type="button" @click="openStartMenuItemLocation">
+                    {{ t('main.contextMenu.openFileLocation') }}
+                </button>
+            </div>
+        </Teleport>
+
         <!-- 底栏 -->
         <div class="new-project-footer">
             <div class="footer-left">
@@ -252,7 +274,14 @@ const activeProjectType = ref('custom')
 const appTheme = ref('auto')
 const isLoadingStartMenu = ref(false)
 const startMenuItems = ref([])
+const startMenuSearchQuery = ref('')
 const builtInIconMap = ref({})
+const startMenuContextMenu = reactive({
+    visible: false,
+    x: 0,
+    y: 0,
+    item: null
+})
 let startMenuIconLoadId = 0
 let iconFetchTimer = null
 let iconFetchRequestId = 0
@@ -271,13 +300,47 @@ const builtInPresets = computed(() => [
     { id: 'calculator', name: t('newProject.presets.calculator'), icon: builtInIconMap.value.calculator || '', targetPath: 'C:\\Windows\\System32\\calc.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.calculator || '' },
     { id: 'registryEditor', name: t('newProject.presets.registryEditor'), icon: builtInIconMap.value.registryEditor || '', targetPath: 'C:\\Windows\\regedit.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.registryEditor || '' },
     { id: 'groupPolicy', name: t('newProject.presets.groupPolicy'), icon: builtInIconMap.value.groupPolicy || '', targetPath: 'C:\\Windows\\System32\\gpedit.msc', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.groupPolicy || '' },
+    { id: 'controlPanel', name: t('newProject.presets.controlPanel'), icon: builtInIconMap.value.controlPanel || '', targetPath: 'C:\\Windows\\System32\\control.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.controlPanel || '' },
+    { id: 'taskManager', name: t('newProject.presets.taskManager'), icon: builtInIconMap.value.taskManager || '', targetPath: 'C:\\Windows\\System32\\Taskmgr.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.taskManager || '' },
+    { id: 'cmd', name: t('newProject.presets.cmd'), icon: builtInIconMap.value.cmd || '', targetPath: 'C:\\Windows\\System32\\cmd.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.cmd || '' },
+    { id: 'powershell', name: t('newProject.presets.powershell'), icon: builtInIconMap.value.powershell || '', targetPath: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.powershell || '' },
+    { id: 'notepad', name: t('newProject.presets.notepad'), icon: builtInIconMap.value.notepad || '', targetPath: 'C:\\Windows\\System32\\notepad.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.notepad || '' },
+    { id: 'paint', name: t('newProject.presets.paint'), icon: builtInIconMap.value.paint || '', targetPath: 'C:\\Windows\\System32\\mspaint.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.paint || '' },
+    { id: 'wordpad', name: t('newProject.presets.wordpad'), icon: builtInIconMap.value.wordpad || '', targetPath: 'C:\\Program Files\\Windows NT\\Accessories\\wordpad.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.wordpad || '' },
+    { id: 'services', name: t('newProject.presets.services'), icon: builtInIconMap.value.services || '', targetPath: 'C:\\Windows\\System32\\services.msc', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.services || '' },
+    { id: 'deviceManager', name: t('newProject.presets.deviceManager'), icon: builtInIconMap.value.deviceManager || '', targetPath: 'C:\\Windows\\System32\\devmgmt.msc', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.deviceManager || '' },
+    { id: 'diskManagement', name: t('newProject.presets.diskManagement'), icon: builtInIconMap.value.diskManagement || '', targetPath: 'C:\\Windows\\System32\\diskmgmt.msc', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.diskManagement || '' },
+    { id: 'eventViewer', name: t('newProject.presets.eventViewer'), icon: builtInIconMap.value.eventViewer || '', targetPath: 'C:\\Windows\\System32\\eventvwr.msc', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.eventViewer || '' },
+    { id: 'systemInfo', name: t('newProject.presets.systemInfo'), icon: builtInIconMap.value.systemInfo || '', targetPath: 'C:\\Windows\\System32\\msinfo32.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.systemInfo || '' },
+    { id: 'remoteDesktop', name: t('newProject.presets.remoteDesktop'), icon: builtInIconMap.value.remoteDesktop || '', targetPath: 'C:\\Windows\\System32\\mstsc.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.remoteDesktop || '' },
+    { id: 'snippingTool', name: t('newProject.presets.snippingTool'), icon: builtInIconMap.value.snippingTool || '', targetPath: 'C:\\Windows\\System32\\SnippingTool.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.snippingTool || '' },
+    { id: 'characterMap', name: t('newProject.presets.characterMap'), icon: builtInIconMap.value.characterMap || '', targetPath: 'C:\\Windows\\System32\\charmap.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.characterMap || '' },
+    { id: 'magnifier', name: t('newProject.presets.magnifier'), icon: builtInIconMap.value.magnifier || '', targetPath: 'C:\\Windows\\System32\\Magnify.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.magnifier || '' },
+    { id: 'osk', name: t('newProject.presets.osk'), icon: builtInIconMap.value.osk || '', targetPath: 'C:\\Windows\\System32\\osk.exe', launchArgs: '', targetType: 'file', iconType: builtInIconMap.value.osk || '' },
+    { id: 'runDialog', name: t('newProject.presets.runDialog'), icon: builtInIconMap.value.runDialog || '', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:::{2559a1f3-21d7-11d4-bdaf-00c04f60b9f0}', targetType: 'file', iconType: builtInIconMap.value.runDialog || '' },
+    { id: 'downloads', name: t('newProject.presets.downloads'), icon: builtInIconMap.value.downloads || '', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:Downloads', targetType: 'file', iconType: builtInIconMap.value.downloads || '' },
+    { id: 'documents', name: t('newProject.presets.documents'), icon: builtInIconMap.value.documents || '', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:Personal', targetType: 'file', iconType: builtInIconMap.value.documents || '' },
+    { id: 'pictures', name: t('newProject.presets.pictures'), icon: builtInIconMap.value.pictures || '', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:My Pictures', targetType: 'file', iconType: builtInIconMap.value.pictures || '' },
+    { id: 'startupFolder', name: t('newProject.presets.startupFolder'), icon: builtInIconMap.value.startupFolder || '', targetPath: 'C:\\Windows\\explorer.exe', launchArgs: 'shell:Startup', targetType: 'file', iconType: builtInIconMap.value.startupFolder || '' },
     { id: 'shutdown', name: t('newProject.presets.shutdown'), icon: builtInIconMap.value.shutdown || '', targetPath: 'C:\\Windows\\System32\\shutdown.exe', launchArgs: '/s /t 0', targetType: 'file', iconType: builtInIconMap.value.shutdown || '' },
     { id: 'restart', name: t('newProject.presets.restart'), icon: builtInIconMap.value.restart || '', targetPath: 'C:\\Windows\\System32\\shutdown.exe', launchArgs: '/r /t 0', targetType: 'file', iconType: builtInIconMap.value.restart || '' },
     { id: 'sleep', name: t('newProject.presets.sleep'), icon: builtInIconMap.value.sleep || '', targetPath: 'C:\\Windows\\System32\\rundll32.exe', launchArgs: 'powrprof.dll,SetSuspendState 0,1,0', targetType: 'file', iconType: builtInIconMap.value.sleep || '' }
 ])
 
 const visiblePresets = computed(() => {
-    return activeProjectType.value === 'builtIn' ? builtInPresets.value : startMenuItems.value
+    if (activeProjectType.value === 'builtIn') {
+        return builtInPresets.value
+    }
+
+    const query = startMenuSearchQuery.value.trim().toLowerCase()
+    if (!query) {
+        return startMenuItems.value
+    }
+
+    return startMenuItems.value.filter(item => {
+        return [item.name, item.targetPath]
+            .some(value => (value || '').toLowerCase().includes(query))
+    })
 })
 
 const resolvedTheme = computed(() => {
@@ -334,6 +397,8 @@ watch(projectData, () => {
 watch(resolvedTheme, applyRuntimeTheme)
 
 watch(activeProjectType, async (type) => {
+    hideStartMenuContextMenu()
+
     if (type === 'builtIn') {
         await loadBuiltInIcons()
     }
@@ -548,6 +613,46 @@ const cancelProject = async () => {
         await invoke('close_new_project_window')
     } catch (error) {
         console.error('关闭新建项目窗口失败:', error)
+    }
+}
+
+const getPresetTitle = (preset) => {
+    if (activeProjectType.value !== 'startMenu') {
+        return preset.name
+    }
+
+    return `${preset.name}\n${t('common.path')}: ${preset.targetPath || ''}`
+}
+
+const showStartMenuContextMenu = (event, item) => {
+    if (activeProjectType.value !== 'startMenu') {
+        return
+    }
+
+    startMenuContextMenu.visible = true
+    startMenuContextMenu.x = event.clientX
+    startMenuContextMenu.y = event.clientY
+    startMenuContextMenu.item = item
+}
+
+const hideStartMenuContextMenu = () => {
+    startMenuContextMenu.visible = false
+    startMenuContextMenu.item = null
+}
+
+const openStartMenuItemLocation = async () => {
+    const item = startMenuContextMenu.item
+    hideStartMenuContextMenu()
+
+    if (!item?.targetPath) {
+        return
+    }
+
+    try {
+        await invoke('open_file_location', { filePath: item.targetPath })
+    } catch (error) {
+        console.error('打开开始菜单项目位置失败:', error)
+        await alertDialog(t('main.alert.openFileLocationFailed', { error: String(error) }), { type: 'error' })
     }
 }
 
@@ -903,6 +1008,28 @@ onBeforeUnmount(() => {
     padding: 0;
 }
 
+.start-menu-search {
+    padding: 0 10px 10px;
+}
+
+.start-menu-search-input {
+    width: 100%;
+    box-sizing: border-box;
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #2c3e50;
+    font-size: 14px;
+    outline: none;
+}
+
+.start-menu-search-input:focus {
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.12);
+}
+
 .preset-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
@@ -965,6 +1092,35 @@ onBeforeUnmount(() => {
     padding: 24px;
     color: #7f8c8d;
     font-size: 14px;
+}
+
+.new-project-context-menu {
+    position: fixed;
+    z-index: 3000;
+    min-width: 150px;
+    padding: 5px 0;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+}
+
+.new-project-context-menu .context-menu-item {
+    width: 100%;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    border: 0;
+    background: transparent;
+    color: #2c3e50;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.new-project-context-menu .context-menu-item:hover {
+    background: rgba(52, 152, 219, 0.12);
 }
 
 /* 面板区域 */
@@ -1432,6 +1588,21 @@ onBeforeUnmount(() => {
     color: #e5e7eb;
 }
 
+.new-project-app.theme-dark .start-menu-search-input {
+    background: rgba(15, 23, 42, 0.88);
+    border-color: rgba(148, 163, 184, 0.22);
+    color: #e5e7eb;
+}
+
+.new-project-app.theme-dark .start-menu-search-input::placeholder {
+    color: #64748b;
+}
+
+.new-project-app.theme-dark .start-menu-search-input:focus {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.16);
+}
+
 .new-project-app.theme-dark .preset-item:hover {
     background: rgba(31, 41, 55, 0.9);
     border-color: rgba(96, 165, 250, 0.35);
@@ -1500,6 +1671,20 @@ onBeforeUnmount(() => {
 .new-project-app.theme-dark .footer-button:disabled {
     background: #334155;
     color: #94a3b8;
+}
+
+:global(body.lora-theme-dark) .new-project-context-menu {
+    background: rgba(31, 41, 55, 0.98);
+    border-color: rgba(148, 163, 184, 0.22);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.36);
+}
+
+:global(body.lora-theme-dark) .new-project-context-menu .context-menu-item {
+    color: #e5e7eb;
+}
+
+:global(body.lora-theme-dark) .new-project-context-menu .context-menu-item:hover {
+    background: rgba(96, 165, 250, 0.16);
 }
 
 /* 动画 */
