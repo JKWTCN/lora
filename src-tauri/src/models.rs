@@ -14,6 +14,7 @@ pub struct AppData {
     pub launch_args: Option<String>, // 启动参数
     pub target_type: Option<String>, // 目标类型: file, folder, url
     pub order: Option<i32>,          // 排序字段，用于图标拖拽排序
+    pub usage_count: Option<u32>,    // 使用次数
 }
 
 // 分类数据结构
@@ -64,7 +65,7 @@ pub struct AppSettings {
     pub window_position_y: Option<i32>,
     pub last_search_query: Option<String>,
     pub grid_view_enabled: Option<bool>,
-    pub sort_order: Option<String>, // "name", "date_added", "date_modified", "frequency"
+    pub sort_order: Option<String>, // "manual", "name", "frequency"
     pub show_hidden_files: Option<bool>,
 }
 

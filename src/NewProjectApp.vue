@@ -459,7 +459,8 @@ const saveProject = async () => {
             target_path: projectData.targetPath,
             is_shortcut: false,
             launch_args: projectData.launchArgs,
-            target_type: projectData.targetType
+            target_type: projectData.targetType,
+            usage_count: 0
         }
 
         // 调用后端保存应用数据

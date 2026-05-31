@@ -220,7 +220,12 @@ export default {
         searchInPath: '搜索文件路径',
         searchInPathDesc: '在搜索时包含文件路径信息',
         maxResults: '最大搜索结果数',
-        results: '{count} 个'
+        results: '{count} 个',
+        sortOrder: '应用排序方式',
+        sortManual: '手动排序',
+        sortName: '按名称排序',
+        sortFrequency: '按使用频率排序',
+        sortOrderDesc: '使用频率会在应用成功启动后自动累计'
       },
       data: {
         title: '数据管理',

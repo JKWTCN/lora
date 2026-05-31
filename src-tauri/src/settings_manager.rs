@@ -59,7 +59,7 @@ pub fn get_default_settings() -> AppSettings {
         window_position_y: None,
         last_search_query: None,
         grid_view_enabled: Some(false),
-        sort_order: Some("name".to_string()),
+        sort_order: Some("manual".to_string()),
         show_hidden_files: Some(false),
     }
 }
@@ -276,6 +276,19 @@ pub fn update_max_search_results(max_search_results: u32) -> Result<String, Stri
     settings.max_search_results = Some(max_search_results);
     save_app_settings(settings)?;
     Ok("最大搜索结果设置已更新".to_string())
+}
+
+/// 更新排序方式设置
+#[tauri::command]
+pub fn update_sort_order(sort_order: String) -> Result<String, String> {
+    if !matches!(sort_order.as_str(), "manual" | "name" | "frequency") {
+        return Err("排序方式无效".to_string());
+    }
+
+    let mut settings = load_app_settings()?;
+    settings.sort_order = Some(sort_order);
+    save_app_settings(settings)?;
+    Ok("排序方式设置已更新".to_string())
 }
 
 /// 更新自动备份设置

@@ -71,6 +71,9 @@ pub fn load_app_data() -> Result<AppStorage, String> {
             app.order = Some(*next_order);
             *next_order += 1;
         }
+        if app.usage_count.is_none() {
+            app.usage_count = Some(0);
+        }
     }
 
     Ok(storage)
@@ -143,7 +146,7 @@ pub fn get_default_settings() -> AppSettings {
         window_position_y: None,
         last_search_query: None,
         grid_view_enabled: Some(false),
-        sort_order: Some("name".to_string()),
+        sort_order: Some("manual".to_string()),
         show_hidden_files: Some(false),
     }
 }
@@ -342,6 +345,10 @@ pub fn save_selected_category(category_id: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn add_new_app(app: AppData) -> Result<String, String> {
     let mut storage = load_app_data()?;
+    let mut app = app;
+    if app.usage_count.is_none() {
+        app.usage_count = Some(0);
+    }
     storage.apps.push(app);
     save_app_data(storage.apps, storage.categories, storage.selected_category)?;
     Ok("应用添加成功".to_string())
@@ -352,9 +359,25 @@ pub async fn update_app(app: AppData) -> Result<String, String> {
     let mut storage = load_app_data()?;
 
     if let Some(existing_app) = storage.apps.iter_mut().find(|a| a.id == app.id) {
+        let usage_count = app.usage_count.or(existing_app.usage_count).or(Some(0));
         *existing_app = app;
+        existing_app.usage_count = usage_count;
         save_app_data(storage.apps, storage.categories, storage.selected_category)?;
         Ok("应用更新成功".to_string())
+    } else {
+        Err("应用不存在".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn increment_app_usage(app_id: i64) -> Result<u32, String> {
+    let mut storage = load_app_data()?;
+
+    if let Some(app) = storage.apps.iter_mut().find(|app| app.id == app_id) {
+        let next_count = app.usage_count.unwrap_or(0).saturating_add(1);
+        app.usage_count = Some(next_count);
+        save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+        Ok(next_count)
     } else {
         Err("应用不存在".to_string())
     }

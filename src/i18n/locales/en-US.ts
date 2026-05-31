@@ -220,7 +220,12 @@ export default {
         searchInPath: 'Search File Paths',
         searchInPathDesc: 'Include file path information in search',
         maxResults: 'Maximum Search Results',
-        results: '{count} items'
+        results: '{count} items',
+        sortOrder: 'Application Sort Order',
+        sortManual: 'Manual Order',
+        sortName: 'By Name',
+        sortFrequency: 'By Usage Frequency',
+        sortOrderDesc: 'Usage frequency is counted automatically after an application launches successfully'
       },
       data: {
         title: 'Data Management',

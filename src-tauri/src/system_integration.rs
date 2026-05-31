@@ -258,7 +258,7 @@ fn get_default_settings() -> AppSettings {
         window_position_y: None,
         last_search_query: None,
         grid_view_enabled: Some(false),
-        sort_order: Some("name".to_string()),
+        sort_order: Some("manual".to_string()),
         show_hidden_files: Some(false),
     }
 }

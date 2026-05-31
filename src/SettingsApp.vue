@@ -215,6 +215,18 @@
                                 <option :value="100">100 {{ $t('settings.features.search.results') }}</option>
                             </select>
                         </div>
+
+                        <div class="setting-item">
+                            <label>{{ $t('settings.features.search.sortOrder') }}</label>
+                            <select v-model="localSettings.sortOrder" @change="updateSortOrder">
+                                <option value="manual">{{ $t('settings.features.search.sortManual') }}</option>
+                                <option value="name">{{ $t('settings.features.search.sortName') }}</option>
+                                <option value="frequency">{{ $t('settings.features.search.sortFrequency') }}</option>
+                            </select>
+                            <p class="setting-description">
+                                {{ $t('settings.features.search.sortOrderDesc') }}
+                            </p>
+                        </div>
                     </div>
 
                     <div class="settings-group">
@@ -326,6 +338,7 @@ const localSettings = reactive({
     fuzzySearch: true,
     searchInPath: false,
     maxSearchResults: 20,
+    sortOrder: 'manual',
 
     // 数据管理
     autoBackup: true,
@@ -535,6 +548,17 @@ const updateMaxSearchResults = async () => {
     }
 }
 
+const updateSortOrder = async () => {
+    try {
+        await invoke('update_sort_order', { sortOrder: localSettings.sortOrder })
+        await notifySettingsUpdated()
+        markSaved()
+        console.log('排序方式设置已更新')
+    } catch (error) {
+        console.error('更新排序方式设置失败:', error)
+    }
+}
+
 const updateAutoBackup = async () => {
     try {
         await invoke('update_auto_backup', { autoBackup: localSettings.autoBackup })
@@ -648,6 +672,7 @@ const loadSettings = async () => {
         localSettings.fuzzySearch = settings.fuzzy_search !== false
         localSettings.searchInPath = settings.search_in_path || false
         localSettings.maxSearchResults = settings.max_search_results || 20
+        localSettings.sortOrder = settings.sort_order || 'manual'
         localSettings.autoBackup = settings.auto_backup !== false
         localSettings.backupInterval = settings.backup_interval || 'weekly'
 

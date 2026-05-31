@@ -345,6 +345,7 @@ interface AppData {
   launch_args?: string // 启动参数
   target_type?: 'file' | 'folder' | 'url' // 目标类型
   order?: number // 排序字段，用于图标拖拽排序
+  usage_count?: number // 使用次数
 }
 
 interface CategoryData {
@@ -483,7 +484,7 @@ const appSettings = ref({
   enableAnimations: true as boolean, // 启用动画
   animationSpeed: 'normal' as string, // 动画速度
   gridViewEnabled: false as boolean, // 网格视图
-  sortOrder: 'name' as string, // 排序方式
+  sortOrder: 'manual' as string, // 排序方式
   showHiddenFiles: false as boolean, // 显示隐藏文件
   fuzzySearch: true as boolean, // 模糊搜索
   searchInPath: false as boolean, // 搜索路径
@@ -640,7 +641,8 @@ const saveAppData = async () => {
     // 确保每个 app 包含后端期望的字段，避免缺少 is_shortcut 导致错误
     const appsForBackend = apps.value.map(a => ({
       ...a,
-      is_shortcut: a.is_shortcut ?? false
+      is_shortcut: a.is_shortcut ?? false,
+      usage_count: a.usage_count ?? 0
     }))
 
     await invoke('save_app_data', {
@@ -674,7 +676,7 @@ const loadAppSettings = async () => {
       enableAnimations: settings.enable_animations !== false,
       animationSpeed: settings.animation_speed || 'normal',
       gridViewEnabled: settings.grid_view_enabled || false,
-      sortOrder: settings.sort_order || 'name',
+      sortOrder: settings.sort_order || 'manual',
       showHiddenFiles: settings.show_hidden_files || false,
       fuzzySearch: settings.fuzzy_search !== false,
       searchInPath: settings.search_in_path || false,
@@ -844,11 +846,25 @@ const filteredApps = computed(() => {
     console.log('按搜索词筛选后:', result)
   }
 
-  // 按 order 字段排序
+  // 按设置排序。历史设置值 name 之前实际按拖拽顺序展示，因此未知值按手动顺序兜底。
   result = [...result].sort((a, b) => {
     const aOrder = a.order ?? Number.MAX_SAFE_INTEGER
     const bOrder = b.order ?? Number.MAX_SAFE_INTEGER
-    return aOrder - bOrder
+    const orderResult = aOrder - bOrder
+
+    if (appSettings.value.sortOrder === 'frequency') {
+      const frequencyResult = (b.usage_count ?? 0) - (a.usage_count ?? 0)
+      if (frequencyResult !== 0) {
+        return frequencyResult
+      }
+      return orderResult || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    }
+
+    if (appSettings.value.sortOrder === 'name') {
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || orderResult
+    }
+
+    return orderResult
   })
 
   if (searchQuery.value) {
@@ -978,6 +994,15 @@ const launchApp = async (app: any) => {
         appPath: targetPath,
         launchArgs: app.launch_args || ''
       })
+    }
+    try {
+      const usageCount = await invoke('increment_app_usage', { appId: app.id }) as number
+      const appIndex = apps.value.findIndex(item => item.id === app.id)
+      if (appIndex !== -1) {
+        apps.value[appIndex].usage_count = usageCount
+      }
+    } catch (error) {
+      console.error('更新应用使用次数失败:', error)
     }
     await hideAfterLaunchIfNeeded()
     console.log('启动成功')
@@ -2690,7 +2715,8 @@ const handleFileDrop = async (filePath: string) => {
       target_path: fileInfo.target_path,
       is_shortcut: fileInfo.is_shortcut,
       launch_args: '', // 默认无启动参数
-      target_type: 'file' // 默认为文件类型
+      target_type: 'file', // 默认为文件类型
+      usage_count: 0
     }
 
     console.log('创建新应用项:', newApp)
