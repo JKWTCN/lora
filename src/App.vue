@@ -15,7 +15,6 @@
         <span class="app-title" data-tauri-drag-region>{{ $t('app.title') }}</span>
       </div>
       <div class="titlebar-right">
-        <LanguageSwitch />
         <button class="titlebar-button" @click="toggleSearch" :title="$t('main.search.placeholder')">
           <i class="icon-search"></i>
         </button>
@@ -154,9 +153,6 @@
           <div class="context-menu-item" @click="openSettings">
             <span>{{ $t('common.settings') }}</span>
           </div>
-          <!-- <div class="context-menu-item" @click="openLanguageSettings">
-            <span>{{ $t('language.switch') }}</span>
-          </div> -->
           <div class="context-menu-divider"></div>
           <div class="context-menu-item context-menu-item-danger" @click="confirmExit">
             <span>{{ $t('main.confirm.exit') }}</span>
@@ -329,7 +325,6 @@ import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { LogicalSize } from '@tauri-apps/api/dpi'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from 'vue-i18n'
-import LanguageSwitch from './components/LanguageSwitch.vue'
 import { alertDialog, confirmDialog } from './utils/customDialog'
 
 const { t } = useI18n()

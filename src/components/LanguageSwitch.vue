@@ -1,5 +1,5 @@
 <template>
-  <div class="language-switch">
+  <div class="language-switch" :class="[`language-switch-${variant}`, { 'language-switch-dark': dark }]">
     <button 
       class="language-button" 
       @click="toggleLanguage"
@@ -32,6 +32,14 @@ import { setLanguage, getCurrentLanguage } from '../i18n'
 import type { SupportedLocale } from '../i18n/types'
 
 const { locale } = useI18n()
+
+withDefaults(defineProps<{
+  variant?: 'titlebar' | 'settings'
+  dark?: boolean
+}>(), {
+  variant: 'titlebar',
+  dark: false
+})
 
 const showDropdown = ref(false)
 
@@ -105,6 +113,32 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.language-switch-settings .language-button {
+  width: 100%;
+  max-width: 220px;
+  height: 34px;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #172033;
+}
+
+.language-switch-settings .language-button:hover {
+  background: #eef6ff;
+  border-color: #2f9ae0;
+}
+
+.language-switch-settings.language-switch-dark .language-button {
+  background: #111827;
+  border-color: #334155;
+  color: #e5edf7;
+}
+
+.language-switch-settings.language-switch-dark .language-button:hover {
+  background: #22364d;
+  border-color: #38bdf8;
+}
+
 .language-icon {
   font-size: 16px;
 }
@@ -132,6 +166,12 @@ onUnmounted(() => {
   min-width: 140px;
 }
 
+.language-switch-settings .language-dropdown {
+  left: 0;
+  right: auto;
+  width: min(220px, 100%);
+}
+
 .language-option {
   display: flex;
   align-items: center;
@@ -149,6 +189,24 @@ onUnmounted(() => {
 .language-option.active {
   background-color: #e3f2fd;
   color: #1976d2;
+}
+
+.language-switch-dark .language-dropdown {
+  background: #111827;
+  border-color: #334155;
+}
+
+.language-switch-dark .language-option {
+  color: #e5edf7;
+}
+
+.language-switch-dark .language-option:hover {
+  background-color: #1f2937;
+}
+
+.language-switch-dark .language-option.active {
+  background-color: #22364d;
+  color: #e0f2fe;
 }
 
 .language-flag {

@@ -102,6 +102,11 @@
                             </select>
                         </div>
 
+                        <div class="setting-item">
+                            <label>{{ $t('language.switch') }}</label>
+                            <LanguageSwitch variant="settings" :dark="resolvedTheme === 'dark'" />
+                        </div>
+
                         <div class="setting-item setting-note">
                             <p>{{ $t('settings.ui.appearance.gridCellSizeHint') }}</p>
                         </div>
@@ -294,6 +299,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { emit, emitTo, listen } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
 import { alertDialog, confirmDialog } from './utils/customDialog'
+import LanguageSwitch from './components/LanguageSwitch.vue'
 
 const { t } = useI18n()
 
