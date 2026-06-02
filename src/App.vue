@@ -305,7 +305,7 @@
               <!-- 默认图标 (应用名称首字母) -->
               <div v-else class="default-icon">{{ app.name.charAt(0) }}</div>
             </div>
-            <div class="app-name">{{ app.name }}</div>
+            <div v-if="appSettings.projectNamePosition !== 'none'" class="app-name">{{ app.name }}</div>
           </div>
         </div>
 
@@ -871,8 +871,11 @@ const sidebarStyle = computed(() => {
 
 const appContainerStyle = computed(() => {
   const cellSize = clampGridCellSize(appSettings.value.gridCellSize)
-  const iconSize = Math.min(84, Math.max(32, Math.round(cellSize * 0.58)))
-  const cellHeight = Math.max(cellSize, iconSize + 30)
+  const hideProjectName = appSettings.value.projectNamePosition === 'none'
+  const iconSize = hideProjectName
+    ? Math.max(32, cellSize - 12)
+    : Math.min(84, Math.max(32, Math.round(cellSize * 0.58)))
+  const cellHeight = hideProjectName ? cellSize : Math.max(cellSize, iconSize + 30)
 
   return {
     '--app-icon-size': `${iconSize}px`,
@@ -3725,6 +3728,10 @@ const clearDragState = () => {
 .name-position-left .app-name {
   order: -1;
   text-align: right;
+}
+
+.name-position-none .app-icon {
+  margin-bottom: 0;
 }
 
 .app-icon img {

@@ -110,7 +110,7 @@ pub fn update_icon_size(icon_size: u32) -> Result<String, String> {
 pub fn update_project_name_position(project_name_position: String) -> Result<String, String> {
     if !matches!(
         project_name_position.as_str(),
-        "top" | "bottom" | "left" | "right"
+        "none" | "top" | "bottom" | "left" | "right"
     ) {
         return Err("项目名称显示位置无效".to_string());
     }

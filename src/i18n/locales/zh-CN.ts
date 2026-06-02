@@ -179,6 +179,7 @@ export default {
         dark: '深色',
         iconSize: '应用图标大小',
         projectNamePosition: '项目名称显示位置',
+        namePositionNone: '无',
         namePositionTop: '上',
         namePositionBottom: '下',
         namePositionLeft: '左',

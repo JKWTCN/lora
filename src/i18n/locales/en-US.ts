@@ -179,6 +179,7 @@ export default {
         dark: 'Dark',
         iconSize: 'Application Icon Size',
         projectNamePosition: 'Project Name Position',
+        namePositionNone: 'None',
         namePositionTop: 'Top',
         namePositionBottom: 'Bottom',
         namePositionLeft: 'Left',

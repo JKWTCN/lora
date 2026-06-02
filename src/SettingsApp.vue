@@ -114,6 +114,7 @@
                         <div class="setting-item">
                             <label>{{ $t('settings.ui.appearance.projectNamePosition') }}</label>
                             <select v-model="localSettings.projectNamePosition" @change="updateProjectNamePosition">
+                                <option value="none">{{ $t('settings.ui.appearance.namePositionNone') }}</option>
                                 <option value="top">{{ $t('settings.ui.appearance.namePositionTop') }}</option>
                                 <option value="bottom">{{ $t('settings.ui.appearance.namePositionBottom') }}</option>
                                 <option value="left">{{ $t('settings.ui.appearance.namePositionLeft') }}</option>
