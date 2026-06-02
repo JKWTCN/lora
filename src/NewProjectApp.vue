@@ -669,6 +669,7 @@ const createProject = async (data) => {
             id: Date.now(),
             name: data.name.trim(),
             category: data.category,
+            category_ids: [data.category],
             icon: data.icon || '',
             path: data.targetPath,
             target_path: data.targetPath,

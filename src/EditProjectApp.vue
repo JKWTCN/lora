@@ -429,6 +429,7 @@ const saveProject = async () => {
             id: projectData.id,
             name: projectData.name.trim(),
             category: projectData.category,
+            category_ids: [projectData.category],
             icon: projectData.icon,
             path: projectData.targetPath,
             target_path: projectData.targetPath,

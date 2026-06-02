@@ -14,14 +14,39 @@ pub fn get_app_data_dir() -> Result<std::path::PathBuf, String> {
     Ok(data_dir)
 }
 
+fn normalize_app_categories(app: &mut AppData) {
+    let mut category_ids: Vec<String> = Vec::new();
+
+    if !app.category.trim().is_empty() {
+        category_ids.push(app.category.clone());
+    }
+
+    for category_id in std::mem::take(&mut app.category_ids) {
+        if !category_id.trim().is_empty() && !category_ids.contains(&category_id) {
+            category_ids.push(category_id);
+        }
+    }
+
+    if category_ids.is_empty() {
+        category_ids.push("all".to_string());
+    }
+
+    app.category = category_ids[0].clone();
+    app.category_ids = category_ids;
+}
+
 #[tauri::command]
 pub fn save_app_data(
-    apps: Vec<AppData>,
+    mut apps: Vec<AppData>,
     categories: Vec<CategoryData>,
     selected_category: Option<String>,
 ) -> Result<String, String> {
     let data_dir = get_app_data_dir()?;
     let file_path = data_dir.join("apps.json");
+
+    for app in &mut apps {
+        normalize_app_categories(app);
+    }
 
     let storage = AppStorage {
         apps,
@@ -65,6 +90,8 @@ pub fn load_app_data() -> Result<AppStorage, String> {
         std::collections::HashMap::new();
 
     for app in &mut storage.apps {
+        normalize_app_categories(app);
+
         if app.order.is_none() {
             let category = &app.category;
             let next_order = category_order_map.entry(category.clone()).or_insert(0);
@@ -328,7 +355,8 @@ pub fn update_app_category(app_id: i64, new_category: String) -> Result<String, 
     let mut storage = load_app_data()?;
 
     if let Some(app) = storage.apps.iter_mut().find(|app| app.id == app_id) {
-        app.category = new_category;
+        app.category = new_category.clone();
+        app.category_ids = vec![new_category];
         save_app_data(storage.apps, storage.categories, storage.selected_category)?;
         Ok("应用分类更新成功".to_string())
     } else {
@@ -348,6 +376,7 @@ pub fn save_selected_category(category_id: String) -> Result<String, String> {
 pub async fn add_new_app(app: AppData) -> Result<String, String> {
     let mut storage = load_app_data()?;
     let mut app = app;
+    normalize_app_categories(&mut app);
     if app.usage_count.is_none() {
         app.usage_count = Some(0);
     }
@@ -359,6 +388,8 @@ pub async fn add_new_app(app: AppData) -> Result<String, String> {
 #[tauri::command]
 pub async fn update_app(app: AppData) -> Result<String, String> {
     let mut storage = load_app_data()?;
+    let mut app = app;
+    normalize_app_categories(&mut app);
 
     if let Some(existing_app) = storage.apps.iter_mut().find(|a| a.id == app.id) {
         let usage_count = app.usage_count.or(existing_app.usage_count).or(Some(0));

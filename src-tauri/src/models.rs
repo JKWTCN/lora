@@ -7,6 +7,8 @@ pub struct AppData {
     pub id: i64,
     pub name: String,
     pub category: String,
+    #[serde(default)]
+    pub category_ids: Vec<String>,
     pub icon: String,
     pub path: String,
     pub target_path: Option<String>, // 用于快捷方式的实际目标路径

@@ -337,6 +337,7 @@ interface AppData {
   id: number
   name: string
   category: string
+  category_ids?: string[]
   icon: string
   path: string
   target_path?: string
@@ -529,6 +530,55 @@ const categories = ref<CategoryData[]>([
 // 应用数据
 const apps = ref<AppData[]>([])
 
+const getAppCategoryIds = (app: AppData) => {
+  const ids = Array.isArray(app.category_ids) && app.category_ids.length > 0
+    ? app.category_ids
+    : [app.category]
+
+  return [...new Set(ids.filter(categoryId => !!categoryId))]
+}
+
+const normalizeAppCategories = (app: AppData) => {
+  const categoryIds = getAppCategoryIds(app)
+  const normalizedIds = categoryIds.length > 0 ? categoryIds : ['all']
+  app.category = normalizedIds[0]
+  app.category_ids = normalizedIds
+  return normalizedIds
+}
+
+const appBelongsToCategory = (app: AppData, categoryId: string) => {
+  return categoryId === 'all' || getAppCategoryIds(app).includes(categoryId)
+}
+
+const setAppSingleCategory = (app: AppData, categoryId: string) => {
+  app.category = categoryId
+  app.category_ids = [categoryId]
+}
+
+const addAppCategory = (app: AppData, categoryId: string) => {
+  const categoryIds = getAppCategoryIds(app)
+  if (categoryIds.includes(categoryId)) {
+    return false
+  }
+
+  app.category_ids = [...categoryIds, categoryId]
+  app.category = app.category_ids[0]
+  return true
+}
+
+const removeAppCategories = (app: AppData, categoryIdsToRemove: string[]) => {
+  const idsToRemove = new Set(categoryIdsToRemove)
+  const remainingIds = getAppCategoryIds(app).filter(categoryId => !idsToRemove.has(categoryId))
+
+  if (remainingIds.length === 0) {
+    return false
+  }
+
+  app.category = remainingIds[0]
+  app.category_ids = remainingIds
+  return true
+}
+
 // 确保"全部应用"分组始终存在
 const ensureDefaultCategory = () => {
   const hasAllCategory = categories.value.some(cat => cat.id === 'all')
@@ -587,7 +637,9 @@ const loadAppData = async () => {
     console.log('从后端加载的数据:', storage)
 
     // 批量更新而不是逐个赋值
-    Object.assign(apps, { value: storage.apps || [] })
+    const loadedApps = (storage.apps || []) as AppData[]
+    loadedApps.forEach(normalizeAppCategories)
+    Object.assign(apps, { value: loadedApps })
 
     // 转换后端的 is_default 为前端使用的 isDefault
     const categoriesFromBackend = storage.categories || []
@@ -639,12 +691,17 @@ const saveAppData = async () => {
     })).map(({ isDefault, ...rest }) => rest) // 完全移除 isDefault 字段
 
     // 确保每个 app 包含后端期望的字段，避免缺少 is_shortcut 导致错误
-    const appsForBackend = apps.value.map(a => ({
+    const appsForBackend = apps.value.map(a => {
+      const categoryIds = getAppCategoryIds(a)
+      return {
       ...a,
+      category: categoryIds[0] || 'all',
+      category_ids: categoryIds.length > 0 ? categoryIds : ['all'],
       is_shortcut: a.is_shortcut ?? false,
       usage_count: a.usage_count ?? 0,
       last_launched_at: a.last_launched_at ?? null
-    }))
+    }
+    })
 
     await invoke('save_app_data', {
       apps: appsForBackend,
@@ -836,7 +893,7 @@ const filteredApps = computed(() => {
 
   // 按分类筛选
   if (selectedCategory.value !== 'all') {
-    result = result.filter(app => app.category === selectedCategory.value)
+    result = result.filter(app => appBelongsToCategory(app, selectedCategory.value))
     console.log('按分类筛选后:', result)
   }
 
@@ -1452,7 +1509,7 @@ const moveAppToCategory = async (categoryId: string) => {
   if (appContextMenu.value.app) {
     const appIndex = apps.value.findIndex(app => app.id === appContextMenu.value.app.id)
     if (appIndex !== -1) {
-      apps.value[appIndex].category = categoryId
+      setAppSingleCategory(apps.value[appIndex], categoryId)
       console.log(`已将 ${appContextMenu.value.app.name} 移动到分类: ${categoryId}`)
 
       // 保存数据
@@ -1463,32 +1520,18 @@ const moveAppToCategory = async (categoryId: string) => {
   hideAppContextMenu()
 }
 
-const createUniqueAppId = () => {
-  let id = Date.now() + Math.floor(Math.random() * 1000)
-
-  while (apps.value.some(app => app.id === id)) {
-    id += 1
-  }
-
-  return id
-}
-
 const copyAppToCategory = async (categoryId: string) => {
   if (appContextMenu.value.app) {
-    const targetApps = apps.value.filter(app => app.category === categoryId)
-    const maxOrder = targetApps.reduce((max, app) => Math.max(max, app.order ?? -1), -1)
-    const copiedApp: AppData = {
-      ...appContextMenu.value.app,
-      id: createUniqueAppId(),
-      category: categoryId,
-      order: maxOrder + 1
+    const appIndex = apps.value.findIndex(app => app.id === appContextMenu.value.app.id)
+    if (appIndex !== -1) {
+      const changed = addAppCategory(apps.value[appIndex], categoryId)
+      if (changed) {
+        console.log(`已将 ${appContextMenu.value.app.name} 复制到分类: ${categoryId}`)
+
+        // 保存数据
+        await saveAppData()
+      }
     }
-
-    apps.value.push(copiedApp)
-    console.log(`已将 ${appContextMenu.value.app.name} 复制到分类: ${categoryId}`)
-
-    // 保存数据
-    await saveAppData()
   }
 
   hideCopyToSubmenu()
@@ -1542,11 +1585,21 @@ const deleteSpecificApp = async (appToDelete: AppData | null) => {
   if (appToDelete) {
     if (await confirmDialog(t('main.confirm.deleteApp', { name: appToDelete.name }))) {
       try {
-        // 调用后端删除
-        await invoke('delete_app', { appId: appToDelete.id })
+        const appIndex = apps.value.findIndex(app => app.id === appToDelete.id)
+        const shouldRemoveFromCategory = selectedCategory.value !== 'all' &&
+          appIndex !== -1 &&
+          appBelongsToCategory(apps.value[appIndex], selectedCategory.value) &&
+          getAppCategoryIds(apps.value[appIndex]).length > 1
 
-        // 从前端数组中移除
-        apps.value = apps.value.filter(app => app.id !== appToDelete.id)
+        if (shouldRemoveFromCategory) {
+          removeAppCategories(apps.value[appIndex], [selectedCategory.value])
+          await saveAppData()
+        } else {
+          // 在"全部应用"中删除，或应用只属于当前分组时，删除应用实体
+          await invoke('delete_app', { appId: appToDelete.id })
+          apps.value = apps.value.filter(app => app.id !== appToDelete.id)
+        }
+
         if (selectedAppId.value === appToDelete.id) {
           selectedAppId.value = filteredApps.value[0]?.id ?? null
         }
@@ -1570,22 +1623,20 @@ const deleteAllApps = async () => {
 
   if (await confirmDialog(t('main.confirm.deleteAllApps'))) {
     try {
-      // 获取要删除的应用列表
-      const appsToDelete = selectedCategory.value === 'all'
-        ? apps.value
-        : apps.value.filter(app => app.category === selectedCategory.value)
-
-      // 删除每个应用
-      for (const app of appsToDelete) {
-        await invoke('delete_app', { appId: app.id })
-      }
-
       // 从前端数组中移除
       if (selectedCategory.value === 'all') {
         apps.value = []
       } else {
-        apps.value = apps.value.filter(app => app.category !== selectedCategory.value)
+        const categoryId = selectedCategory.value
+        apps.value = apps.value.filter(app => {
+          if (!appBelongsToCategory(app, categoryId)) {
+            return true
+          }
+          return removeAppCategories(app, [categoryId])
+        })
       }
+
+      await saveAppData()
 
       console.log('已删除所有应用')
     } catch (error) {
@@ -1671,7 +1722,11 @@ const confirmEditApp = async () => {
     const appIndex = apps.value.findIndex(app => app.id === editAppDialog.value.app!.id)
     if (appIndex !== -1) {
       apps.value[appIndex].name = editAppDialog.value.editedName.trim()
-      apps.value[appIndex].category = editAppDialog.value.editedCategory
+      if (apps.value[appIndex].category !== editAppDialog.value.editedCategory) {
+        setAppSingleCategory(apps.value[appIndex], editAppDialog.value.editedCategory)
+      } else {
+        normalizeAppCategories(apps.value[appIndex])
+      }
       apps.value[appIndex].icon = editAppDialog.value.editedIcon
       apps.value[appIndex].target_path = editAppDialog.value.editedTargetPath
       apps.value[appIndex].launch_args = editAppDialog.value.editedLaunchArgs
@@ -1812,7 +1867,7 @@ const deleteCategory = async () => {
     const categoryId = categoryToDelete.id
 
     // 确认删除操作
-    const appsInCategory = apps.value.filter(app => app.category === categoryId)
+    const appsInCategory = apps.value.filter(app => appBelongsToCategory(app, categoryId))
     const confirmMessage = appsInCategory.length > 0
       ? t('main.confirm.deleteCategory', { name: categoryToDelete.name, count: appsInCategory.length })
       : t('main.confirm.deleteCategoryEmpty', { name: categoryToDelete.name })
@@ -1821,17 +1876,13 @@ const deleteCategory = async () => {
       return
     }
 
-    // 删除该分类下的所有应用
-    for (const app of appsInCategory) {
-      try {
-        await invoke('delete_app', { appId: app.id })
-      } catch (error) {
-        console.error('删除应用失败:', error)
+    // 从前端数组中移除该分类关联；只属于该分类的应用会被删除
+    apps.value = apps.value.filter(app => {
+      if (!appBelongsToCategory(app, categoryId)) {
+        return true
       }
-    }
-
-    // 从前端数组中移除该分类下的应用
-    apps.value = apps.value.filter(app => app.category !== categoryId)
+      return removeAppCategories(app, [categoryId])
+    })
 
     // 删除分类
     categories.value = categories.value.filter(cat => cat.id !== categoryId)
@@ -1857,7 +1908,7 @@ const deleteAllCategories = async () => {
 
   // 计算要删除的应用数量
   const deletedCategoryIds = customCategories.map(cat => cat.id)
-  const appsToDelete = apps.value.filter(app => deletedCategoryIds.includes(app.category))
+  const appsToDelete = apps.value.filter(app => getAppCategoryIds(app).some(categoryId => deletedCategoryIds.includes(categoryId)))
 
   const confirmMessage = appsToDelete.length > 0
     ? t('main.confirm.deleteAllCategories', { groupCount: customCategories.length, appCount: appsToDelete.length })
@@ -1867,17 +1918,13 @@ const deleteAllCategories = async () => {
     return
   }
 
-  // 删除所有自定义分组下的应用
-  for (const app of appsToDelete) {
-    try {
-      await invoke('delete_app', { appId: app.id })
-    } catch (error) {
-      console.error('删除应用失败:', error)
+  // 从前端数组中移除被删除分组关联；只属于这些分组的应用会被删除
+  apps.value = apps.value.filter(app => {
+    if (!getAppCategoryIds(app).some(categoryId => deletedCategoryIds.includes(categoryId))) {
+      return true
     }
-  }
-
-  // 从前端数组中移除被删除分组下的应用
-  apps.value = apps.value.filter(app => !deletedCategoryIds.includes(app.category))
+    return removeAppCategories(app, deletedCategoryIds)
+  })
 
   // 只保留默认分组
   categories.value = categories.value.filter(cat => cat.isDefault)
@@ -2731,6 +2778,7 @@ const handleFileDrop = async (filePath: string) => {
       id: Date.now() + Math.floor(Math.random() * 1000), // 避免ID冲突，使用整数
       name: fileInfo.name,
       category: selectedCategory.value === 'all' ? (defaultCategory || 'all') : selectedCategory.value,
+      category_ids: [selectedCategory.value === 'all' ? (defaultCategory || 'all') : selectedCategory.value],
       icon: fileInfo.icon || '', // 使用后端返回的图标标识符
       path: fileInfo.path,
       target_path: fileInfo.target_path,
@@ -2878,7 +2926,7 @@ const reorderApps = async (sourceApp: AppData, sourceIndex: number, targetIndex:
 
   const currentApps = selectedCategory.value === 'all'
     ? [...apps.value]
-    : apps.value.filter(app => app.category === selectedCategory.value)
+    : apps.value.filter(app => appBelongsToCategory(app, selectedCategory.value))
 
   if (sourceIndex < 0 || sourceIndex >= currentApps.length || targetIndex >= currentApps.length) {
     return
