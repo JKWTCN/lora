@@ -27,6 +27,7 @@ pub struct CategoryData {
     pub name: String,
     pub icon: String,
     pub is_default: bool,
+    pub order: Option<i32>, // 侧栏分组排序字段
 }
 
 // 应用设置结构

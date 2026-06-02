@@ -38,9 +38,11 @@
         <h2>分类</h2>
       </div> -->
         <div class="sidebar-content" @contextmenu.prevent="showContextMenu($event, null)">
-          <div v-for="category in categories" :key="category.id" class="category-item"
-            :class="{ active: selectedCategory === category.id }" @click="selectCategory(category.id)"
-            @contextmenu.prevent="showContextMenu($event, category)">
+          <div v-for="(category, index) in categories" :key="category.id" class="category-item"
+            :class="{ active: selectedCategory === category.id }" :data-category-index="index"
+            @click="handleCategoryClick(category.id)"
+            @contextmenu.prevent="showContextMenu($event, category)"
+            @pointerdown="handleCategoryPointerDown($event, category, index)">
             <span>{{ category.name }}</span>
           </div>
         </div>
@@ -354,6 +356,7 @@ interface CategoryData {
   name: string
   icon: string
   isDefault: boolean
+  order?: number
 }
 
 // 响应式数据
@@ -386,6 +389,19 @@ let pointerDragState: {
 } | null = null
 let suppressNextAppClick = false
 const appSortDragThreshold = 6
+
+let categoryPointerDragState: {
+  category: CategoryData
+  sourceIndex: number
+  targetIndex: number
+  startX: number
+  startY: number
+  pointerId: number
+  dragging: boolean
+} | null = null
+let suppressNextCategoryClick = false
+const categorySortDragThreshold = 6
+let lastInternalSortDragEndAt = 0
 
 // 右键菜单相关
 const contextMenu = ref<{
@@ -524,7 +540,7 @@ const searchInputRef = ref(null)
 
 // 分类数据
 const categories = ref<CategoryData[]>([
-  { id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true },
+  { id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true, order: 0 },
 ])
 
 // 应用数据
@@ -583,8 +599,35 @@ const removeAppCategories = (app: AppData, categoryIdsToRemove: string[]) => {
 const ensureDefaultCategory = () => {
   const hasAllCategory = categories.value.some(cat => cat.id === 'all')
   if (!hasAllCategory) {
-    categories.value.unshift({ id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true })
+    categories.value.unshift({ id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true, order: 0 })
   }
+
+  categories.value = normalizeCategoryOrder(categories.value)
+}
+
+const normalizeCategoryOrder = (categoryList: CategoryData[]) => {
+  const defaultCategories = categoryList.filter(category => category.id === 'all' || category.isDefault)
+  const customCategories = categoryList.filter(category => category.id !== 'all' && !category.isDefault)
+
+  const sortedDefaults = defaultCategories.sort((a, b) => {
+    if (a.id === 'all') {
+      return -1
+    }
+    if (b.id === 'all') {
+      return 1
+    }
+    return (a.order ?? 0) - (b.order ?? 0)
+  })
+
+  const sortedCustoms = customCategories.sort((a, b) => {
+    const orderResult = (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
+    return orderResult || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  })
+
+  return [...sortedDefaults, ...sortedCustoms].map((category, index) => ({
+    ...category,
+    order: index
+  }))
 }
 
 // 获取合适的默认分组（用于新应用）
@@ -647,7 +690,8 @@ const loadAppData = async () => {
       id: category.id,
       name: category.name,
       icon: category.icon,
-      isDefault: category.is_default
+      isDefault: category.is_default,
+      order: category.order
     }))
 
     Object.assign(categories, { value: convertedCategories })
@@ -668,7 +712,7 @@ const loadAppData = async () => {
     console.error('加载应用数据失败:', error)
     // 使用默认数据
     categories.value = [
-      { id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true }
+      { id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true, order: 0 }
     ]
     apps.value = []
     selectedCategory.value = 'all'
@@ -686,6 +730,7 @@ const saveAppData = async () => {
     // 转换前端的 isDefault 为后端期望的 is_default
     const categoriesForBackend = categories.value.map(category => ({
       ...category,
+      order: category.order ?? 0,
       is_default: category.isDefault,
       isDefault: undefined // 移除前端字段
     })).map(({ isDefault, ...rest }) => rest) // 完全移除 isDefault 字段
@@ -996,6 +1041,14 @@ const moveSelectedApp = (offset: number) => {
 }
 
 // 方法
+const handleCategoryClick = async (categoryId: string) => {
+  if (suppressNextCategoryClick) {
+    return
+  }
+
+  await selectCategory(categoryId)
+}
+
 const selectCategory = async (categoryId: string) => {
   selectedCategory.value = categoryId
 
@@ -1652,7 +1705,8 @@ const createNewCategory = async () => {
     id: newId,
     name: t('main.contextMenu.newCategory'),
     icon: 'icon-apps',
-    isDefault: false
+    isDefault: false,
+    order: categories.value.length
   }
 
   categories.value.push(newCategory)
@@ -2485,11 +2539,23 @@ const handleDragStart = () => {
 
 // 处理窗口拖拽结束
 const handleDragEnd = () => {
+  if (!isDraggingWindow.value) {
+    return
+  }
+
   // 延迟重置拖拽状态，确保拖拽完全结束
   setTimeout(() => {
     isDraggingWindow.value = false
     console.log('结束拖拽窗口')
   }, 200)
+}
+
+const isInternalSortDragActive = () => {
+  return Boolean(pointerDragState?.dragging || categoryPointerDragState?.dragging)
+}
+
+const didInternalSortDragJustEnd = () => {
+  return Date.now() - lastInternalSortDragEndAt < 500
 }
 
 // 窗口聚焦处理函数
@@ -2525,7 +2591,7 @@ const handleWindowBlur = async () => {
 
     setTimeout(async () => {
       // 只有当鼠标不在窗口内且不在拖动窗口时才隐藏窗口
-      if (!isMouseInWindow.value && !isDraggingWindow.value) {
+      if (!isMouseInWindow.value && !isDraggingWindow.value && !isInternalSortDragActive() && !didInternalSortDragJustEnd()) {
         try {
           console.log('窗口失去焦点且鼠标不在窗口内且未拖动窗口，隐藏到托盘')
           const { getCurrentWindow } = await import('@tauri-apps/api/window')
@@ -2551,6 +2617,8 @@ onUnmounted(() => {
 
   // 清理拖拽功能
   cleanupDragAndDrop()
+  clearCategoryDragState()
+  clearDragState()
 
   // 清理全局键盘监听器
   document.removeEventListener('keydown', handleGlobalKeydown)
@@ -2910,6 +2978,159 @@ const cleanupDragAndDrop = () => {
 
 // ===== 图标拖拽排序相关函数 =====
 
+const saveCategoriesOrder = async () => {
+  categories.value = categories.value.map((category, index) => ({
+    ...category,
+    order: index
+  }))
+
+  await saveAppData()
+}
+
+const reorderCategories = async (sourceCategory: CategoryData, sourceIndex: number, targetIndex: number) => {
+  if (sourceCategory.isDefault || sourceCategory.id === 'all') {
+    return
+  }
+  if (sourceIndex === targetIndex || sourceIndex <= 0 || targetIndex <= 0) {
+    return
+  }
+  if (sourceIndex >= categories.value.length || targetIndex >= categories.value.length) {
+    return
+  }
+
+  const nextCategories = [...categories.value]
+  nextCategories.splice(sourceIndex, 1)
+  nextCategories.splice(targetIndex, 0, sourceCategory)
+  categories.value = nextCategories.map((category, index) => ({
+    ...category,
+    order: index
+  }))
+
+  await saveCategoriesOrder()
+}
+
+const getCategoryItemIndexAtPoint = (x: number, y: number) => {
+  const target = document.elementFromPoint(x, y) as HTMLElement | null
+  const categoryItem = target?.closest('.category-item') as HTMLElement | null
+  if (!categoryItem) {
+    return -1
+  }
+
+  return parseInt(categoryItem.dataset.categoryIndex || '-1')
+}
+
+const updateCategoryDragTarget = (targetIndex: number) => {
+  document.querySelectorAll('.category-item.drag-target').forEach(el => {
+    el.classList.remove('drag-target')
+  })
+
+  if (targetIndex <= 0 || targetIndex === categoryPointerDragState?.sourceIndex) {
+    return
+  }
+
+  const targetItem = document.querySelector(`.category-item[data-category-index="${targetIndex}"]`)
+  targetItem?.classList.add('drag-target')
+}
+
+const startPointerCategorySort = (event: PointerEvent) => {
+  if (!categoryPointerDragState || categoryPointerDragState.dragging) {
+    return
+  }
+
+  categoryPointerDragState.dragging = true
+  suppressNextCategoryClick = true
+
+  const categoryItem = document.querySelector(`.category-item[data-category-index="${categoryPointerDragState.sourceIndex}"]`)
+  categoryItem?.classList.add('dragging')
+
+  document.body.classList.add('category-sort-dragging')
+  event.preventDefault()
+}
+
+const handleCategoryPointerMove = (event: PointerEvent) => {
+  if (!categoryPointerDragState || categoryPointerDragState.pointerId !== event.pointerId) {
+    return
+  }
+
+  const distance = Math.hypot(
+    event.clientX - categoryPointerDragState.startX,
+    event.clientY - categoryPointerDragState.startY
+  )
+
+  if (!categoryPointerDragState.dragging && distance >= categorySortDragThreshold) {
+    startPointerCategorySort(event)
+  }
+
+  if (!categoryPointerDragState.dragging) {
+    return
+  }
+
+  event.preventDefault()
+  const targetIndex = getCategoryItemIndexAtPoint(event.clientX, event.clientY)
+  categoryPointerDragState.targetIndex = targetIndex
+  updateCategoryDragTarget(targetIndex)
+}
+
+const handleCategoryPointerUp = async (event: PointerEvent) => {
+  if (!categoryPointerDragState || categoryPointerDragState.pointerId !== event.pointerId) {
+    return
+  }
+
+  const dragState = categoryPointerDragState
+
+  if (dragState.dragging) {
+    event.preventDefault()
+    event.stopPropagation()
+    await reorderCategories(dragState.category, dragState.sourceIndex, dragState.targetIndex)
+  }
+
+  clearCategoryDragState()
+}
+
+const handleCategoryPointerDown = (event: PointerEvent, category: CategoryData, index: number) => {
+  if (event.button !== 0 || category.isDefault || category.id === 'all') {
+    return
+  }
+
+  categoryPointerDragState = {
+    category,
+    sourceIndex: index,
+    targetIndex: index,
+    startX: event.clientX,
+    startY: event.clientY,
+    pointerId: event.pointerId,
+    dragging: false
+  }
+
+  document.addEventListener('pointermove', handleCategoryPointerMove)
+  document.addEventListener('pointerup', handleCategoryPointerUp)
+  document.addEventListener('pointercancel', handleCategoryPointerUp)
+}
+
+const clearCategoryDragState = () => {
+  if (categoryPointerDragState?.dragging) {
+    lastInternalSortDragEndAt = Date.now()
+  }
+
+  categoryPointerDragState = null
+
+  document.removeEventListener('pointermove', handleCategoryPointerMove)
+  document.removeEventListener('pointerup', handleCategoryPointerUp)
+  document.removeEventListener('pointercancel', handleCategoryPointerUp)
+  document.body.classList.remove('category-sort-dragging')
+
+  document.querySelectorAll('.category-item.dragging').forEach(el => {
+    el.classList.remove('dragging')
+  })
+  document.querySelectorAll('.category-item.drag-target').forEach(el => {
+    el.classList.remove('drag-target')
+  })
+
+  setTimeout(() => {
+    suppressNextCategoryClick = false
+  }, 0)
+}
+
 const saveAppsOrder = async () => {
   try {
     await invoke('save_apps_order', { apps: apps.value })
@@ -3053,6 +3274,10 @@ const handleAppPointerDown = (event: PointerEvent, app: AppData, index: number) 
 
 // 清除拖拽状态
 const clearDragState = () => {
+  if (pointerDragState?.dragging) {
+    lastInternalSortDragEndAt = Date.now()
+  }
+
   isDraggingApp = false
   pointerDragState = null
 
@@ -3260,7 +3485,7 @@ const clearDragState = () => {
   display: flex;
   align-items: center;
   padding: 8px 12px;
-  cursor: pointer;
+  cursor: grab;
   transition: background-color 0.2s ease;
   white-space: nowrap;
   /* 优化悬停效果 */
@@ -3273,6 +3498,25 @@ const clearDragState = () => {
 
 .category-item.active {
   background: var(--accent-color);
+}
+
+.category-item[data-category-index="0"] {
+  cursor: pointer;
+}
+
+.category-item.dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+.category-item.drag-target {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -2px;
+}
+
+:global(body.category-sort-dragging) {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .category-item span {

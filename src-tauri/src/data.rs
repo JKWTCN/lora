@@ -103,6 +103,20 @@ pub fn load_app_data() -> Result<AppStorage, String> {
         }
     }
 
+    for (index, category) in storage.categories.iter_mut().enumerate() {
+        if category.order.is_none() {
+            category.order = Some(if category.id == "all" { 0 } else { index as i32 });
+        }
+    }
+
+    storage.categories.sort_by(|a, b| {
+        let a_order = if a.id == "all" { i32::MIN } else { a.order.unwrap_or(i32::MAX) };
+        let b_order = if b.id == "all" { i32::MIN } else { b.order.unwrap_or(i32::MAX) };
+        a_order
+            .cmp(&b_order)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+
     Ok(storage)
 }
 
