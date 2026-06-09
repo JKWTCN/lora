@@ -3988,6 +3988,48 @@ const clearDragState = () => {
   background: #2980b9;
 }
 
+.app-container.theme-dark .dialog-overlay {
+  background: rgba(2, 6, 23, 0.62);
+}
+
+.app-container.theme-dark .dialog {
+  background: var(--surface-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+}
+
+.app-container.theme-dark .dialog-header h3,
+.app-container.theme-dark .form-group label {
+  color: var(--text-color);
+}
+
+.app-container.theme-dark .dialog-input,
+.app-container.theme-dark .dialog-select {
+  background: #111827;
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
+
+.app-container.theme-dark .dialog-input::placeholder {
+  color: #6b7280;
+}
+
+.app-container.theme-dark .dialog-button-secondary {
+  background: #111827;
+  color: #cbd5e1;
+  border: 1px solid var(--border-color);
+}
+
+.app-container.theme-dark .dialog-button-secondary:hover {
+  background: var(--surface-hover);
+  color: var(--text-color);
+}
+
+.app-container.theme-dark .icon-preview {
+  background: #111827;
+  border-color: var(--border-color);
+}
+
 /* 表单组样式 */
 .form-group {
   margin-bottom: 15px;
@@ -4277,6 +4319,15 @@ body.lora-animation-fast {
   line-height: 1.4;
 }
 
+body.lora-theme-dark .toast {
+  background: #172033;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+}
+
+body.lora-theme-dark .toast-message {
+  color: #e5edf7;
+}
+
 @keyframes slideInFromRight {
   from {
     opacity: 0;
@@ -4323,6 +4374,14 @@ body.lora-animation-fast {
   color: #666;
   font-size: 14px;
   font-weight: 500;
+}
+
+body.lora-theme-dark .loading-overlay {
+  background: #111827;
+}
+
+body.lora-theme-dark .loading-text {
+  color: #e5e7eb;
 }
 
 @keyframes spin {

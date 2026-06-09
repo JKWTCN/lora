@@ -1,5 +1,5 @@
 <template>
-    <div class="edit-project-app">
+    <div class="edit-project-app" :class="editProjectAppClasses">
         <!-- 自定义标题栏 -->
         <!-- <div class="titlebar">
             <div class="titlebar-left" data-tauri-drag-region>
@@ -240,6 +240,7 @@ const errorMessage = ref('')
 const isSaving = ref(false)
 const lastSaved = ref(false)
 const appId = ref(null)
+const appTheme = ref('auto')
 
 // 分类数据
 const categories = ref([])
@@ -269,10 +270,31 @@ const canSave = computed(() => {
     return projectData.name.trim() && projectData.category && projectData.targetPath.trim()
 })
 
+const resolvedTheme = computed(() => {
+    if (appTheme.value === 'auto') {
+        return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    }
+
+    return appTheme.value === 'dark' ? 'dark' : 'light'
+})
+
+const editProjectAppClasses = computed(() => ({
+    'theme-dark': resolvedTheme.value === 'dark',
+    'theme-light': resolvedTheme.value === 'light'
+}))
+
+const applyRuntimeTheme = () => {
+    const body = document.body
+    body.classList.toggle('lora-theme-dark', resolvedTheme.value === 'dark')
+    body.classList.toggle('lora-theme-light', resolvedTheme.value === 'light')
+}
+
 // 监听项目数据变化
 watch(projectData, () => {
     lastSaved.value = false
 }, { deep: true })
+
+watch(resolvedTheme, applyRuntimeTheme)
 
 // 方法
 const handleTargetTypeChange = () => {
@@ -606,6 +628,17 @@ const retryLoading = async () => {
     await initializeApp()
 }
 
+const loadTheme = async () => {
+    try {
+        const settings = await invoke('load_app_settings')
+        appTheme.value = settings.theme || 'auto'
+        applyRuntimeTheme()
+    } catch (error) {
+        console.error('加载主题设置失败:', error)
+        applyRuntimeTheme()
+    }
+}
+
 // 初始化应用
 const initializeApp = async () => {
     debugLog('开始初始化应用')
@@ -625,6 +658,7 @@ const initializeApp = async () => {
 // 初始化
 onMounted(async () => {
     debugLog('组件已挂载，开始初始化')
+    await loadTheme()
     await initializeApp()
 })
 </script>
@@ -638,6 +672,14 @@ onMounted(async () => {
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     overflow: hidden;
+    color: #2c3e50;
+    color-scheme: light;
+}
+
+.edit-project-app.theme-dark {
+    background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+    color: #e5e7eb;
+    color-scheme: dark;
 }
 
 /* 加载状态 */
@@ -1266,6 +1308,92 @@ onMounted(async () => {
     background: #bdc3c7;
     transform: none;
     box-shadow: none;
+}
+
+/* 深色模式 */
+.edit-project-app.theme-dark .loading-overlay {
+    background: rgba(17, 24, 39, 0.94);
+}
+
+.edit-project-app.theme-dark .loading-text {
+    color: #e5e7eb;
+}
+
+.edit-project-app.theme-dark .error-overlay {
+    background: rgba(17, 24, 39, 0.96);
+}
+
+.edit-project-app.theme-dark .error-container {
+    background: #172033;
+    border: 1px solid #2b3748;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+}
+
+.edit-project-app.theme-dark .error-title {
+    color: #f8fafc;
+}
+
+.edit-project-app.theme-dark .error-message {
+    color: #94a3b8;
+}
+
+.edit-project-app.theme-dark .edit-project-panel {
+    background: rgba(17, 24, 39, 0.76);
+}
+
+.edit-project-app.theme-dark .settings-group,
+.edit-project-app.theme-dark .edit-project-footer {
+    background: rgba(31, 41, 55, 0.88);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+
+.edit-project-app.theme-dark .setting-label,
+.edit-project-app.theme-dark .section-title,
+.edit-project-app.theme-dark .checkbox-setting {
+    color: #f8fafc;
+}
+
+.edit-project-app.theme-dark .label-optional,
+.edit-project-app.theme-dark .input-icon,
+.edit-project-app.theme-dark .save-status {
+    color: #94a3b8;
+}
+
+.edit-project-app.theme-dark .setting-input {
+    background: rgba(15, 23, 42, 0.88);
+    border-color: rgba(148, 163, 184, 0.22);
+    color: #e5e7eb;
+}
+
+.edit-project-app.theme-dark .setting-input::placeholder {
+    color: #64748b;
+}
+
+.edit-project-app.theme-dark .setting-input:focus {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.16);
+}
+
+.edit-project-app.theme-dark .icon-preview {
+    background: rgba(15, 23, 42, 0.88);
+    border-color: rgba(148, 163, 184, 0.28);
+}
+
+.edit-project-app.theme-dark .footer-button.secondary {
+    background: rgba(15, 23, 42, 0.84);
+    color: #cbd5e1;
+    border-color: rgba(148, 163, 184, 0.22);
+}
+
+.edit-project-app.theme-dark .footer-button.secondary:hover {
+    background: rgba(30, 41, 59, 0.95);
+    color: #f8fafc;
+}
+
+.edit-project-app.theme-dark .footer-button:disabled {
+    background: #334155;
+    color: #94a3b8;
 }
 
 /* 动画 */
