@@ -3540,6 +3540,42 @@ const clearDragState = () => {
   padding: 6px 8px;
   overflow-x: auto;
   overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.32) transparent;
+}
+
+.layout-vertical .sidebar-content::-webkit-scrollbar {
+  height: 8px;
+}
+
+.layout-vertical .sidebar-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.layout-vertical .sidebar-content::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  background-clip: padding-box;
+}
+
+.layout-vertical .sidebar-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.42);
+  background-clip: padding-box;
+}
+
+.app-container.theme-dark.layout-vertical .sidebar-content {
+  scrollbar-color: rgba(148, 163, 184, 0.42) transparent;
+}
+
+.app-container.theme-dark.layout-vertical .sidebar-content::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.34);
+  background-clip: padding-box;
+}
+
+.app-container.theme-dark.layout-vertical .sidebar-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+  background-clip: padding-box;
 }
 
 .category-item {
@@ -4052,10 +4088,30 @@ const clearDragState = () => {
 }
 
 .dialog-checkbox input {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: #3498db;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--surface-bg);
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.dialog-checkbox input:checked {
+  border-color: var(--accent-color);
+  background: var(--accent-color);
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2.3 6.15L4.8 8.65L9.7 3.35' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.dialog-checkbox input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.18);
 }
 
 .dialog-select {

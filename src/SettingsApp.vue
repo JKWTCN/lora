@@ -18,7 +18,7 @@
                     <div class="about-section">
                         <div class="app-info">
                             <div class="app-icon">
-                                <img src="/tauri.svg" alt="Lora" />
+                                <img src="/app-icon.png" alt="Lora" />
                             </div>
                             <div class="app-details">
                                 <h3>{{ $t('settings.about.appName') }}</h3>
@@ -814,10 +814,44 @@ onUnmounted(() => {
     min-height: 0;
     overflow-y: auto;
     background: #f6f8fb;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(47, 154, 224, 0.28) transparent;
+}
+
+.settings-panel::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.settings-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.settings-panel::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: rgba(47, 154, 224, 0.24);
+    background-clip: padding-box;
+}
+
+.settings-panel::-webkit-scrollbar-thumb:hover {
+    background: rgba(47, 154, 224, 0.38);
+    background-clip: padding-box;
 }
 
 .settings-app.theme-dark .settings-panel {
     background: #111827;
+    scrollbar-color: rgba(56, 189, 248, 0.38) transparent;
+}
+
+.settings-app.theme-dark .settings-panel::-webkit-scrollbar-thumb {
+    background: rgba(56, 189, 248, 0.32);
+    background-clip: padding-box;
+}
+
+.settings-app.theme-dark .settings-panel::-webkit-scrollbar-thumb:hover {
+    background: rgba(56, 189, 248, 0.46);
+    background-clip: padding-box;
 }
 
 .panel-content {
@@ -1046,8 +1080,40 @@ onUnmounted(() => {
 }
 
 .setting-item input[type="checkbox"] {
+    appearance: none;
+    display: inline-grid;
+    place-content: center;
+    width: 16px;
+    height: 16px;
     margin: 0;
-    accent-color: #2f9ae0;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #ffffff;
+    cursor: pointer;
+    transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.setting-item input[type="checkbox"]:checked {
+    border-color: #2f9ae0;
+    background: #2f9ae0;
+    background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2.3 6.15L4.8 8.65L9.7 3.35' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.setting-item input[type="checkbox"]:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(47, 154, 224, 0.16);
+}
+
+.settings-app.theme-dark .setting-item input[type="checkbox"] {
+    background: #111827;
+    border-color: #334155;
+}
+
+.settings-app.theme-dark .setting-item input[type="checkbox"]:checked {
+    background: #38bdf8;
+    border-color: #38bdf8;
 }
 
 .setting-item input[type="number"],
@@ -1120,7 +1186,69 @@ onUnmounted(() => {
 
 .slider-group input[type="range"] {
     flex: 1;
-    accent-color: #2f9ae0;
+    height: 18px;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.slider-group input[type="range"]:focus {
+    outline: none;
+}
+
+.slider-group input[type="range"]::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 999px;
+    background: #dbe6f1;
+}
+
+.slider-group input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    margin-top: -5px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    background: #2f9ae0;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.22);
+}
+
+.slider-group input[type="range"]:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px rgba(47, 154, 224, 0.18), 0 1px 4px rgba(15, 23, 42, 0.22);
+}
+
+.slider-group input[type="range"]::-moz-range-track {
+    height: 6px;
+    border: 0;
+    border-radius: 999px;
+    background: #dbe6f1;
+}
+
+.slider-group input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    background: #2f9ae0;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.22);
+}
+
+.settings-app.theme-dark .slider-group input[type="range"]::-webkit-slider-runnable-track {
+    background: #334155;
+}
+
+.settings-app.theme-dark .slider-group input[type="range"]::-webkit-slider-thumb {
+    border-color: #172033;
+    background: #38bdf8;
+}
+
+.settings-app.theme-dark .slider-group input[type="range"]::-moz-range-track {
+    background: #334155;
+}
+
+.settings-app.theme-dark .slider-group input[type="range"]::-moz-range-thumb {
+    border-color: #172033;
+    background: #38bdf8;
 }
 
 .slider-value {

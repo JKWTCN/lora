@@ -970,6 +970,29 @@ onBeforeUnmount(() => {
     flex-direction: row;
     min-height: 0;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(52, 73, 94, 0.28) transparent;
+}
+
+.new-project-content::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.new-project-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.new-project-content::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: rgba(52, 73, 94, 0.24);
+    background-clip: padding-box;
+}
+
+.new-project-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(52, 73, 94, 0.38);
+    background-clip: padding-box;
 }
 
 .project-type-nav {
@@ -1018,6 +1041,33 @@ onBeforeUnmount(() => {
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(5px);
     padding: 16px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(52, 73, 94, 0.28) transparent;
+}
+
+.new-project-panel::-webkit-scrollbar,
+.preset-section::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.new-project-panel::-webkit-scrollbar-track,
+.preset-section::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.new-project-panel::-webkit-scrollbar-thumb,
+.preset-section::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: rgba(52, 73, 94, 0.24);
+    background-clip: padding-box;
+}
+
+.new-project-panel::-webkit-scrollbar-thumb:hover,
+.preset-section::-webkit-scrollbar-thumb:hover {
+    background: rgba(52, 73, 94, 0.38);
+    background-clip: padding-box;
 }
 
 .preset-section {
@@ -1300,10 +1350,30 @@ onBeforeUnmount(() => {
 }
 
 .checkbox-setting input {
+    appearance: none;
+    display: inline-grid;
+    place-content: center;
     width: 16px;
     height: 16px;
     margin: 0;
-    accent-color: #3498db;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.checkbox-setting input:checked {
+    border-color: #3498db;
+    background: #3498db;
+    background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2.3 6.15L4.8 8.65L9.7 3.35' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.checkbox-setting input:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.14);
 }
 
 .setting-input {
@@ -1615,6 +1685,25 @@ onBeforeUnmount(() => {
 
 .new-project-app.theme-dark .new-project-panel {
     background: rgba(17, 24, 39, 0.76);
+    scrollbar-color: rgba(148, 163, 184, 0.42) transparent;
+}
+
+.new-project-app.theme-dark .new-project-content {
+    scrollbar-color: rgba(148, 163, 184, 0.42) transparent;
+}
+
+.new-project-app.theme-dark .new-project-content::-webkit-scrollbar-thumb,
+.new-project-app.theme-dark .new-project-panel::-webkit-scrollbar-thumb,
+.new-project-app.theme-dark .preset-section::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.34);
+    background-clip: padding-box;
+}
+
+.new-project-app.theme-dark .new-project-content::-webkit-scrollbar-thumb:hover,
+.new-project-app.theme-dark .new-project-panel::-webkit-scrollbar-thumb:hover,
+.new-project-app.theme-dark .preset-section::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.5);
+    background-clip: padding-box;
 }
 
 .new-project-app.theme-dark .preset-item {
@@ -1660,6 +1749,7 @@ onBeforeUnmount(() => {
 }
 
 .new-project-app.theme-dark .setting-label,
+.new-project-app.theme-dark .checkbox-setting,
 .new-project-app.theme-dark .section-title {
     color: #f8fafc;
 }
@@ -1674,6 +1764,16 @@ onBeforeUnmount(() => {
     background: rgba(15, 23, 42, 0.88);
     border-color: rgba(148, 163, 184, 0.22);
     color: #e5e7eb;
+}
+
+.new-project-app.theme-dark .checkbox-setting input {
+    background: rgba(15, 23, 42, 0.88);
+    border-color: rgba(148, 163, 184, 0.28);
+}
+
+.new-project-app.theme-dark .checkbox-setting input:checked {
+    background: #60a5fa;
+    border-color: #60a5fa;
 }
 
 .new-project-app.theme-dark .setting-input::placeholder {
