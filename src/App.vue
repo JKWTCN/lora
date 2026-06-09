@@ -2543,6 +2543,14 @@ const isMouseInWindow = ref(true)
 const isDraggingWindow = ref(false)
 const windowJustShown = ref(false) // 追踪窗口是否刚刚显示
 const userInteracted = ref(false) // 追踪用户是否已经与窗口交互过
+let autoHideTimer: number | null = null
+
+const clearAutoHideTimer = () => {
+  if (autoHideTimer !== null) {
+    clearTimeout(autoHideTimer)
+    autoHideTimer = null
+  }
+}
 
 // 处理用户首次点击窗口
 const handleFirstUserInteraction = () => {
@@ -2593,9 +2601,25 @@ const didInternalSortDragJustEnd = () => {
   return Date.now() - lastInternalSortDragEndAt < 500
 }
 
+const isAppChildWindowOpen = async () => {
+  try {
+    const [isSettingsOpen, isNewProjectOpen, isEditProjectOpen] = await Promise.all([
+      invoke<boolean>('is_settings_window_open'),
+      invoke<boolean>('is_new_project_window_open'),
+      invoke<boolean>('is_edit_project_window_open')
+    ])
+
+    return Boolean(isSettingsOpen || isNewProjectOpen || isEditProjectOpen)
+  } catch (error) {
+    console.error('检查内部窗口状态失败:', error)
+    return false
+  }
+}
+
 // 窗口聚焦处理函数
 const handleWindowFocus = () => {
   console.log('窗口获得焦点')
+  clearAutoHideTimer()
   // 重置用户交互状态，需要等待新的用户交互
   userInteracted.value = false
   windowJustShown.value = true
@@ -2604,17 +2628,11 @@ const handleWindowFocus = () => {
 
 // 窗口失焦处理函数
 const handleWindowBlur = async () => {
-  // 检查设置窗口是否打开
-  let isSettingsOpen = false
-  try {
-    isSettingsOpen = await invoke('is_settings_window_open')
-  } catch (error) {
-    console.error('检查设置窗口状态失败:', error)
-  }
+  clearAutoHideTimer()
 
-  // 如果设置窗口打开，则不执行自动隐藏
-  if (isSettingsOpen) {
-    console.log('设置窗口打开中，不执行自动隐藏')
+  // 如果内部子窗口打开，则不执行自动隐藏
+  if (await isAppChildWindowOpen()) {
+    console.log('内部窗口打开中，不执行自动隐藏')
     return
   }
 
@@ -2624,12 +2642,18 @@ const handleWindowBlur = async () => {
     // 延迟检查，给鼠标事件时间更新状态
     const delay = 100
 
-    setTimeout(async () => {
+    autoHideTimer = window.setTimeout(async () => {
+      autoHideTimer = null
+
+      if (await isAppChildWindowOpen()) {
+        console.log('内部窗口打开中，不执行自动隐藏')
+        return
+      }
+
       // 只有当鼠标不在窗口内且不在拖动窗口时才隐藏窗口
       if (!isMouseInWindow.value && !isDraggingWindow.value && !isInternalSortDragActive() && !didInternalSortDragJustEnd()) {
         try {
           console.log('窗口失去焦点且鼠标不在窗口内且未拖动窗口，隐藏到托盘')
-          const { getCurrentWindow } = await import('@tauri-apps/api/window')
           const currentWindow = getCurrentWindow()
           await currentWindow.hide()
         } catch (error) {
@@ -2666,6 +2690,8 @@ onUnmounted(() => {
 
   // 清理窗口尺寸监听器
   window.removeEventListener('resize', updateViewportWidth)
+
+  clearAutoHideTimer()
 
   if (saveGridCellSizeTimer) {
     clearTimeout(saveGridCellSizeTimer)
