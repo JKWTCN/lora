@@ -160,7 +160,17 @@
                             </div>
                         </div>
 
-                        <!-- 第四行：项目描述（全宽） -->
+                        <!-- 第四行：管理员启动 -->
+                        <div v-if="projectData.targetType !== 'url'" class="settings-row">
+                            <div class="setting-item full-width">
+                                <label class="checkbox-setting">
+                                    <input type="checkbox" v-model="projectData.runAsAdmin" />
+                                    <span>{{ t('editProject.form.runAsAdmin') }}</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 第五行：项目描述（全宽） -->
                         <div class="settings-row">
                             <div class="setting-item full-width">
                                 <label class="setting-label">
@@ -243,6 +253,7 @@ const projectData = reactive({
     targetType: 'file',
     targetPath: '',
     launchArgs: '',
+    runAsAdmin: false,
     icon: ''
 })
 
@@ -435,7 +446,8 @@ const saveProject = async () => {
             target_path: projectData.targetPath,
             is_shortcut: false,
             launch_args: projectData.launchArgs,
-            target_type: projectData.targetType
+            target_type: projectData.targetType,
+            run_as_admin: projectData.targetType !== 'url' && projectData.runAsAdmin
         }
 
         debugLog('调用 Tauri API: update_app', updatedApp)
@@ -561,6 +573,7 @@ const loadAppData = async () => {
         projectData.targetType = app.target_type || 'file'
         projectData.targetPath = app.path || ''
         projectData.launchArgs = app.launch_args || ''
+        projectData.runAsAdmin = !!app.run_as_admin
         projectData.icon = app.icon || ''
         
         debugLog('应用数据填充完成', projectData)
@@ -576,6 +589,7 @@ const loadAppData = async () => {
         projectData.targetType = 'file'
         projectData.targetPath = ''
         projectData.launchArgs = ''
+        projectData.runAsAdmin = false
         projectData.icon = ''
         
         debugLog('使用默认应用数据', projectData)
@@ -969,6 +983,23 @@ onMounted(async () => {
     position: relative;
     display: flex;
     align-items: center;
+}
+
+.checkbox-setting {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #2c3e50;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.checkbox-setting input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: #3498db;
 }
 
 .setting-input {

@@ -194,7 +194,17 @@
                             </div>
                         </div>
 
-                        <!-- 第四行：项目描述（全宽） -->
+                        <!-- 第四行：管理员启动 -->
+                        <div v-if="projectData.targetType !== 'url'" class="settings-row">
+                            <div class="setting-item full-width">
+                                <label class="checkbox-setting">
+                                    <input type="checkbox" v-model="projectData.runAsAdmin" />
+                                    <span>{{ t('newProject.runAsAdmin') }}</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 第五行：项目描述（全宽） -->
                         <div class="settings-row">
                             <div class="setting-item full-width">
                                 <label class="setting-label">
@@ -373,6 +383,7 @@ const projectData = reactive({
     targetType: 'file',
     targetPath: '',
     launchArgs: '',
+    runAsAdmin: false,
     icon: ''
 })
 
@@ -676,6 +687,7 @@ const createProject = async (data) => {
             is_shortcut: false,
             launch_args: data.launchArgs || '',
             target_type: data.targetType || 'file',
+            run_as_admin: data.targetType !== 'url' && !!data.runAsAdmin,
             usage_count: 0,
             last_launched_at: null
         }
@@ -732,7 +744,8 @@ const createPresetProject = async (preset) => {
         icon,
         targetPath: preset.targetPath || preset.path,
         launchArgs: preset.launchArgs || '',
-        targetType: preset.targetType || 'file'
+        targetType: preset.targetType || 'file',
+        runAsAdmin: false
     })
 }
 
@@ -1272,6 +1285,23 @@ onBeforeUnmount(() => {
     position: relative;
     display: flex;
     align-items: center;
+}
+
+.checkbox-setting {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #2c3e50;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.checkbox-setting input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: #3498db;
 }
 
 .setting-input {

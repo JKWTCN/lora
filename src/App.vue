@@ -227,6 +227,12 @@
               <input v-model="editAppDialog.editedLaunchArgs" type="text" class="dialog-input"
                 :placeholder="$t('main.dialog.launchArgsPlaceholder')">
             </div>
+            <div v-if="editAppDialog.editedTargetType !== 'url'" class="form-group">
+              <label class="dialog-checkbox">
+                <input v-model="editAppDialog.editedRunAsAdmin" type="checkbox">
+                <span>{{ $t('main.dialog.runAsAdmin') }}</span>
+              </label>
+            </div>
             <div class="form-group">
               <label>{{ $t('main.dialog.icon') }}:</label>
               <div class="icon-section">
@@ -346,6 +352,7 @@ interface AppData {
   is_shortcut?: false
   launch_args?: string // 启动参数
   target_type?: 'file' | 'folder' | 'url' // 目标类型
+  run_as_admin?: boolean // 是否始终以管理员权限启动
   order?: number // 排序字段，用于图标拖拽排序
   usage_count?: number // 使用次数
   last_launched_at?: number | null // 上次启动时间戳
@@ -532,7 +539,8 @@ const editAppDialog = ref({
   editedIcon: '',
   editedTargetPath: '',
   editedLaunchArgs: '',
-  editedTargetType: 'file' as 'file' | 'folder' | 'url'
+  editedTargetType: 'file' as 'file' | 'folder' | 'url',
+  editedRunAsAdmin: false
 })
 
 const renameInput = ref(null)
@@ -743,6 +751,7 @@ const saveAppData = async () => {
       category: categoryIds[0] || 'all',
       category_ids: categoryIds.length > 0 ? categoryIds : ['all'],
       is_shortcut: a.is_shortcut ?? false,
+      run_as_admin: a.run_as_admin ?? false,
       usage_count: a.usage_count ?? 0,
       last_launched_at: a.last_launched_at ?? null
     }
@@ -1113,16 +1122,25 @@ const launchApp = async (app: any) => {
         launchArgs: app.launch_args || ''
       })
     } else if (app.target_type === 'folder') {
-      // 打开文件夹
-      await invoke('open_folder', {
-        folderPath: targetPath,
-        launchArgs: app.launch_args || ''
-      })
+      if (app.run_as_admin) {
+        await invoke('launch_app_with_auto_hide', {
+          appPath: targetPath,
+          launchArgs: app.launch_args || '',
+          runAsAdmin: true
+        })
+      } else {
+        // 打开文件夹
+        await invoke('open_folder', {
+          folderPath: targetPath,
+          launchArgs: app.launch_args || ''
+        })
+      }
     } else {
       // 启动文件，使用支持自动隐藏的函数
       await invoke('launch_app_with_auto_hide', {
         appPath: targetPath,
-        launchArgs: app.launch_args || ''
+        launchArgs: app.launch_args || '',
+        runAsAdmin: app.run_as_admin || false
       })
     }
     try {
@@ -1446,7 +1464,10 @@ const runAsAdmin = async () => {
   if (appContextMenu.value.app) {
     try {
       console.log(`以管理员权限运行: ${appContextMenu.value.app.name}`)
-      const result = await invoke('run_as_admin', { appPath: getLaunchTargetPath(appContextMenu.value.app) })
+      const result = await invoke('run_as_admin', {
+        appPath: getLaunchTargetPath(appContextMenu.value.app),
+        launchArgs: appContextMenu.value.app.launch_args || ''
+      })
       console.log('管理员权限运行结果:', result)
     } catch (error) {
       console.error('以管理员权限运行失败:', error)
@@ -1617,7 +1638,8 @@ const editApp = async () => {
         editedIcon: appContextMenu.value.app.icon || '',
         editedTargetPath: appContextMenu.value.app.target_path || appContextMenu.value.app.path,
         editedLaunchArgs: appContextMenu.value.app.launch_args || '',
-        editedTargetType: appContextMenu.value.app.target_type || 'file'
+        editedTargetType: appContextMenu.value.app.target_type || 'file',
+        editedRunAsAdmin: !!appContextMenu.value.app.run_as_admin
       }
 
       // 如果没有目标类型，自动检测
@@ -1788,6 +1810,7 @@ const confirmEditApp = async () => {
       apps.value[appIndex].target_path = editAppDialog.value.editedTargetPath
       apps.value[appIndex].launch_args = editAppDialog.value.editedLaunchArgs
       apps.value[appIndex].target_type = editAppDialog.value.editedTargetType
+      apps.value[appIndex].run_as_admin = editAppDialog.value.editedTargetType !== 'url' && editAppDialog.value.editedRunAsAdmin
 
       // 如果目标路径改变，更新主路径
       if (editAppDialog.value.editedTargetPath !== apps.value[appIndex].path) {
@@ -1811,7 +1834,8 @@ const cancelEditApp = () => {
     editedIcon: '',
     editedTargetPath: '',
     editedLaunchArgs: '',
-    editedTargetType: 'file'
+    editedTargetType: 'file',
+    editedRunAsAdmin: false
   }
 }
 
@@ -3941,6 +3965,21 @@ const clearDragState = () => {
   font-size: 14px;
   font-weight: 500;
   color: #2c3e50;
+}
+
+.form-group .dialog-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+.dialog-checkbox input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #3498db;
 }
 
 .dialog-select {

@@ -15,6 +15,8 @@ pub struct AppData {
     pub is_shortcut: bool,
     pub launch_args: Option<String>, // 启动参数
     pub target_type: Option<String>, // 目标类型: file, folder, url
+    #[serde(default)]
+    pub run_as_admin: bool, // 是否始终以管理员权限启动
     pub order: Option<i32>,          // 排序字段，用于图标拖拽排序
     pub usage_count: Option<u32>,    // 使用次数
     pub last_launched_at: Option<i64>, // 上次启动时间(时间戳)

@@ -318,7 +318,11 @@ pub fn get_file_info(file_path: String) -> Result<serde_json::Value, String> {
 /// 此函数用于启动指定的应用程序，支持传递启动参数。
 /// 对于快捷方式文件，会先解析其目标路径，然后启动目标应用程序。
 #[tauri::command]
-pub fn launch_app(app_path: String, launch_args: Option<String>) -> Result<String, String> {
+pub fn launch_app(
+    app_path: String,
+    launch_args: Option<String>,
+    run_as_admin: Option<bool>,
+) -> Result<String, String> {
     let path = Path::new(&app_path);
 
     if !path.exists() {
@@ -357,7 +361,12 @@ pub fn launch_app(app_path: String, launch_args: Option<String>) -> Result<Strin
         let params = launch_args
             .as_deref()
             .filter(|args| !args.trim().is_empty());
-        crate::win_native::shell_execute(&actual_path, params, work_dir, Some("open"))
+        let verb = if run_as_admin.unwrap_or(false) {
+            "runas"
+        } else {
+            "open"
+        };
+        crate::win_native::shell_execute(&actual_path, params, work_dir, Some(verb))
             .map(|_| "应用启动成功".to_string())
             .map_err(|e| format!("启动应用失败: {}", e))
     }
@@ -396,9 +405,10 @@ pub async fn launch_app_with_auto_hide(
     app: AppHandle,
     app_path: String,
     launch_args: Option<String>,
+    run_as_admin: Option<bool>,
 ) -> Result<String, String> {
     // 先启动应用
-    let launch_result = launch_app(app_path, launch_args)?;
+    let launch_result = launch_app(app_path, launch_args, run_as_admin)?;
 
     // 检查是否启用了自动隐藏功能
     let settings = load_app_settings().unwrap_or_else(|_| get_default_settings());
