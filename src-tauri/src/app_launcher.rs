@@ -316,7 +316,7 @@ pub fn get_file_info(file_path: String) -> Result<serde_json::Value, String> {
 /// 启动应用程序
 ///
 /// 此函数用于启动指定的应用程序，支持传递启动参数。
-/// 对于快捷方式文件，会先解析其目标路径，然后启动目标应用程序。
+/// 对于快捷方式文件，直接交给 Windows Shell 打开，保留快捷方式内置参数和起始位置。
 #[tauri::command]
 pub fn launch_app(
     app_path: String,
@@ -331,33 +331,28 @@ pub fn launch_app(
 
     #[cfg(target_os = "windows")]
     {
-        // 检查文件扩展名，如果是快捷方式(.lnk)，解析目标路径
+        // 检查文件扩展名。Windows 快捷方式必须由 Shell 直接打开，否则会丢失
+        // .lnk 内保存的 Arguments / WorkingDirectory 等信息。
         let extension = path
             .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("")
             .to_lowercase();
 
-        let actual_path = if extension == "lnk" {
-            // 解析快捷方式的目标路径
-            if let Some(target) = resolve_shortcut_target(&app_path) {
-                println!("解析快捷方式目标路径: {}", target);
-                target
-            } else {
-                return Err("无法解析快捷方式目标路径".to_string());
-            }
-        } else if extension == "url" {
+        if extension == "url" {
             // 对于 .url 文件(Internet 快捷方式)，使用系统默认方式打开
             if let Some(url) = resolve_shortcut_target(&app_path) {
                 return crate::system::open_url(url, launch_args);
             } else {
                 return Err("无法解析URL快捷方式".to_string());
             }
-        } else {
-            app_path.clone()
-        };
+        }
 
-        let work_dir = Path::new(&actual_path).parent().and_then(|p| p.to_str());
+        let work_dir = if extension == "lnk" {
+            None
+        } else {
+            path.parent().and_then(|p| p.to_str())
+        };
         let params = launch_args
             .as_deref()
             .filter(|args| !args.trim().is_empty());
@@ -366,7 +361,7 @@ pub fn launch_app(
         } else {
             "open"
         };
-        crate::win_native::shell_execute(&actual_path, params, work_dir, Some(verb))
+        crate::win_native::shell_execute(&app_path, params, work_dir, Some(verb))
             .map(|_| "应用启动成功".to_string())
             .map_err(|e| format!("启动应用失败: {}", e))
     }

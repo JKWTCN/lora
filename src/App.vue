@@ -349,7 +349,7 @@ interface AppData {
   icon: string
   path: string
   target_path?: string
-  is_shortcut?: false
+  is_shortcut?: boolean
   launch_args?: string // 启动参数
   target_type?: 'file' | 'folder' | 'url' // 目标类型
   run_as_admin?: boolean // 是否始终以管理员权限启动
@@ -1087,7 +1087,15 @@ const showToast = (message: string, type: string = 'info') => {
   }, 3000)
 }
 
-const getLaunchTargetPath = (app: AppData) => app.target_path || app.path
+const isShortcutPath = (value?: string) => /\.(lnk|url)$/i.test(value || '')
+
+const getLaunchTargetPath = (app: AppData) => {
+  if (isShortcutPath(app.path)) {
+    return app.path
+  }
+
+  return app.target_path || app.path
+}
 
 const hideAfterLaunchIfNeeded = async () => {
   if (!appSettings.value.autoHideAfterLaunch) {

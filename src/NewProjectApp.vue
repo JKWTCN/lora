@@ -399,6 +399,8 @@ const canSave = computed(() => {
     return projectData.name.trim() && projectData.category && projectData.targetPath.trim()
 })
 
+const isShortcutPath = (value) => /\.(lnk|url)$/i.test(value || '')
+
 
 // 监听项目数据变化
 watch(projectData, () => {
@@ -684,7 +686,7 @@ const createProject = async (data) => {
             icon: data.icon || '',
             path: data.targetPath,
             target_path: data.targetPath,
-            is_shortcut: false,
+            is_shortcut: isShortcutPath(data.targetPath),
             launch_args: data.launchArgs || '',
             target_type: data.targetType || 'file',
             run_as_admin: data.targetType !== 'url' && !!data.runAsAdmin,
