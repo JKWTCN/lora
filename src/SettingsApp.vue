@@ -122,6 +122,32 @@
                             </select>
                         </div>
                     </div>
+
+                    <div class="settings-group">
+                        <h3>{{ $t('settings.ui.categories.title') }}</h3>
+
+                        <p class="group-description">{{ $t('settings.ui.categories.description') }}</p>
+
+                        <div v-if="customCategories.length > 0" class="category-visibility-list">
+                            <label
+                                v-for="category in customCategories"
+                                :key="category.id"
+                                class="category-visibility-item">
+                                <span class="category-name">{{ category.name }}</span>
+                                <span class="category-toggle">
+                                    <input
+                                        type="checkbox"
+                                        v-model="category.hidden"
+                                        @change="updateCategoryHidden(category)" />
+                                    <span>{{ category.hidden ? $t('settings.ui.categories.hidden') : $t('settings.ui.categories.visible') }}</span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <div v-else class="empty-state">
+                            {{ $t('settings.ui.categories.empty') }}
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 功能设置页面 -->
@@ -314,6 +340,7 @@ const tabs = computed(() => [
 const activeTab = ref('about')
 const isSaving = ref(false)
 const lastSaved = ref(false)
+const categories = ref([])
 let unlistenSettingsUpdated = null
 let removeThemePreferenceListener = null
 
@@ -359,6 +386,8 @@ const saveStatusText = computed(() => {
     return ''
 })
 
+const customCategories = computed(() => categories.value.filter(category => !category.isDefault))
+
 const resolvedTheme = computed(() => {
     if (localSettings.theme === 'auto') {
         return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -398,6 +427,14 @@ const notifySettingsUpdated = async () => {
         invoke('notify_main_settings_updated'),
         emitTo('main', 'settings-updated'),
         emit('settings-updated')
+    ])
+}
+
+const notifyDataUpdated = async () => {
+    await Promise.allSettled([
+        invoke('notify_main_window_refresh'),
+        emitTo('main', 'data-updated'),
+        emit('data-updated')
     ])
 }
 
@@ -443,6 +480,22 @@ const updateProjectNamePosition = async () => {
         console.log('项目名称显示位置已更新')
     } catch (error) {
         console.error('更新项目名称显示位置失败:', error)
+    }
+}
+
+const updateCategoryHidden = async (category) => {
+    try {
+        await invoke('update_category_hidden', {
+            categoryId: category.id,
+            hidden: !!category.hidden
+        })
+        await notifyDataUpdated()
+        markSaved()
+        console.log('分组显示状态已更新')
+    } catch (error) {
+        console.error('更新分组显示状态失败:', error)
+        await loadCategories()
+        await alertDialog(t('settings.alert.updateCategoryVisibilityFailed', { error: String(error) }), { type: 'error' })
     }
 }
 
@@ -662,6 +715,24 @@ const resetToDefaults = async () => {
     }
 }
 
+const loadCategories = async () => {
+    try {
+        const storage = await invoke('load_app_data')
+        const categoriesFromBackend = storage.categories || []
+        categories.value = categoriesFromBackend.map(category => ({
+            id: category.id,
+            name: category.name,
+            icon: category.icon,
+            isDefault: category.is_default,
+            order: category.order,
+            hidden: !!category.hidden
+        }))
+    } catch (error) {
+        console.error('加载分组数据失败:', error)
+        categories.value = []
+    }
+}
+
 // 加载设置
 const loadSettings = async () => {
     try {
@@ -696,6 +767,8 @@ const loadSettings = async () => {
     } catch (error) {
         console.error('加载设置失败:', error)
     }
+
+    await loadCategories()
 }
 
 // 初始化
@@ -923,6 +996,9 @@ onUnmounted(() => {
 .settings-app.theme-dark .description,
 .settings-app.theme-dark .info-item label,
 .settings-app.theme-dark .setting-description,
+.settings-app.theme-dark .group-description,
+.settings-app.theme-dark .category-toggle,
+.settings-app.theme-dark .empty-state,
 .settings-app.theme-dark .setting-note p,
 .settings-app.theme-dark .unit,
 .settings-app.theme-dark .slider-value,
@@ -1116,6 +1192,11 @@ onUnmounted(() => {
     border-color: #38bdf8;
 }
 
+.settings-app.theme-dark .category-visibility-item {
+    background: #111827;
+    border-color: #253246;
+}
+
 .setting-item input[type="number"],
 .setting-item input[type="text"],
 .setting-item select {
@@ -1152,6 +1233,53 @@ onUnmounted(() => {
     color: #64748b;
     margin: 0;
     line-height: 1.45;
+}
+
+.group-description {
+    margin: -4px 0 12px;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.category-visibility-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.category-visibility-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 38px;
+    padding: 0 10px;
+    border: 1px solid #edf1f5;
+    border-radius: 6px;
+    background: #f8fafc;
+}
+
+.category-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.category-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #64748b;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.empty-state {
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.5;
 }
 
 .setting-note {

@@ -30,6 +30,8 @@ pub struct CategoryData {
     pub icon: String,
     pub is_default: bool,
     pub order: Option<i32>, // 侧栏分组排序字段
+    #[serde(default)]
+    pub hidden: bool, // 是否在侧栏隐藏该分组
 }
 
 // 应用设置结构

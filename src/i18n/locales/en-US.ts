@@ -199,6 +199,13 @@ export default {
         slow: 'Slow',
         normal: 'Normal',
         fast: 'Fast'
+      },
+      categories: {
+        title: 'Category Display',
+        description: 'Hidden categories are removed from the left sidebar. Their apps still appear in All Apps and search results.',
+        visible: 'Visible',
+        hidden: 'Hidden',
+        empty: 'No custom categories'
       }
     },
     features: {
@@ -264,7 +271,8 @@ export default {
       resetSuccess: 'Data reset successfully! Please restart the application.',
       resetFailed: 'Failed to reset data: {error}',
       restoreDefaultsSuccess: 'Settings restored to default values',
-      restoreDefaultsFailed: 'Failed to restore default settings: {error}'
+      restoreDefaultsFailed: 'Failed to restore default settings: {error}',
+      updateCategoryVisibilityFailed: 'Failed to update category display state: {error}'
     }
   },
 

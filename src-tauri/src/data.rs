@@ -387,6 +387,35 @@ pub fn save_selected_category(category_id: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn update_category_hidden(category_id: String, hidden: bool) -> Result<String, String> {
+    if category_id == "all" {
+        return Err("默认分组不能隐藏".to_string());
+    }
+
+    let mut storage = load_app_data()?;
+
+    if let Some(category) = storage
+        .categories
+        .iter_mut()
+        .find(|category| category.id == category_id)
+    {
+        if category.is_default {
+            return Err("默认分组不能隐藏".to_string());
+        }
+
+        category.hidden = hidden;
+        if hidden && storage.selected_category.as_deref() == Some(category.id.as_str()) {
+            storage.selected_category = Some("all".to_string());
+        }
+
+        save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+        Ok("分组显示状态已更新".to_string())
+    } else {
+        Err("分组不存在".to_string())
+    }
+}
+
+#[tauri::command]
 pub async fn add_new_app(app: AppData) -> Result<String, String> {
     let mut storage = load_app_data()?;
     let mut app = app;

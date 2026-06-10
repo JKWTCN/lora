@@ -199,6 +199,13 @@ export default {
         slow: '慢速',
         normal: '正常',
         fast: '快速'
+      },
+      categories: {
+        title: '分组显示',
+        description: '隐藏分组后，它不会出现在左侧侧栏；分组内应用仍会出现在全部应用和搜索结果中。',
+        visible: '显示',
+        hidden: '隐藏',
+        empty: '暂无自定义分组'
       }
     },
     features: {
@@ -264,7 +271,8 @@ export default {
       resetSuccess: '数据重置成功！请重启应用。',
       resetFailed: '重置数据失败: {error}',
       restoreDefaultsSuccess: '设置已恢复到默认值',
-      restoreDefaultsFailed: '恢复默认设置失败: {error}'
+      restoreDefaultsFailed: '恢复默认设置失败: {error}',
+      updateCategoryVisibilityFailed: '更新分组显示状态失败: {error}'
     }
   },
 

@@ -38,11 +38,11 @@
         <h2>分类</h2>
       </div> -->
         <div class="sidebar-content" @contextmenu.prevent="showContextMenu($event, null)">
-          <div v-for="(category, index) in categories" :key="category.id" class="category-item"
-            :class="{ active: selectedCategory === category.id }" :data-category-index="index"
+          <div v-for="category in visibleCategories" :key="category.id" class="category-item"
+            :class="{ active: selectedCategory === category.id }" :data-category-index="getCategorySortIndex(category.id)"
             @click="handleCategoryClick(category.id)"
             @contextmenu.prevent="showContextMenu($event, category)"
-            @pointerdown="handleCategoryPointerDown($event, category, index)">
+            @pointerdown="handleCategoryPointerDown($event, category, getCategorySortIndex(category.id))">
             <span>{{ category.name }}</span>
           </div>
         </div>
@@ -364,6 +364,7 @@ interface CategoryData {
   icon: string
   isDefault: boolean
   order?: number
+  hidden?: boolean
 }
 
 // 响应式数据
@@ -548,7 +549,7 @@ const searchInputRef = ref(null)
 
 // 分类数据
 const categories = ref<CategoryData[]>([
-  { id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true, order: 0 },
+  { id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true, order: 0, hidden: false },
 ])
 
 // 应用数据
@@ -603,11 +604,27 @@ const removeAppCategories = (app: AppData, categoryIdsToRemove: string[]) => {
   return true
 }
 
+const isCategoryHidden = (categoryId: string) => {
+  return categories.value.some(category => category.id === categoryId && !!category.hidden)
+}
+
+const isCategorySelectableInSidebar = (categoryId: string) => {
+  return categoryId === 'all' || !isCategoryHidden(categoryId)
+}
+
+const visibleCategories = computed(() => {
+  return categories.value.filter(category => isCategorySelectableInSidebar(category.id))
+})
+
+const getCategorySortIndex = (categoryId: string) => {
+  return categories.value.findIndex(category => category.id === categoryId)
+}
+
 // 确保"全部应用"分组始终存在
 const ensureDefaultCategory = () => {
   const hasAllCategory = categories.value.some(cat => cat.id === 'all')
   if (!hasAllCategory) {
-    categories.value.unshift({ id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true, order: 0 })
+    categories.value.unshift({ id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true, order: 0, hidden: false })
   }
 
   categories.value = normalizeCategoryOrder(categories.value)
@@ -699,7 +716,8 @@ const loadAppData = async () => {
       name: category.name,
       icon: category.icon,
       isDefault: category.is_default,
-      order: category.order
+      order: category.order,
+      hidden: !!category.hidden
     }))
 
     Object.assign(categories, { value: convertedCategories })
@@ -709,7 +727,7 @@ const loadAppData = async () => {
 
     // 恢复选中的分组
     const targetCategory = storage.selected_category &&
-      categories.value.some(cat => cat.id === storage.selected_category)
+      categories.value.some(cat => cat.id === storage.selected_category && isCategorySelectableInSidebar(cat.id))
       ? storage.selected_category
       : 'all'
 
@@ -720,7 +738,7 @@ const loadAppData = async () => {
     console.error('加载应用数据失败:', error)
     // 使用默认数据
     categories.value = [
-      { id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true, order: 0 }
+      { id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true, order: 0, hidden: false }
     ]
     apps.value = []
     selectedCategory.value = 'all'
@@ -739,6 +757,7 @@ const saveAppData = async () => {
     const categoriesForBackend = categories.value.map(category => ({
       ...category,
       order: category.order ?? 0,
+      hidden: !!category.hidden,
       is_default: category.isDefault,
       isDefault: undefined // 移除前端字段
     })).map(({ isDefault, ...rest }) => rest) // 完全移除 isDefault 字段
@@ -800,7 +819,7 @@ const loadAppSettings = async () => {
     Object.assign(appSettings.value, newSettings)
 
     // 恢复界面状态
-    if (settings.last_selected_category) {
+    if (settings.last_selected_category && isCategorySelectableInSidebar(settings.last_selected_category)) {
       selectedCategory.value = settings.last_selected_category
     }
     if (settings.last_search_query) {
@@ -1739,7 +1758,8 @@ const createNewCategory = async () => {
     name: t('main.contextMenu.newCategory'),
     icon: 'icon-apps',
     isDefault: false,
-    order: categories.value.length
+    order: categories.value.length,
+    hidden: false
   }
 
   categories.value.push(newCategory)

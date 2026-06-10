@@ -191,6 +191,7 @@ pub fn run() {
             data::delete_app,
             data::update_app_category,
             data::save_selected_category,
+            data::update_category_hidden,
             app_launcher::get_app_icon,
             windows::run_as_admin,
             windows::open_file_location,
