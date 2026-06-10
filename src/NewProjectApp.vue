@@ -401,6 +401,26 @@ const canSave = computed(() => {
 
 const isShortcutPath = (value) => /\.(lnk|url)$/i.test(value || '')
 
+const isUsableProjectCategory = (category) => {
+    return category && category.id !== 'all' && !category.isDefault && !category.hidden
+}
+
+const resolveDefaultProjectCategory = (categoryList, selectedCategoryId) => {
+    if (selectedCategoryId && selectedCategoryId !== 'all') {
+        const selectedCategory = categoryList.find(category => category.id === selectedCategoryId)
+        if (isUsableProjectCategory(selectedCategory)) {
+            return selectedCategory.id
+        }
+    }
+
+    const firstCustomCategory = categoryList.find(isUsableProjectCategory)
+    if (firstCustomCategory) {
+        return firstCustomCategory.id
+    }
+
+    return categoryList.find(category => category.id === 'all')?.id || ''
+}
+
 
 // 监听项目数据变化
 watch(projectData, () => {
@@ -761,21 +781,19 @@ const loadCategories = async () => {
             id: category.id,
             name: category.name,
             icon: category.icon,
-            isDefault: category.is_default
+            isDefault: category.is_default,
+            order: category.order,
+            hidden: !!category.hidden
         }))
 
         // 确保"全部应用"分组始终存在
         if (!convertedCategories.some(cat => cat.id === 'all')) {
-            convertedCategories.unshift({ id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true })
+            convertedCategories.unshift({ id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true, order: 0, hidden: false })
         }
 
         categories.value = convertedCategories
 
-        // 默认选择第一个非"全部应用"的分组
-        const defaultCategory = convertedCategories.find(cat => !cat.isDefault)
-        if (defaultCategory) {
-            projectData.category = defaultCategory.id
-        }
+        projectData.category = resolveDefaultProjectCategory(convertedCategories, storage.selected_category)
     } catch (error) {
         console.error('加载分类数据失败:', error)
     }

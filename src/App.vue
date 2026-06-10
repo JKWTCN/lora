@@ -1475,6 +1475,8 @@ const createNewProject = async () => {
   console.log('新建项目')
   
   try {
+    await invoke('save_selected_category', { categoryId: selectedCategory.value })
+    await saveUIState()
     // 调用后端命令打开新建项目窗口
     await invoke('open_new_project_window')
     console.log('新建项目窗口已打开')
