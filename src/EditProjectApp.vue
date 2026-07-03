@@ -475,6 +475,9 @@ const saveProject = async () => {
         debugLog('调用 Tauri API: update_app', updatedApp)
         // 调用后端更新应用数据
         await invoke('update_app', { app: updatedApp })
+
+        // 通知主窗口刷新数据
+        await invoke('notify_main_window_refresh')
         debugLog('项目保存成功')
 
         lastSaved.value = true
