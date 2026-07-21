@@ -1574,4 +1574,112 @@ onUnmounted(() => {
         flex-wrap: wrap;
     }
 }
+
+/* Apple-inspired settings: translucent navigation and grouped controls. */
+.settings-app {
+    grid-template-columns: 184px minmax(0, 1fr);
+    background: #f2f2f7;
+    color: #1d1d1f;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", sans-serif;
+}
+
+.settings-app.theme-dark { background: #161618; color: #f5f5f7; }
+.settings-nav {
+    width: 184px;
+    padding: 12px 9px;
+    background: rgba(232, 232, 237, .82);
+    backdrop-filter: blur(28px) saturate(170%);
+    border-right: 1px solid rgba(60,60,67,.16);
+}
+.settings-app.theme-dark .settings-nav {
+    background: rgba(36,36,38,.86);
+    border-right-color: rgba(255,255,255,.1);
+}
+.nav-item {
+    min-height: 36px;
+    margin: 2px 0;
+    padding: 0 11px;
+    border: 0;
+    border-radius: 9px;
+    color: #3a3a3c;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background-color 140ms ease, transform 90ms ease;
+}
+.settings-app.theme-dark .nav-item { color: #d1d1d6; }
+.nav-item:hover { color: inherit; background: rgba(118,118,128,.12); }
+.nav-item:active { transform: scale(.97); }
+.nav-item.active { color: #fff; background: #007aff; border: 0; }
+.nav-item i { --icon-size: 17px; width: 17px; }
+.settings-panel, .settings-app.theme-dark .settings-panel { background: transparent; }
+.panel-content { width: min(680px, 100%); padding: 24px 28px 34px; }
+
+.app-info, .info-grid, .links-section, .settings-group {
+    border-color: rgba(60,60,67,.12);
+    border-radius: 14px;
+    background: rgba(255,255,255,.82);
+    box-shadow: 0 1px 1px rgba(0,0,0,.03), 0 8px 30px rgba(0,0,0,.04);
+}
+.settings-app.theme-dark .app-info,
+.settings-app.theme-dark .info-grid,
+.settings-app.theme-dark .links-section,
+.settings-app.theme-dark .settings-group {
+    border-color: rgba(255,255,255,.1);
+    background: rgba(44,44,46,.78);
+}
+.app-details h3 { font-size: 22px; font-weight: 650; letter-spacing: -.025em; }
+.settings-group { padding: 17px 18px; margin-bottom: 16px; }
+.settings-group h3 {
+    padding-bottom: 11px;
+    border-bottom-color: rgba(60,60,67,.12);
+    font-size: 14px;
+    letter-spacing: -.01em;
+}
+.setting-item { min-height: 42px; }
+.setting-item label { color: #1d1d1f; font-size: 13px; font-weight: 500; }
+.setting-description, .group-description { color: #6e6e73; }
+.setting-item input[type="number"],
+.setting-item input[type="text"],
+.setting-item select,
+.hotkey-input input {
+    height: 36px;
+    border-color: rgba(60,60,67,.18);
+    border-radius: 9px;
+    background: rgba(118,118,128,.08);
+}
+.setting-item input:focus, .setting-item select:focus {
+    border-color: #007aff;
+    box-shadow: 0 0 0 3px rgba(0,122,255,.16);
+}
+.setting-item input[type="checkbox"] { width: 18px; height: 18px; border-radius: 5px; }
+.setting-item input[type="checkbox"]:checked { background-color: #007aff; border-color: #007aff; }
+.category-visibility-item { min-height: 42px; border-radius: 9px; background: rgba(118,118,128,.07); }
+.link-button, .clear-button, .action-button, .footer-button {
+    min-height: 36px;
+    border-radius: 10px;
+    transition: background-color 140ms ease, color 140ms ease, transform 90ms ease;
+}
+.link-button i, .action-button i { --icon-size: 16px; }
+.link-button:hover, .clear-button:hover, .action-button:hover { border-color: #007aff; color: #007aff; background: rgba(0,122,255,.08); }
+.settings-footer {
+    min-height: 64px;
+    padding: 12px 22px;
+    border-top-color: rgba(60,60,67,.14);
+    background: rgba(246,246,246,.78);
+    backdrop-filter: blur(24px) saturate(170%);
+}
+.settings-app.theme-dark .settings-footer { background: rgba(28,28,30,.82); border-top-color: rgba(255,255,255,.1); }
+.footer-button.primary { background: #007aff; border-color: #007aff; box-shadow: 0 7px 18px rgba(0,122,255,.2); }
+
+@media (prefers-reduced-transparency: reduce) {
+    .settings-nav, .settings-footer { backdrop-filter: none; }
+    .settings-nav { background: #e5e5ea; }
+    .settings-footer { background: #f2f2f7; }
+}
+
+@media (max-width: 640px) {
+    .settings-app { grid-template-columns: 148px minmax(0, 1fr); }
+    .settings-nav { width: 148px; }
+    .panel-content { padding: 18px; }
+}
 </style>

@@ -95,7 +95,7 @@ fn show_custom_tray_menu(app: &AppHandle, position: PhysicalPosition<f64>) {
     };
 
     const MENU_WIDTH: i32 = 164;
-    const MENU_HEIGHT: i32 = 112;
+    const MENU_HEIGHT: i32 = 104;
     const GAP: i32 = 8;
 
     let mut x = position.x.round() as i32 - MENU_WIDTH + 20;

@@ -489,7 +489,8 @@ const GRID_CELL_SIZE_DEFAULT = 88
 const GRID_CELL_SIZE_MIN = 56
 const GRID_CELL_SIZE_MAX = 144
 const GRID_CELL_SIZE_STEP = 4
-const SIDEBAR_WIDTH_MIN = 72
+const SIDEBAR_WIDTH_MIN = 96
+const SIDEBAR_WIDTH_MAX = 240
 
 const clampGridCellSize = (value: unknown) => {
   const numericValue = Number(value)
@@ -907,16 +908,23 @@ const sidebarStyle = computed(() => {
 
 const appContainerStyle = computed(() => {
   const cellSize = clampGridCellSize(appSettings.value.gridCellSize)
-  const hideProjectName = appSettings.value.projectNamePosition === 'none'
+  const namePosition = appSettings.value.projectNamePosition || 'bottom'
+  const hideProjectName = namePosition === 'none'
+  const usesHorizontalName = namePosition === 'left' || namePosition === 'right'
   const iconSize = hideProjectName
     ? Math.max(32, cellSize - 12)
-    : Math.min(84, Math.max(32, Math.round(cellSize * 0.58)))
-  const cellHeight = hideProjectName ? cellSize : Math.max(cellSize, iconSize + 30)
+    : Math.min(82, Math.max(30, Math.round(cellSize * 0.54)))
+  // Vertical labels need room for the icon, gap, line box and card padding.
+  // Horizontal labels share the icon's row and can retain the configured cell size.
+  const cellExtent = hideProjectName || usesHorizontalName
+    ? cellSize
+    : Math.max(cellSize, iconSize + 34)
 
   return {
     '--app-icon-size': `${iconSize}px`,
     '--app-cell-size': `${cellSize}px`,
-    '--app-cell-height': `${cellHeight}px`,
+    '--app-cell-extent': `${cellExtent}px`,
+    '--app-cell-height': `${cellExtent}px`,
   }
 })
 
@@ -2070,7 +2078,7 @@ const resize = (e: MouseEvent) => {
   if (!isResizing.value) return
 
   const newWidth = e.clientX
-  if (newWidth > SIDEBAR_WIDTH_MIN && newWidth < 200) {
+  if (newWidth >= SIDEBAR_WIDTH_MIN && newWidth <= SIDEBAR_WIDTH_MAX) {
     sidebarWidth.value = newWidth
   }
 }
@@ -3514,8 +3522,8 @@ const clearDragState = () => {
   background: var(--sidebar-bg);
   color: white;
   width: auto;
-  min-width: 72px;
-  max-width: 200px;
+  min-width: 96px;
+  max-width: 240px;
   display: flex;
   flex-direction: column;
   box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
@@ -3639,6 +3647,8 @@ const clearDragState = () => {
   flex: 1;
   min-width: 0;
   font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .layout-vertical .category-item {
@@ -3740,7 +3750,8 @@ const clearDragState = () => {
   overflow-y: auto;
   overflow-x: hidden;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--app-cell-size, 88px), 1fr));
+  grid-template-columns: repeat(auto-fill, var(--app-cell-extent, 88px));
+  grid-auto-rows: var(--app-cell-extent, 88px);
   gap: 8px;
   align-content: start;
   justify-content: start;
@@ -3754,8 +3765,9 @@ const clearDragState = () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: var(--app-cell-height, var(--app-cell-size, 88px));
+  width: var(--app-cell-extent, 88px);
+  height: var(--app-cell-extent, 88px);
+  aspect-ratio: 1;
   min-width: 0;
   overflow: hidden;
   padding: 6px;
@@ -3885,6 +3897,9 @@ const clearDragState = () => {
   font-size: 12px;
   color: var(--text-color);
   line-height: 1.25;
+  min-height: 15px;
+  padding: 0 2px;
+  flex: 0 0 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4239,6 +4254,199 @@ const clearDragState = () => {
 
 .icon-input {
   flex: 1;
+}
+
+/* Apple-inspired interface layer: quiet chrome, direct feedback, clear depth. */
+.app-container {
+  --app-bg: #f2f2f7;
+  --surface-bg: rgba(255, 255, 255, 0.72);
+  --surface-hover: rgba(0, 122, 255, 0.08);
+  --text-color: #1d1d1f;
+  --muted-text: #6e6e73;
+  --border-color: rgba(60, 60, 67, 0.16);
+  --accent-color: #007aff;
+  --titlebar-bg: rgba(246, 246, 246, 0.82);
+  --sidebar-bg: rgba(232, 232, 237, 0.82);
+  --sidebar-hover: rgba(118, 118, 128, 0.12);
+  --shadow-color: rgba(0, 0, 0, 0.14);
+  background: var(--app-bg);
+  color: var(--text-color);
+}
+
+.app-container.theme-dark {
+  --app-bg: #161618;
+  --surface-bg: rgba(44, 44, 46, 0.7);
+  --surface-hover: rgba(10, 132, 255, 0.16);
+  --text-color: #f5f5f7;
+  --muted-text: #98989d;
+  --border-color: rgba(255, 255, 255, 0.12);
+  --accent-color: #0a84ff;
+  --titlebar-bg: rgba(28, 28, 30, 0.82);
+  --sidebar-bg: rgba(36, 36, 38, 0.84);
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+}
+
+.titlebar {
+  height: 42px;
+  padding: 0 10px 0 16px;
+  color: var(--text-color);
+  background: var(--titlebar-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow: 0 1px 0 var(--border-color);
+}
+
+.app-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.titlebar-right { gap: 3px; }
+
+.titlebar-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: var(--text-color);
+  transition: background-color 140ms ease, transform 100ms ease;
+}
+
+.titlebar-button i { --icon-size: 17px; }
+
+.titlebar-button:hover { background: rgba(118, 118, 128, 0.15); }
+.titlebar-button:active { transform: scale(.9); }
+.titlebar-close:hover { color: #fff; background: #ff3b30; }
+
+.launcher-container {
+  background:
+    radial-gradient(circle at 88% 8%, rgba(0, 122, 255, 0.08), transparent 34%),
+    var(--app-bg);
+}
+
+.sidebar {
+  min-width: 96px;
+  max-width: 240px;
+  background: var(--sidebar-bg);
+  color: var(--text-color);
+  backdrop-filter: blur(28px) saturate(160%);
+  box-shadow: inset -1px 0 var(--border-color);
+}
+
+.sidebar-content { padding: 10px 8px; }
+
+.category-item {
+  min-height: 34px;
+  margin: 1px 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  transition: background-color 140ms ease, color 140ms ease, transform 100ms ease;
+}
+
+.category-item:hover { background: var(--sidebar-hover); }
+.category-item:active { transform: scale(.97); }
+.category-item.active { color: #fff; background: var(--accent-color); }
+.category-item span { font-size: 13px; font-weight: 500; }
+
+.resizer { width: 5px; margin-left: -2px; z-index: 2; }
+.resizer:hover { background: rgba(0, 122, 255, .42); }
+
+.content-header {
+  min-height: 58px;
+  padding: 10px 22px;
+  background: rgba(246, 246, 246, 0.68);
+  backdrop-filter: blur(22px) saturate(160%);
+  border: 0;
+  box-shadow: 0 10px 24px -24px rgba(0, 0, 0, .7);
+  animation: search-materialize 240ms cubic-bezier(.2,.8,.2,1);
+}
+
+.theme-dark .content-header { background: rgba(28, 28, 30, 0.66); }
+
+.search-box { flex-direction: column; gap: 4px; }
+.search-input {
+  width: min(360px, 100%);
+  height: 34px;
+  padding: 0 34px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--text-color);
+  background: rgba(118, 118, 128, 0.14);
+  text-align: center;
+  box-shadow: inset 0 0 0 1px transparent;
+}
+.search-input:focus {
+  text-align: left;
+  background: var(--surface-bg);
+  box-shadow: inset 0 0 0 1px var(--accent-color), 0 0 0 3px rgba(0, 122, 255, .15);
+}
+.search-info { margin: 0; }
+
+.app-grid { padding: 18px; gap: 10px; }
+.app-item {
+  padding: 6px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  box-shadow: none;
+  transition: background-color 150ms ease, transform 120ms ease, box-shadow 180ms ease;
+}
+.app-item:hover {
+  transform: translateY(-2px);
+  background: var(--surface-bg);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .1), inset 0 1px rgba(255, 255, 255, .5);
+}
+.app-item:active { transform: scale(.96); }
+.app-item.selected {
+  outline: 0;
+  border-color: rgba(0, 122, 255, .42);
+  background: var(--surface-hover);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, .12);
+}
+.app-icon img,
+.default-icon,
+.file-type-icon { border-radius: 11px; }
+.default-icon {
+  background: linear-gradient(145deg, #3b9cff, #0062d9);
+  box-shadow: inset 0 1px rgba(255,255,255,.35), 0 5px 12px rgba(0,122,255,.22);
+}
+.app-name { font-size: 12px; font-weight: 500; letter-spacing: -.01em; }
+
+.dialog-overlay {
+  background: rgba(0,0,0,.28);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+.dialog {
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 18px;
+  background: rgba(250,250,250,.92);
+  box-shadow: 0 24px 70px rgba(0,0,0,.25), inset 0 1px rgba(255,255,255,.8);
+}
+.theme-dark .dialog { background: rgba(44,44,46,.94); }
+.dialog-input, .dialog-select {
+  border-color: var(--border-color);
+  border-radius: 10px;
+  color: var(--text-color);
+  background: rgba(118,118,128,.1);
+}
+.dialog-button, .browse-button { border-radius: 10px; }
+.dialog-button-primary, .browse-button { background: var(--accent-color); border-color: var(--accent-color); }
+
+@keyframes search-materialize {
+  from { opacity: 0; transform: translateY(-6px) scale(.985); backdrop-filter: blur(6px); }
+  to { opacity: 1; transform: none; backdrop-filter: blur(22px) saturate(160%); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .titlebar, .sidebar, .content-header { backdrop-filter: none; }
+  .titlebar { background: #f2f2f7; }
+  .sidebar { background: #e5e5ea; }
+  .theme-dark .titlebar, .theme-dark .sidebar, .theme-dark .content-header { background: #1c1c1e; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content-header { animation: none; }
+  .app-item:hover { transform: none; }
 }
 </style>
 

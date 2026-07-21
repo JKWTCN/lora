@@ -23,7 +23,7 @@
                     :class="{ active: activeProjectType === type.id }"
                     type="button"
                     @click="activeProjectType = type.id">
-                    <span class="project-type-icon">{{ type.icon }}</span>
+                    <span class="project-type-icon"><i :class="type.icon"></i></span>
                     <span>{{ type.name }}</span>
                 </button>
             </aside>
@@ -84,7 +84,7 @@
                                            v-model="projectData.name"
                                            :placeholder="t('newProject.projectNamePlaceholder')"
                                            class="setting-input" />
-                                    <div class="input-icon">📋</div>
+                                    <div class="input-icon"><i class="icon-edit"></i></div>
                                 </div>
                             </div>
 
@@ -99,7 +99,7 @@
                                             {{ category.name }}
                                         </option>
                                     </select>
-                                    <div class="input-icon">📁</div>
+                                    <div class="input-icon"><i class="icon-folder"></i></div>
                                 </div>
                             </div>
                         </div>
@@ -119,7 +119,7 @@
                                         <option value="folder">{{ t('newProject.targetTypeFolder') }}</option>
                                         <option value="url">{{ t('newProject.targetTypeUrl') }}</option>
                                     </select>
-                                    <div class="input-icon">🎯</div>
+                                    <div class="input-icon"><i class="icon-target"></i></div>
                                 </div>
                             </div>
 
@@ -139,7 +139,7 @@
                                         <i class="icon-folder"></i>
                                         {{ t('common.browse') }}
                                     </button>
-                                    <div v-else class="input-icon">🌐</div>
+                                    <div v-else class="input-icon"><i class="icon-globe"></i></div>
                                 </div>
                             </div>
                         </div>
@@ -189,7 +189,7 @@
                                            v-model="projectData.launchArgs"
                                            :placeholder="t('newProject.launchArgsPlaceholder')"
                                            class="setting-input" />
-                                    <div class="input-icon">⚙️</div>
+                                    <div class="input-icon"><i class="icon-settings"></i></div>
                                 </div>
                             </div>
                         </div>
@@ -215,7 +215,7 @@
                                     <textarea v-model="projectData.description"
                                               :placeholder="t('newProject.projectDescriptionPlaceholder')"
                                               class="setting-input textarea"></textarea>
-                                    <div class="input-icon">💬</div>
+                                    <div class="input-icon"><i class="icon-description"></i></div>
                                 </div>
                             </div>
                         </div>
@@ -297,9 +297,9 @@ let iconFetchTimer = null
 let iconFetchRequestId = 0
 
 const projectTypes = computed(() => [
-    { id: 'custom', name: t('newProject.customProject'), icon: '○' },
-    { id: 'builtIn', name: t('newProject.builtInItems'), icon: '▦' },
-    { id: 'startMenu', name: t('newProject.startMenuItems'), icon: '☰' }
+    { id: 'custom', name: t('newProject.customProject'), icon: 'icon-plus' },
+    { id: 'builtIn', name: t('newProject.builtInItems'), icon: 'icon-apps' },
+    { id: 'startMenu', name: t('newProject.startMenuItems'), icon: 'icon-menu' }
 ])
 
 const builtInPresets = computed(() => [
@@ -1918,5 +1918,120 @@ onBeforeUnmount(() => {
         justify-content: center;
         width: 100%;
     }
+}
+
+/* Apple-inspired creation flow. */
+.new-project-app {
+    background: #f2f2f7;
+    color: #1d1d1f;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", sans-serif;
+}
+.new-project-app.theme-dark { background: #161618; color: #f5f5f7; }
+.new-project-content { background: transparent; }
+.project-type-nav {
+    width: 172px;
+    flex: 0 0 172px;
+    padding: 12px 9px;
+    background: rgba(232,232,237,.82);
+    backdrop-filter: blur(28px) saturate(170%);
+    border-right: 1px solid rgba(60,60,67,.16);
+}
+.project-type-icon {
+    width: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: currentColor;
+}
+.project-type-icon i { --icon-size: 17px; }
+.project-type-item {
+    min-height: 38px;
+    margin: 2px 0;
+    padding: 0 11px;
+    border-radius: 9px;
+    color: #3a3a3c;
+    font-size: 13px;
+    transition: background-color 140ms ease, transform 90ms ease;
+}
+.project-type-item:hover { background: rgba(118,118,128,.12); }
+.project-type-item:active { transform: scale(.97); }
+.project-type-item.active { color: #fff; background: #007aff; }
+.new-project-panel { background: transparent; padding-top: 18px; }
+.preset-grid { gap: 10px; }
+.preset-item {
+    border-radius: 14px;
+    border-color: transparent;
+    background: transparent;
+    transition: background-color 150ms ease, transform 100ms ease, box-shadow 180ms ease;
+}
+.preset-item:hover { transform: translateY(-2px); background: rgba(255,255,255,.78); box-shadow: 0 10px 24px rgba(0,0,0,.08); }
+.preset-item:active { transform: scale(.96); }
+.settings-group {
+    border: 1px solid rgba(60,60,67,.12);
+    border-radius: 16px;
+    background: rgba(255,255,255,.82);
+    box-shadow: 0 10px 34px rgba(0,0,0,.05);
+}
+.setting-label { color: #1d1d1f; font-size: 13px; font-weight: 500; }
+.input-icon i { --icon-size: 16px; }
+.setting-input, .start-menu-search-input, .footer-select {
+    border-color: rgba(60,60,67,.18);
+    border-radius: 10px;
+    background: rgba(118,118,128,.08);
+    color: #1d1d1f;
+    transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+.setting-input:focus, .start-menu-search-input:focus {
+    border-color: #007aff;
+    background: rgba(255,255,255,.9);
+    box-shadow: 0 0 0 3px rgba(0,122,255,.16);
+}
+.checkbox-setting input { width: 18px; height: 18px; border-radius: 5px; }
+.checkbox-setting input:checked { background-color: #007aff; border-color: #007aff; }
+.icon-preview { border-radius: 13px; }
+.browse-button, .footer-button { border-radius: 10px; transition: background-color 140ms ease, transform 90ms ease; }
+.browse-button, .footer-button.primary { background: #007aff; box-shadow: 0 7px 18px rgba(0,122,255,.2); }
+.new-project-footer {
+    position: relative;
+    padding-left: 196px;
+    background: rgba(246,246,246,.78);
+    backdrop-filter: blur(24px) saturate(170%);
+    border-top-color: rgba(60,60,67,.14);
+    box-shadow: 0 -12px 30px -28px rgba(0,0,0,.8);
+}
+.new-project-footer::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 0;
+    width: 172px;
+    background: rgba(232,232,237,.82);
+    border-right: 1px solid rgba(60,60,67,.16);
+}
+.new-project-footer > * { position: relative; z-index: 1; }
+.new-project-app.theme-dark .project-type-nav { background: rgba(36,36,38,.86); border-right-color: rgba(255,255,255,.1); }
+.new-project-app.theme-dark .project-type-item { color: #d1d1d6; }
+.new-project-app.theme-dark .project-type-item.active { color: #fff; background: #0a84ff; }
+.new-project-app.theme-dark .settings-group { background: rgba(44,44,46,.78); border-color: rgba(255,255,255,.1); }
+.new-project-app.theme-dark .new-project-footer { background: rgba(28,28,30,.82); }
+.new-project-app.theme-dark .new-project-footer::before { background: rgba(36,36,38,.86); border-right-color: rgba(255,255,255,.1); }
+.new-project-app.theme-dark .preset-item:hover { background: rgba(44,44,46,.84); }
+
+@media (prefers-reduced-transparency: reduce) {
+    .project-type-nav, .new-project-footer { backdrop-filter: none; }
+}
+
+@media (max-width: 768px) {
+    .project-type-nav {
+        width: 100%;
+        padding: 8px;
+        flex-direction: row;
+        overflow-x: auto;
+        border-right: 0;
+        border-bottom: 1px solid rgba(60,60,67,.16);
+    }
+    .project-type-item { flex: 0 0 auto; }
+    .new-project-footer { padding-left: 24px; }
+    .new-project-footer::before { display: none; }
 }
 </style>

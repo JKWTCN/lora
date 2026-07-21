@@ -27,7 +27,7 @@
         "title": "Lora Tray Menu",
         "url": "tray-menu.html",
         "width": 164,
-        "height": 112,
+        "height": 104,
         "decorations": false,
         "transparent": true,
         "resizable": false,
