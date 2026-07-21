@@ -5,7 +5,6 @@
       @click="toggleLanguage"
       :title="$t('language.switch')"
     >
-      <span class="language-icon">🌐</span>
       <span class="language-text">{{ currentLanguageName }}</span>
       <span class="language-arrow">▼</span>
     </button>
@@ -18,7 +17,6 @@
         :class="{ active: lang.code === currentLanguage }"
         @click="selectLanguage(lang.code)"
       >
-        <span class="language-flag">{{ lang.flag }}</span>
         <span class="language-name">{{ lang.nativeName }}</span>
       </div>
     </div>
@@ -44,8 +42,8 @@ withDefaults(defineProps<{
 const showDropdown = ref(false)
 
 const languages = [
-  { code: 'zh-CN' as SupportedLocale, name: 'Chinese', nativeName: '中文', flag: '🇨🇳' },
-  { code: 'en-US' as SupportedLocale, name: 'English', nativeName: 'English', flag: '🇺🇸' }
+  { code: 'zh-CN' as SupportedLocale, name: 'Chinese', nativeName: '中文' },
+  { code: 'en-US' as SupportedLocale, name: 'English', nativeName: 'English' }
 ]
 
 const currentLanguage = computed(() => getCurrentLanguage())
@@ -98,15 +96,15 @@ onUnmounted(() => {
 .language-button {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-3);
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--ui-radius-sm);
   color: white;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 13px;
+  font-size: var(--ui-font-body);
 }
 
 .language-button:hover {
@@ -115,8 +113,8 @@ onUnmounted(() => {
 
 .language-switch-settings .language-button {
   width: 100%;
-  max-width: 220px;
-  height: 34px;
+  max-width: var(--ui-field-max-width);
+  height: var(--ui-control-standard);
   justify-content: space-between;
   background: #ffffff;
   border: 1px solid #cbd5e1;
@@ -139,16 +137,12 @@ onUnmounted(() => {
   border-color: #38bdf8;
 }
 
-.language-icon {
-  font-size: 16px;
-}
-
 .language-text {
   font-weight: 500;
 }
 
 .language-arrow {
-  font-size: 10px;
+  font-size: var(--ui-font-caption);
   transition: transform 0.2s ease;
 }
 
@@ -169,7 +163,7 @@ onUnmounted(() => {
 .language-switch-settings .language-dropdown {
   left: 0;
   right: auto;
-  width: min(220px, 100%);
+  width: min(var(--ui-field-max-width), 100%);
 }
 
 .language-option {
@@ -209,12 +203,8 @@ onUnmounted(() => {
   color: #e0f2fe;
 }
 
-.language-flag {
-  font-size: 16px;
-}
-
 .language-name {
-  font-size: 13px;
+  font-size: var(--ui-font-body);
   font-weight: 500;
 }
 </style>

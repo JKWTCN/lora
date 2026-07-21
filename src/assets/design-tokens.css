@@ -1,0 +1,53 @@
+:root {
+  /* 4px spacing grid */
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-5: 20px;
+  --ui-space-6: 24px;
+  --ui-space-7: 28px;
+  --ui-space-8: 32px;
+
+  /* Type scale */
+  --ui-font-caption: 11px;
+  --ui-font-secondary: 12px;
+  --ui-font-body: 13px;
+  --ui-font-title: 15px;
+  --ui-font-display: 20px;
+
+  /* Icon scale */
+  --ui-icon-small: 14px;
+  --ui-icon-medium: 16px;
+  --ui-icon-large: 20px;
+
+  /* Control and chrome heights */
+  --ui-control-compact: 28px;
+  --ui-control-standard: 36px;
+  --ui-control-large: 40px;
+  --ui-checkbox-size: 18px;
+  --ui-titlebar-height: 42px;
+  --ui-footer-height: 64px;
+
+  /* Corner scale */
+  --ui-radius-xs: 6px;
+  --ui-radius-sm: 8px;
+  --ui-radius-md: 10px;
+  --ui-radius-lg: 14px;
+  --ui-radius-xl: 18px;
+
+  /* Shared component geometry */
+  --ui-sidebar-min-width: 96px;
+  --ui-sidebar-max-width: 240px;
+  --ui-sidebar-wide-width: 184px;
+  --ui-sidebar-compact-width: 148px;
+  --ui-project-nav-width: 172px;
+  --ui-panel-max-width: 680px;
+  --ui-form-max-width: 860px;
+  --ui-field-max-width: 220px;
+
+  /* Motion timings */
+  --ui-motion-press: 90ms;
+  --ui-motion-fast: 140ms;
+  --ui-motion-enter: 240ms;
+}

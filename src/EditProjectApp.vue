@@ -51,7 +51,6 @@
                                            v-model="projectData.name"
                                            :placeholder="t('editProject.form.projectNamePlaceholder')"
                                            class="setting-input" />
-                                    <div class="input-icon"><i class="icon-edit"></i></div>
                                 </div>
                             </div>
 
@@ -66,7 +65,6 @@
                                             {{ category.name }}
                                         </option>
                                     </select>
-                                    <div class="input-icon"><i class="icon-folder"></i></div>
                                 </div>
                             </div>
                         </div>
@@ -86,7 +84,6 @@
                                         <option value="folder">{{ t('editProject.form.targetTypeFolder') }}</option>
                                         <option value="url">{{ t('editProject.form.targetTypeUrl') }}</option>
                                     </select>
-                                    <div class="input-icon"><i class="icon-target"></i></div>
                                 </div>
                             </div>
 
@@ -105,7 +102,6 @@
                                         <i class="icon-folder"></i>
                                         {{ t('common.browse') }}
                                     </button>
-                                    <div v-else class="input-icon"><i class="icon-globe"></i></div>
                                 </div>
                             </div>
                         </div>
@@ -155,7 +151,6 @@
                                            v-model="projectData.launchArgs"
                                            :placeholder="t('editProject.form.launchArgsPlaceholder')"
                                            class="setting-input" />
-                                    <div class="input-icon"><i class="icon-settings"></i></div>
                                 </div>
                             </div>
                         </div>
@@ -181,7 +176,6 @@
                                     <textarea v-model="projectData.description"
                                               :placeholder="t('editProject.form.projectDescriptionPlaceholder')"
                                               class="setting-input textarea"></textarea>
-                                    <div class="input-icon"><i class="icon-description"></i></div>
                                 </div>
                             </div>
                         </div>
@@ -1137,14 +1131,6 @@ onMounted(async () => {
     padding-bottom: 12px;
 }
 
-.input-icon {
-    position: absolute;
-    left: 12px;
-    font-size: 16px;
-    color: #95a5a6;
-    pointer-events: none;
-}
-
 .browse-button {
     display: flex;
     align-items: center;
@@ -1441,7 +1427,6 @@ onMounted(async () => {
 }
 
 .edit-project-app.theme-dark .label-optional,
-.edit-project-app.theme-dark .input-icon,
 .edit-project-app.theme-dark .save-status {
     color: #94a3b8;
 }
@@ -1560,31 +1545,33 @@ onMounted(async () => {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", sans-serif;
 }
 .edit-project-app.theme-dark { background: #161618; color: #f5f5f7; }
-.edit-project-panel { background: transparent; padding: 22px 0; backdrop-filter: none; }
-.panel-section { max-width: 860px; width: 100%; margin-inline: auto; animation: editor-materialize 240ms cubic-bezier(.2,.8,.2,1); }
+.edit-project-panel { background: transparent; padding: var(--ui-space-5) 0; backdrop-filter: none; }
+.panel-section { max-width: var(--ui-form-max-width); width: 100%; margin-inline: auto; animation: editor-materialize var(--ui-motion-enter) cubic-bezier(.2,.8,.2,1); }
 .settings-group {
-    padding: 22px;
+    padding: var(--ui-space-5);
     border: 1px solid rgba(60,60,67,.12);
-    border-radius: 16px;
+    border-radius: var(--ui-radius-lg);
     background: rgba(255,255,255,.82);
     box-shadow: 0 10px 34px rgba(0,0,0,.05);
 }
-.setting-label { color: #1d1d1f; font-size: 13px; font-weight: 500; }
-.input-icon i { --icon-size: 16px; }
+.setting-label { color: #1d1d1f; font-size: var(--ui-font-body); font-weight: 500; }
 .setting-input {
+    min-height: var(--ui-control-standard);
+    padding-left: var(--ui-space-3);
     border-color: rgba(60,60,67,.18);
-    border-radius: 10px;
+    border-radius: var(--ui-radius-md);
     background: rgba(118,118,128,.08);
     color: #1d1d1f;
     transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
 }
 .setting-input:focus { border-color: #007aff; background: rgba(255,255,255,.9); box-shadow: 0 0 0 3px rgba(0,122,255,.16); }
-.checkbox-setting input { width: 18px; height: 18px; border-radius: 5px; }
+.checkbox-setting input { width: var(--ui-checkbox-size); height: var(--ui-checkbox-size); border-radius: 5px; }
 .checkbox-setting input:checked { background-color: #007aff; border-color: #007aff; }
 .icon-preview { border-radius: 13px; }
-.browse-button, .footer-button { border-radius: 10px; transition: background-color 140ms ease, transform 90ms ease; }
+.browse-button, .footer-button { min-height: var(--ui-control-standard); border-radius: var(--ui-radius-md); transition: background-color var(--ui-motion-fast) ease, transform var(--ui-motion-press) ease; }
 .browse-button, .footer-button.primary { background: #007aff; box-shadow: 0 7px 18px rgba(0,122,255,.2); }
 .edit-project-footer {
+    min-height: var(--ui-footer-height);
     background: rgba(246,246,246,.78);
     backdrop-filter: blur(24px) saturate(170%);
     border-top-color: rgba(60,60,67,.14);

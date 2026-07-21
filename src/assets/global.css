@@ -1,3 +1,5 @@
+@import "./design-tokens.css";
+
 * {
     margin: 0;
     padding: 0;
@@ -58,7 +60,7 @@ button:active:not(:disabled) {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    padding: var(--ui-space-6);
     background: rgba(0, 0, 0, 0.28);
     backdrop-filter: blur(14px) saturate(140%);
 }
@@ -67,10 +69,10 @@ button:active:not(:disabled) {
     width: min(420px, 100%);
     display: grid;
     grid-template-columns: 40px 1fr;
-    gap: 16px;
-    padding: 22px;
+    gap: var(--ui-space-4);
+    padding: var(--ui-space-6);
     border: 1px solid rgba(148, 163, 184, 0.22);
-    border-radius: 18px;
+    border-radius: var(--ui-radius-xl);
     background: rgba(252, 252, 252, 0.92);
     color: var(--apple-label);
     box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24), inset 0 1px rgba(255, 255, 255, 0.8);
@@ -107,7 +109,7 @@ button:active:not(:disabled) {
 
 .custom-dialog-body h3 {
     margin: 0 0 8px;
-    font-size: 17px;
+    font-size: var(--ui-font-title);
     font-weight: 650;
     line-height: 1.35;
 }
@@ -115,7 +117,7 @@ button:active:not(:disabled) {
 .custom-dialog-message {
     margin: 0;
     color: #475569;
-    font-size: 14px;
+    font-size: var(--ui-font-body);
     line-height: 1.65;
     white-space: pre-wrap;
     word-break: break-word;
@@ -124,17 +126,17 @@ button:active:not(:disabled) {
 .custom-dialog-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 10px;
-    margin-top: 22px;
+    gap: var(--ui-space-2);
+    margin-top: var(--ui-space-5);
 }
 
 .custom-dialog-button {
     min-width: 76px;
-    height: 34px;
-    padding: 0 16px;
+    height: var(--ui-control-standard);
+    padding: 0 var(--ui-space-4);
     border: 0;
-    border-radius: 10px;
-    font-size: 13px;
+    border-radius: var(--ui-radius-md);
+    font-size: var(--ui-font-body);
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;

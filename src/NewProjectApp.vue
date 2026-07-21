@@ -84,7 +84,6 @@
                                            v-model="projectData.name"
                                            :placeholder="t('newProject.projectNamePlaceholder')"
                                            class="setting-input" />
-                                    <div class="input-icon"><i class="icon-edit"></i></div>
                                 </div>
                             </div>
 
@@ -99,7 +98,6 @@
                                             {{ category.name }}
                                         </option>
                                     </select>
-                                    <div class="input-icon"><i class="icon-folder"></i></div>
                                 </div>
                             </div>
                         </div>
@@ -119,7 +117,6 @@
                                         <option value="folder">{{ t('newProject.targetTypeFolder') }}</option>
                                         <option value="url">{{ t('newProject.targetTypeUrl') }}</option>
                                     </select>
-                                    <div class="input-icon"><i class="icon-target"></i></div>
                                 </div>
                             </div>
 
@@ -139,7 +136,6 @@
                                         <i class="icon-folder"></i>
                                         {{ t('common.browse') }}
                                     </button>
-                                    <div v-else class="input-icon"><i class="icon-globe"></i></div>
                                 </div>
                             </div>
                         </div>
@@ -189,7 +185,6 @@
                                            v-model="projectData.launchArgs"
                                            :placeholder="t('newProject.launchArgsPlaceholder')"
                                            class="setting-input" />
-                                    <div class="input-icon"><i class="icon-settings"></i></div>
                                 </div>
                             </div>
                         </div>
@@ -215,7 +210,6 @@
                                     <textarea v-model="projectData.description"
                                               :placeholder="t('newProject.projectDescriptionPlaceholder')"
                                               class="setting-input textarea"></textarea>
-                                    <div class="input-icon"><i class="icon-description"></i></div>
                                 </div>
                             </div>
                         </div>
@@ -1418,14 +1412,6 @@ onBeforeUnmount(() => {
     padding-bottom: 12px;
 }
 
-.input-icon {
-    position: absolute;
-    left: 12px;
-    font-size: 16px;
-    color: #95a5a6;
-    pointer-events: none;
-}
-
 .browse-button {
     display: flex;
     align-items: center;
@@ -1773,7 +1759,6 @@ onBeforeUnmount(() => {
 }
 
 .new-project-app.theme-dark .label-optional,
-.new-project-app.theme-dark .input-icon,
 .new-project-app.theme-dark .save-status {
     color: #94a3b8;
 }
@@ -1929,9 +1914,9 @@ onBeforeUnmount(() => {
 .new-project-app.theme-dark { background: #161618; color: #f5f5f7; }
 .new-project-content { background: transparent; }
 .project-type-nav {
-    width: 172px;
-    flex: 0 0 172px;
-    padding: 12px 9px;
+    width: var(--ui-project-nav-width);
+    flex: 0 0 var(--ui-project-nav-width);
+    padding: var(--ui-space-3) var(--ui-space-2);
     background: rgba(232,232,237,.82);
     backdrop-filter: blur(28px) saturate(170%);
     border-right: 1px solid rgba(60,60,67,.16);
@@ -1943,14 +1928,14 @@ onBeforeUnmount(() => {
     justify-content: center;
     color: currentColor;
 }
-.project-type-icon i { --icon-size: 17px; }
+.project-type-icon i { --icon-size: var(--ui-icon-medium); }
 .project-type-item {
-    min-height: 38px;
+    min-height: var(--ui-control-standard);
     margin: 2px 0;
-    padding: 0 11px;
-    border-radius: 9px;
+    padding: 0 var(--ui-space-3);
+    border-radius: var(--ui-radius-sm);
     color: #3a3a3c;
-    font-size: 13px;
+    font-size: var(--ui-font-body);
     transition: background-color 140ms ease, transform 90ms ease;
 }
 .project-type-item:hover { background: rgba(118,118,128,.12); }
@@ -1959,7 +1944,7 @@ onBeforeUnmount(() => {
 .new-project-panel { background: transparent; padding-top: 18px; }
 .preset-grid { gap: 10px; }
 .preset-item {
-    border-radius: 14px;
+    border-radius: var(--ui-radius-lg);
     border-color: transparent;
     background: transparent;
     transition: background-color 150ms ease, transform 100ms ease, box-shadow 180ms ease;
@@ -1968,32 +1953,34 @@ onBeforeUnmount(() => {
 .preset-item:active { transform: scale(.96); }
 .settings-group {
     border: 1px solid rgba(60,60,67,.12);
-    border-radius: 16px;
+    border-radius: var(--ui-radius-lg);
     background: rgba(255,255,255,.82);
     box-shadow: 0 10px 34px rgba(0,0,0,.05);
 }
-.setting-label { color: #1d1d1f; font-size: 13px; font-weight: 500; }
-.input-icon i { --icon-size: 16px; }
+.setting-label { color: #1d1d1f; font-size: var(--ui-font-body); font-weight: 500; }
 .setting-input, .start-menu-search-input, .footer-select {
+    min-height: var(--ui-control-standard);
     border-color: rgba(60,60,67,.18);
-    border-radius: 10px;
+    border-radius: var(--ui-radius-md);
     background: rgba(118,118,128,.08);
     color: #1d1d1f;
     transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
 }
+.setting-input { padding-left: var(--ui-space-3); }
 .setting-input:focus, .start-menu-search-input:focus {
     border-color: #007aff;
     background: rgba(255,255,255,.9);
     box-shadow: 0 0 0 3px rgba(0,122,255,.16);
 }
-.checkbox-setting input { width: 18px; height: 18px; border-radius: 5px; }
+.checkbox-setting input { width: var(--ui-checkbox-size); height: var(--ui-checkbox-size); border-radius: 5px; }
 .checkbox-setting input:checked { background-color: #007aff; border-color: #007aff; }
 .icon-preview { border-radius: 13px; }
-.browse-button, .footer-button { border-radius: 10px; transition: background-color 140ms ease, transform 90ms ease; }
+.browse-button, .footer-button { min-height: var(--ui-control-standard); border-radius: var(--ui-radius-md); transition: background-color var(--ui-motion-fast) ease, transform var(--ui-motion-press) ease; }
 .browse-button, .footer-button.primary { background: #007aff; box-shadow: 0 7px 18px rgba(0,122,255,.2); }
 .new-project-footer {
     position: relative;
-    padding-left: 196px;
+    min-height: var(--ui-footer-height);
+    padding-left: calc(var(--ui-project-nav-width) + var(--ui-space-6));
     background: rgba(246,246,246,.78);
     backdrop-filter: blur(24px) saturate(170%);
     border-top-color: rgba(60,60,67,.14);
@@ -2004,7 +1991,7 @@ onBeforeUnmount(() => {
     position: absolute;
     inset: 0 auto 0 0;
     z-index: 0;
-    width: 172px;
+    width: var(--ui-project-nav-width);
     background: rgba(232,232,237,.82);
     border-right: 1px solid rgba(60,60,67,.16);
 }
@@ -2024,14 +2011,14 @@ onBeforeUnmount(() => {
 @media (max-width: 768px) {
     .project-type-nav {
         width: 100%;
-        padding: 8px;
+        padding: var(--ui-space-2);
         flex-direction: row;
         overflow-x: auto;
         border-right: 0;
         border-bottom: 1px solid rgba(60,60,67,.16);
     }
     .project-type-item { flex: 0 0 auto; }
-    .new-project-footer { padding-left: 24px; }
+    .new-project-footer { padding-left: var(--ui-space-6); }
     .new-project-footer::before { display: none; }
 }
 </style>

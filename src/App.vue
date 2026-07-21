@@ -337,6 +337,7 @@ import { LogicalSize } from '@tauri-apps/api/dpi'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from 'vue-i18n'
 import { alertDialog, confirmDialog } from './utils/customDialog'
+import { LAUNCHER_GRID_SIZE, LAUNCHER_ICON_SIZE, SIDEBAR_SIZE } from './designTokens'
 
 const { t } = useI18n()
 
@@ -485,12 +486,12 @@ const mainMenu = ref<{
   y: 0
 })
 
-const GRID_CELL_SIZE_DEFAULT = 88
-const GRID_CELL_SIZE_MIN = 56
-const GRID_CELL_SIZE_MAX = 144
-const GRID_CELL_SIZE_STEP = 4
-const SIDEBAR_WIDTH_MIN = 96
-const SIDEBAR_WIDTH_MAX = 240
+const GRID_CELL_SIZE_DEFAULT = LAUNCHER_GRID_SIZE.default
+const GRID_CELL_SIZE_MIN = LAUNCHER_GRID_SIZE.min
+const GRID_CELL_SIZE_MAX = LAUNCHER_GRID_SIZE.max
+const GRID_CELL_SIZE_STEP = LAUNCHER_GRID_SIZE.step
+const SIDEBAR_WIDTH_MIN = SIDEBAR_SIZE.min
+const SIDEBAR_WIDTH_MAX = SIDEBAR_SIZE.max
 
 const clampGridCellSize = (value: unknown) => {
   const numericValue = Number(value)
@@ -912,13 +913,16 @@ const appContainerStyle = computed(() => {
   const hideProjectName = namePosition === 'none'
   const usesHorizontalName = namePosition === 'left' || namePosition === 'right'
   const iconSize = hideProjectName
-    ? Math.max(32, cellSize - 12)
-    : Math.min(82, Math.max(30, Math.round(cellSize * 0.54)))
+    ? Math.max(LAUNCHER_ICON_SIZE.minWithoutLabel, cellSize - LAUNCHER_ICON_SIZE.noLabelInset)
+    : Math.min(
+      LAUNCHER_ICON_SIZE.maxWithLabel,
+      Math.max(LAUNCHER_ICON_SIZE.minWithLabel, Math.round(cellSize * LAUNCHER_ICON_SIZE.labelRatio)),
+    )
   // Vertical labels need room for the icon, gap, line box and card padding.
   // Horizontal labels share the icon's row and can retain the configured cell size.
   const cellExtent = hideProjectName || usesHorizontalName
     ? cellSize
-    : Math.max(cellSize, iconSize + 34)
+    : Math.max(cellSize, iconSize + LAUNCHER_ICON_SIZE.verticalLabelAllowance)
 
   return {
     '--app-icon-size': `${iconSize}px`,
@@ -4287,8 +4291,8 @@ const clearDragState = () => {
 }
 
 .titlebar {
-  height: 42px;
-  padding: 0 10px 0 16px;
+  height: var(--ui-titlebar-height);
+  padding: 0 var(--ui-space-2) 0 var(--ui-space-4);
   color: var(--text-color);
   background: var(--titlebar-bg);
   backdrop-filter: blur(24px) saturate(180%);
@@ -4297,22 +4301,22 @@ const clearDragState = () => {
 }
 
 .app-title {
-  font-size: 13px;
+  font-size: var(--ui-font-body);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
-.titlebar-right { gap: 3px; }
+.titlebar-right { gap: var(--ui-space-1); }
 
 .titlebar-button {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: var(--ui-control-compact);
+  height: var(--ui-control-compact);
+  border-radius: var(--ui-radius-sm);
   color: var(--text-color);
   transition: background-color 140ms ease, transform 100ms ease;
 }
 
-.titlebar-button i { --icon-size: 17px; }
+.titlebar-button i { --icon-size: var(--ui-icon-medium); }
 
 .titlebar-button:hover { background: rgba(118, 118, 128, 0.15); }
 .titlebar-button:active { transform: scale(.9); }
@@ -4325,35 +4329,35 @@ const clearDragState = () => {
 }
 
 .sidebar {
-  min-width: 96px;
-  max-width: 240px;
+  min-width: var(--ui-sidebar-min-width);
+  max-width: var(--ui-sidebar-max-width);
   background: var(--sidebar-bg);
   color: var(--text-color);
   backdrop-filter: blur(28px) saturate(160%);
   box-shadow: inset -1px 0 var(--border-color);
 }
 
-.sidebar-content { padding: 10px 8px; }
+.sidebar-content { padding: var(--ui-space-2); }
 
 .category-item {
-  min-height: 34px;
+  min-height: var(--ui-control-standard);
   margin: 1px 0;
-  padding: 7px 10px;
-  border-radius: 8px;
+  padding: var(--ui-space-2);
+  border-radius: var(--ui-radius-sm);
   transition: background-color 140ms ease, color 140ms ease, transform 100ms ease;
 }
 
 .category-item:hover { background: var(--sidebar-hover); }
 .category-item:active { transform: scale(.97); }
 .category-item.active { color: #fff; background: var(--accent-color); }
-.category-item span { font-size: 13px; font-weight: 500; }
+.category-item span { font-size: var(--ui-font-body); font-weight: 500; }
 
 .resizer { width: 5px; margin-left: -2px; z-index: 2; }
 .resizer:hover { background: rgba(0, 122, 255, .42); }
 
 .content-header {
   min-height: 58px;
-  padding: 10px 22px;
+  padding: var(--ui-space-2) var(--ui-space-5);
   background: rgba(246, 246, 246, 0.68);
   backdrop-filter: blur(22px) saturate(160%);
   border: 0;
@@ -4366,10 +4370,10 @@ const clearDragState = () => {
 .search-box { flex-direction: column; gap: 4px; }
 .search-input {
   width: min(360px, 100%);
-  height: 34px;
+  height: var(--ui-control-standard);
   padding: 0 34px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--ui-radius-md);
   color: var(--text-color);
   background: rgba(118, 118, 128, 0.14);
   text-align: center;
@@ -4382,11 +4386,11 @@ const clearDragState = () => {
 }
 .search-info { margin: 0; }
 
-.app-grid { padding: 18px; gap: 10px; }
+.app-grid { padding: var(--ui-space-4); gap: var(--ui-space-2); }
 .app-item {
-  padding: 6px;
+  padding: var(--ui-space-1);
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: var(--ui-radius-lg);
   background: transparent;
   box-shadow: none;
   transition: background-color 150ms ease, transform 120ms ease, box-shadow 180ms ease;
@@ -4410,7 +4414,7 @@ const clearDragState = () => {
   background: linear-gradient(145deg, #3b9cff, #0062d9);
   box-shadow: inset 0 1px rgba(255,255,255,.35), 0 5px 12px rgba(0,122,255,.22);
 }
-.app-name { font-size: 12px; font-weight: 500; letter-spacing: -.01em; }
+.app-name { font-size: var(--ui-font-secondary); font-weight: 500; letter-spacing: -.01em; }
 
 .dialog-overlay {
   background: rgba(0,0,0,.28);
@@ -4418,18 +4422,19 @@ const clearDragState = () => {
 }
 .dialog {
   border: 1px solid rgba(255,255,255,.55);
-  border-radius: 18px;
+  border-radius: var(--ui-radius-xl);
   background: rgba(250,250,250,.92);
   box-shadow: 0 24px 70px rgba(0,0,0,.25), inset 0 1px rgba(255,255,255,.8);
 }
 .theme-dark .dialog { background: rgba(44,44,46,.94); }
 .dialog-input, .dialog-select {
+  min-height: var(--ui-control-standard);
   border-color: var(--border-color);
-  border-radius: 10px;
+  border-radius: var(--ui-radius-md);
   color: var(--text-color);
   background: rgba(118,118,128,.1);
 }
-.dialog-button, .browse-button { border-radius: 10px; }
+.dialog-button, .browse-button { border-radius: var(--ui-radius-md); }
 .dialog-button-primary, .browse-button { background: var(--accent-color); border-color: var(--accent-color); }
 
 @keyframes search-materialize {

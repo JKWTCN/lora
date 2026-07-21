@@ -1,14 +1,16 @@
+@import "./design-tokens.css";
+
 .context-menu {
   position: fixed !important;
   min-width: 120px;
-  padding: 5px;
+  padding: var(--ui-space-1);
   overflow: visible;
   color: #1d1d1f;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: rgba(246, 246, 246, 0.86);
   backdrop-filter: blur(28px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.68);
-  border-radius: 12px;
+  border-radius: var(--ui-radius-md);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.2), inset 0 1px rgba(255, 255, 255, 0.72);
   z-index: 999999;
   pointer-events: auto;
@@ -48,13 +50,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 30px;
-  padding: 0 10px;
+  min-height: var(--ui-control-compact);
+  padding: 0 var(--ui-space-2);
   color: #1d1d1f;
-  font-size: 13px;
-  line-height: 30px;
+  font-size: var(--ui-font-secondary);
+  line-height: var(--ui-control-compact);
   white-space: nowrap;
-  border-radius: 7px;
+  border-radius: var(--ui-radius-xs);
   cursor: pointer;
   transition: background-color 0.14s ease, color 0.14s ease;
 }
@@ -91,7 +93,7 @@
 
 .context-menu-divider {
   height: 1px;
-  margin: 4px 8px;
+  margin: var(--ui-space-1) var(--ui-space-2);
   background: rgba(60, 60, 67, 0.16);
 }
 

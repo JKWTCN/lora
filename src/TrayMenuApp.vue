@@ -125,8 +125,8 @@ body,
   width: 100%;
   height: 100%;
   min-width: 0;
-  padding: 5px;
-  border-radius: 10px;
+  padding: var(--ui-space-1);
+  border-radius: var(--ui-radius-md);
   background: rgba(248, 248, 248, 0.98);
   border: 0;
   box-shadow: inset 0 0 0 1px rgba(60, 60, 67, 0.16);
@@ -135,31 +135,31 @@ body,
 
 .tray-context-menu .tray-menu-item {
   width: 100%;
-  min-height: 28px;
+  min-height: var(--ui-control-compact);
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
+  grid-template-columns: var(--ui-icon-medium) minmax(0, 1fr);
   align-items: center;
-  gap: 6px;
-  padding: 0 8px;
-  border-radius: 6px;
+  gap: var(--ui-space-2);
+  padding: 0 var(--ui-space-2);
+  border-radius: var(--ui-radius-xs);
   background: transparent;
   border: 0;
   appearance: none;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--ui-font-secondary);
   font-weight: 500;
   line-height: 1.2;
   text-align: left;
 }
 
 .menu-mark {
-  width: 16px;
-  height: 16px;
+  width: var(--ui-icon-medium);
+  height: var(--ui-icon-medium);
   display: grid;
   place-items: center;
   text-align: center;
   color: transparent;
-  font-size: 11px;
+  font-size: var(--ui-font-caption);
   font-weight: 700;
 }
 
@@ -176,7 +176,7 @@ body,
 }
 
 .tray-context-menu .context-menu-divider {
-  margin: 2px 8px;
+  margin: 2px var(--ui-space-2);
 }
 
 body.lora-theme-dark .tray-context-menu {
