@@ -268,7 +268,8 @@
       </div>
 
       <!-- 拖拽分隔线 -->
-      <div class="resizer" @mousedown="startResize"></div>
+      <div class="resizer" :class="{ disabled: appSettings.layoutLocked }" @mousedown="startResize"
+        :title="appSettings.layoutLocked ? $t('settings.ui.window.layoutLocked') : ''"></div>
 
       <!-- 主内容区域 -->
       <div class="main-content" :class="{ 'drag-over': isDragOver }">
@@ -514,6 +515,7 @@ const appSettings = ref({
   windowWidth: undefined as number | undefined, // 窗口宽度
   windowHeight: undefined as number | undefined, // 窗口高度
   windowLayout: 'horizontal' as string, // 窗口布局
+  layoutLocked: false as boolean, // 锁定应用、分组与侧栏布局
   theme: 'auto' as string, // 主题
   projectNamePosition: 'bottom' as string, // 项目名称显示位置
   gridCellSize: GRID_CELL_SIZE_DEFAULT as number, // 启动器格子大小
@@ -816,6 +818,7 @@ const loadAppSettings = async () => {
       windowWidth: settings.window_width,
       windowHeight: settings.window_height,
       windowLayout: settings.window_layout || 'horizontal',
+      layoutLocked: settings.layout_locked === true,
       theme: settings.theme || 'auto',
       projectNamePosition: settings.project_name_position || 'bottom',
       gridCellSize: clampGridCellSize(settings.icon_size ?? GRID_CELL_SIZE_DEFAULT),
@@ -900,6 +903,7 @@ const appContainerClasses = computed(() => ({
   'theme-light': resolvedTheme.value === 'light',
   'layout-horizontal': appSettings.value.windowLayout !== 'vertical',
   'layout-vertical': appSettings.value.windowLayout === 'vertical',
+  'layout-locked': appSettings.value.layoutLocked,
   [`name-position-${appSettings.value.projectNamePosition || 'bottom'}`]: true,
   'animations-disabled': !appSettings.value.enableAnimations,
   [`animation-${appSettings.value.animationSpeed || 'normal'}`]: true,
@@ -2128,7 +2132,7 @@ const deleteAllCategories = async () => {
 
 // 拖拽调整侧栏宽度
 const startResize = (e: MouseEvent) => {
-  if (appSettings.value.windowLayout === 'vertical') {
+  if (appSettings.value.windowLayout === 'vertical' || appSettings.value.layoutLocked) {
     return
   }
 
@@ -2149,7 +2153,7 @@ const startResize = (e: MouseEvent) => {
 }
 
 const resize = (e: MouseEvent) => {
-  if (!isResizing.value) return
+  if (!isResizing.value || appSettings.value.layoutLocked) return
 
   const newWidth = e.clientX
   if (newWidth >= SIDEBAR_WIDTH_MIN && newWidth <= SIDEBAR_WIDTH_MAX) {
@@ -2294,6 +2298,10 @@ const handleLauncherWheel = (event: WheelEvent) => {
   }
 
   event.preventDefault()
+  if (appSettings.value.layoutLocked) {
+    return
+  }
+
   adjustGridCellSize(event.deltaY < 0 ? GRID_CELL_SIZE_STEP : -GRID_CELL_SIZE_STEP)
 }
 
@@ -3150,7 +3158,7 @@ const saveCategoriesOrder = async () => {
 }
 
 const reorderCategories = async (sourceCategory: CategoryData, sourceIndex: number, targetIndex: number) => {
-  if (sourceCategory.isDefault || sourceCategory.id === 'all') {
+  if (appSettings.value.layoutLocked || sourceCategory.isDefault || sourceCategory.id === 'all') {
     return
   }
   if (sourceIndex === targetIndex || sourceIndex <= 0 || targetIndex <= 0) {
@@ -3250,7 +3258,7 @@ const handleCategoryPointerUp = async (event: PointerEvent) => {
 }
 
 const handleCategoryPointerDown = (event: PointerEvent, category: CategoryData, index: number) => {
-  if (event.button !== 0 || category.isDefault || category.id === 'all') {
+  if (appSettings.value.layoutLocked || event.button !== 0 || category.isDefault || category.id === 'all') {
     return
   }
 
@@ -3303,7 +3311,7 @@ const saveAppsOrder = async () => {
 }
 
 const reorderApps = async (sourceApp: AppData, sourceIndex: number, targetIndex: number) => {
-  if (sourceIndex === targetIndex || targetIndex < 0) {
+  if (appSettings.value.layoutLocked || sourceIndex === targetIndex || targetIndex < 0) {
     return
   }
 
@@ -3415,7 +3423,7 @@ const handleAppPointerUp = async (event: PointerEvent) => {
 }
 
 const handleAppPointerDown = (event: PointerEvent, app: AppData, index: number) => {
-  if (event.button !== 0) {
+  if (appSettings.value.layoutLocked || event.button !== 0) {
     return
   }
 
@@ -3745,6 +3753,15 @@ const clearDragState = () => {
 
 .resizer:hover {
   background: var(--accent-color);
+}
+
+.layout-locked .resizer {
+  cursor: default;
+  pointer-events: none;
+}
+
+.layout-locked .resizer:hover {
+  background: transparent;
 }
 
 .layout-vertical .resizer {

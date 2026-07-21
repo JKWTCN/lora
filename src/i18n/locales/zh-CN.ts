@@ -169,6 +169,8 @@ export default {
         layout: '窗口布局',
         layoutHorizontal: '横向布局',
         layoutVertical: '竖向布局',
+        layoutLocked: '锁定启动器布局',
+        layoutLockedDesc: '禁止调整侧栏宽度以及拖动应用或分组排序，其他功能不受影响',
         preventAutoHide: '阻止窗口自动隐藏',
         preventAutoHideDesc: '启用此选项后，窗口失去焦点时不会自动隐藏'
       },

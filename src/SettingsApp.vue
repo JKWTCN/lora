@@ -121,6 +121,17 @@
                                 <option value="right">{{ $t('settings.ui.appearance.namePositionRight') }}</option>
                             </select>
                         </div>
+
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" v-model="localSettings.layoutLocked"
+                                    @change="updateLayoutLocked" />
+                                {{ $t('settings.ui.window.layoutLocked') }}
+                            </label>
+                            <p class="setting-description">
+                                {{ $t('settings.ui.window.layoutLockedDesc') }}
+                            </p>
+                        </div>
                     </div>
 
                     <div class="settings-group">
@@ -365,6 +376,7 @@ const localSettings = reactive({
     // 窗口设置
     preventAutoHide: false,
     windowLayout: 'horizontal',
+    layoutLocked: false,
 
     // 外观设置
     theme: 'auto',
@@ -492,6 +504,17 @@ const updateProjectNamePosition = async () => {
         console.log('项目名称显示位置已更新')
     } catch (error) {
         console.error('更新项目名称显示位置失败:', error)
+    }
+}
+
+const updateLayoutLocked = async () => {
+    try {
+        await invoke('update_layout_locked', { layoutLocked: localSettings.layoutLocked })
+        await notifySettingsUpdated()
+        markSaved()
+        console.log('布局锁定设置已更新')
+    } catch (error) {
+        console.error('更新布局锁定设置失败:', error)
     }
 }
 
@@ -765,6 +788,7 @@ const loadSettings = async () => {
         // 将后端设置映射到前端本地设置
         localSettings.preventAutoHide = settings.prevent_auto_hide || false
         localSettings.windowLayout = settings.window_layout || 'horizontal'
+        localSettings.layoutLocked = settings.layout_locked === true
         localSettings.theme = settings.theme || 'auto'
         localSettings.projectNamePosition = settings.project_name_position || 'bottom'
         localSettings.startMinimized = settings.start_minimized || false

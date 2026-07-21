@@ -169,6 +169,8 @@ export default {
         layout: 'Window Layout',
         layoutHorizontal: 'Horizontal',
         layoutVertical: 'Vertical',
+        layoutLocked: 'Lock Launcher Layout',
+        layoutLockedDesc: 'Prevent sidebar resizing and app or group reordering without disabling other features',
         preventAutoHide: 'Prevent Window Auto-Hide',
         preventAutoHideDesc: 'When enabled, the window will not auto-hide when it loses focus'
       },

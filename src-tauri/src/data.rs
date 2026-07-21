@@ -165,6 +165,7 @@ pub fn get_default_settings() -> AppSettings {
         new_project_window_width: Some(600),
         new_project_window_height: Some(500),
         window_layout: Some("horizontal".to_string()),
+        layout_locked: Some(false),
         theme: Some("auto".to_string()),
         icon_size: Some(88),
         project_name_position: Some("bottom".to_string()),

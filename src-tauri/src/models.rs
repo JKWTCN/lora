@@ -45,6 +45,7 @@ pub struct AppSettings {
     pub new_project_window_width: Option<u32>,
     pub new_project_window_height: Option<u32>,
     pub window_layout: Option<String>, // "horizontal", "vertical"
+    pub layout_locked: Option<bool>,
     // 外观设置
     pub theme: Option<String>,
     pub icon_size: Option<u32>,

@@ -36,6 +36,7 @@ pub fn get_default_settings() -> AppSettings {
         new_project_window_width: Some(600),
         new_project_window_height: Some(500),
         window_layout: Some("horizontal".to_string()),
+        layout_locked: Some(false),
         theme: Some("auto".to_string()),
         icon_size: Some(88),
         project_name_position: Some("bottom".to_string()),
@@ -95,6 +96,15 @@ pub fn update_window_layout(window_layout: String) -> Result<String, String> {
     settings.window_layout = Some(window_layout);
     save_app_settings(settings)?;
     Ok("窗口布局设置已更新".to_string())
+}
+
+/// 更新布局锁定设置
+#[tauri::command]
+pub fn update_layout_locked(layout_locked: bool) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.layout_locked = Some(layout_locked);
+    save_app_settings(settings)?;
+    Ok("布局锁定设置已更新".to_string())
 }
 
 /// 更新图标大小设置
