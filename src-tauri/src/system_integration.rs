@@ -12,8 +12,8 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-use crate::data::load_app_settings;
-use crate::models::AppSettings;
+use crate::data::{load_app_data, load_app_settings};
+use crate::models::{AppData, AppSettings};
 
 #[cfg(target_os = "windows")]
 mod mouse_invocation {
@@ -217,27 +217,108 @@ fn show_custom_tray_menu(app: &AppHandle, position: PhysicalPosition<f64>) {
 
 /// 初始化全局快捷键
 pub fn initialize_global_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    // 先加载设置以获取当前状态
-    let settings = load_app_settings().unwrap_or_else(|_| get_default_settings());
+    refresh_global_shortcuts(app).map_err(|error| {
+        Box::new(std::io::Error::new(std::io::ErrorKind::Other, error))
+            as Box<dyn std::error::Error>
+    })
+}
 
-    // 注册全局快捷键
+/// 重新注册窗口呼出与所有单项目快捷键。
+pub fn refresh_global_shortcuts(app: &AppHandle) -> Result<(), String> {
+    let settings = load_app_settings().unwrap_or_else(|_| get_default_settings());
+    let storage = load_app_data()?;
+    let mut registrations: Vec<(Shortcut, String)> = Vec::new();
+
     if settings.global_hotkey.unwrap_or(true) {
         if let Some(hotkey) = &settings.toggle_hotkey {
             if !hotkey.is_empty() {
-                if let Ok(shortcut) = hotkey.parse::<Shortcut>() {
-                    if let Err(e) = app.global_shortcut().register(shortcut.clone()) {
-                        eprintln!("注册全局快捷键失败: {}", e);
-                    } else {
-                        println!("已注册全局快捷键: {}", hotkey);
-                    }
-                } else {
-                    eprintln!("快捷键格式无效: {}", hotkey);
-                }
+                let shortcut = hotkey
+                    .parse::<Shortcut>()
+                    .map_err(|error| format!("窗口呼出快捷键格式无效: {}", error))?;
+                registrations.push((shortcut, "窗口呼出".to_string()));
             }
         }
     }
 
+    for project in storage.apps {
+        let Some(hotkey) = project
+            .shortcut_hotkey
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            continue;
+        };
+
+        let shortcut = hotkey
+            .parse::<Shortcut>()
+            .map_err(|error| format!("项目“{}”的快捷键格式无效: {}", project.name, error))?;
+        if shortcut.mods.is_empty() {
+            return Err(format!("项目“{}”的快捷键缺少修饰键", project.name));
+        }
+        registrations.push((shortcut, format!("项目“{}”", project.name)));
+    }
+
+    let mut registered_ids = std::collections::HashSet::new();
+    for (shortcut, label) in &registrations {
+        if !registered_ids.insert(shortcut.id()) {
+            return Err(format!("{}的快捷键与其他绑定冲突", label));
+        }
+    }
+
+    app.global_shortcut()
+        .unregister_all()
+        .map_err(|error| format!("清理全局快捷键失败: {}", error))?;
+
+    for (shortcut, label) in registrations {
+        app.global_shortcut()
+            .register(shortcut)
+            .map_err(|error| format!("注册{}快捷键失败: {}", label, error))?;
+    }
+
     Ok(())
+}
+
+#[tauri::command]
+pub fn refresh_shortcut_registrations(app: AppHandle) -> Result<String, String> {
+    refresh_global_shortcuts(&app)?;
+    Ok("快捷键注册已刷新".to_string())
+}
+
+fn shortcut_id(value: &str) -> Option<u32> {
+    value.parse::<Shortcut>().ok().map(|shortcut| shortcut.id())
+}
+
+fn launch_project_from_shortcut(app: &AppHandle, project: &AppData) {
+    let target_path = if project.path.to_lowercase().ends_with(".lnk")
+        || project.path.to_lowercase().ends_with(".url")
+    {
+        project.path.clone()
+    } else {
+        project
+            .target_path
+            .clone()
+            .unwrap_or_else(|| project.path.clone())
+    };
+    let launch_args = project.launch_args.clone();
+
+    let result = if project.target_type.as_deref() == Some("url") {
+        crate::system::open_url(target_path, launch_args)
+    } else if project.target_type.as_deref() == Some("folder") && !project.run_as_admin {
+        crate::system::open_folder(target_path, launch_args)
+    } else {
+        crate::app_launcher::launch_app(target_path, launch_args, Some(project.run_as_admin))
+    };
+
+    match result {
+        Ok(_) => {
+            if let Err(error) = crate::data::increment_app_usage(project.id) {
+                eprintln!("更新项目快捷键使用次数失败: {}", error);
+            }
+            let _ = app.emit("data-updated", {});
+        }
+        Err(error) => eprintln!("项目快捷键启动“{}”失败: {}", project.name, error),
+    }
 }
 
 /// 创建全局快捷键处理器
@@ -250,6 +331,23 @@ pub fn create_global_shortcut_handler(
         }
 
         println!("快捷键按下触发: {:?}, 事件: {:?}", shortcut, event);
+
+        let settings = load_app_settings().unwrap_or_else(|_| get_default_settings());
+        let is_window_toggle = settings.global_hotkey.unwrap_or(true)
+            && settings.toggle_hotkey.as_deref().and_then(shortcut_id) == Some(shortcut.id());
+
+        if !is_window_toggle {
+            let project = load_app_data().ok().and_then(|storage| {
+                storage.apps.into_iter().find(|project| {
+                    project.shortcut_hotkey.as_deref().and_then(shortcut_id) == Some(shortcut.id())
+                })
+            });
+
+            if let Some(project) = project {
+                launch_project_from_shortcut(app, &project);
+            }
+            return;
+        }
 
         // 尝试多种方式获取主窗口
         let window = app.get_webview_window("main").or_else(|| {

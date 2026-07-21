@@ -189,7 +189,26 @@
                             </div>
                         </div>
 
-                        <!-- 第四行：管理员启动 -->
+                        <!-- 第四行：项目快捷键 -->
+                        <div class="settings-row">
+                            <div class="setting-item half-width">
+                                <label class="setting-label">
+                                    <span class="label-text">{{ t('newProject.projectHotkey') }}</span>
+                                    <span class="label-optional">{{ t('common.optional') }}</span>
+                                </label>
+                                <div class="input-wrapper">
+                                    <input type="text" v-model="projectData.shortcutHotkey"
+                                           :placeholder="t('newProject.projectHotkeyPlaceholder')"
+                                           class="setting-input" @keydown="captureProjectHotkey" readonly />
+                                    <button v-if="projectData.shortcutHotkey" class="browse-button"
+                                            @click="clearProjectHotkey" type="button">
+                                        {{ t('common.clear') }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 第五行：管理员启动 -->
                         <div v-if="projectData.targetType !== 'url'" class="settings-row">
                             <div class="setting-item full-width">
                                 <label class="checkbox-setting">
@@ -377,6 +396,7 @@ const projectData = reactive({
     targetType: 'file',
     targetPath: '',
     launchArgs: '',
+    shortcutHotkey: '',
     runAsAdmin: false,
     icon: ''
 })
@@ -440,6 +460,38 @@ const handleTargetTypeChange = () => {
     // 当目标类型改变时，清空路径
     projectData.targetPath = ''
     clearPendingIconFetch()
+}
+
+const captureProjectHotkey = (event) => {
+    if (event.key === 'Tab') {
+        return
+    }
+
+    event.preventDefault()
+
+    if (['Backspace', 'Delete', 'Escape'].includes(event.key)) {
+        projectData.shortcutHotkey = ''
+        return
+    }
+
+    const modifiers = []
+    if (event.ctrlKey) modifiers.push('Ctrl')
+    if (event.altKey) modifiers.push('Alt')
+    if (event.shiftKey) modifiers.push('Shift')
+    if (event.metaKey) modifiers.push('Super')
+
+    if (modifiers.length === 0 || ['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) {
+        return
+    }
+
+    const key = /^Key[A-Z]$/.test(event.code)
+        ? event.code.slice(3)
+        : (/^Digit\d$/.test(event.code) ? event.code.slice(5) : (event.code || event.key))
+    projectData.shortcutHotkey = [...modifiers, key].join('+')
+}
+
+const clearProjectHotkey = () => {
+    projectData.shortcutHotkey = ''
 }
 
 const browseTarget = async () => {
@@ -702,6 +754,7 @@ const createProject = async (data) => {
             target_path: data.targetPath,
             is_shortcut: isShortcutPath(data.targetPath),
             launch_args: data.launchArgs || '',
+            shortcut_hotkey: data.shortcutHotkey || null,
             target_type: data.targetType || 'file',
             run_as_admin: data.targetType !== 'url' && !!data.runAsAdmin,
             usage_count: 0,

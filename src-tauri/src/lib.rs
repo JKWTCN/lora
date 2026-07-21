@@ -46,6 +46,7 @@ async fn quit_app(app: tauri::AppHandle) -> Result<String, String> {
 // 通知主窗口刷新数据
 #[tauri::command]
 async fn notify_main_window_refresh(app: tauri::AppHandle) -> Result<String, String> {
+    crate::system_integration::refresh_global_shortcuts(&app)?;
     if let Some(main_window) = app.get_webview_window("main") {
         let _ = main_window.emit("data-updated", {});
     }
@@ -55,6 +56,7 @@ async fn notify_main_window_refresh(app: tauri::AppHandle) -> Result<String, Str
 // 通知主窗口设置已更新
 #[tauri::command]
 async fn notify_main_settings_updated(app: tauri::AppHandle) -> Result<String, String> {
+    crate::system_integration::refresh_global_shortcuts(&app)?;
     if let Some(main_window) = app.get_webview_window("main") {
         let _ = main_window.emit("settings-updated", {});
     }
@@ -166,6 +168,7 @@ pub fn run() {
             window_manager::get_main_window_size,
             settings_manager::update_prevent_auto_hide,
             system_integration::update_tray_menu,
+            system_integration::refresh_shortcut_registrations,
             window_manager::toggle_window_visibility,
             window_manager::open_settings_window,
             window_manager::close_settings_window,

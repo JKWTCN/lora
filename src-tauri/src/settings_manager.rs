@@ -10,7 +10,6 @@
 use crate::data::{load_app_settings, save_app_settings};
 use crate::models::AppSettings;
 use crate::system_integration::set_auto_start_windows;
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 /// 更新阻止自动隐藏设置
 #[tauri::command]
@@ -70,9 +69,17 @@ pub fn get_default_settings() -> AppSettings {
 
 /// 重置设置到默认值
 #[tauri::command]
-pub fn reset_settings_to_default() -> Result<String, String> {
+pub fn reset_settings_to_default(app: tauri::AppHandle) -> Result<String, String> {
+    let previous_settings = load_app_settings()?;
     let default_settings = get_default_settings();
     save_app_settings(default_settings)?;
+
+    if let Err(error) = crate::system_integration::refresh_global_shortcuts(&app) {
+        save_app_settings(previous_settings)?;
+        let _ = crate::system_integration::refresh_global_shortcuts(&app);
+        return Err(error);
+    }
+
     Ok("设置已重置为默认值".to_string())
 }
 
@@ -204,28 +211,15 @@ pub async fn update_toggle_hotkey(
     toggle_hotkey: String,
 ) -> Result<String, String> {
     let mut settings = load_app_settings()?;
-
-    // 先取消注册旧的快捷键
-    if let Some(old_hotkey) = &settings.toggle_hotkey {
-        if !old_hotkey.is_empty() {
-            if let Ok(shortcut) = old_hotkey.parse::<Shortcut>() {
-                let _ = app.global_shortcut().unregister(shortcut);
-            }
-        }
-    }
+    let previous_settings = settings.clone();
 
     settings.toggle_hotkey = Some(toggle_hotkey.clone());
-    save_app_settings(settings.clone())?;
+    save_app_settings(settings)?;
 
-    // 注册新的快捷键
-    if settings.global_hotkey.unwrap_or(true) && !toggle_hotkey.is_empty() {
-        if let Ok(shortcut) = toggle_hotkey.parse::<Shortcut>() {
-            if let Err(e) = app.global_shortcut().register(shortcut) {
-                return Err(format!("注册全局快捷键失败: {}", e));
-            }
-        } else {
-            return Err("快捷键格式无效".to_string());
-        }
+    if let Err(error) = crate::system_integration::refresh_global_shortcuts(&app) {
+        save_app_settings(previous_settings)?;
+        let _ = crate::system_integration::refresh_global_shortcuts(&app);
+        return Err(error);
     }
 
     Ok("快捷键设置已更新".to_string())
@@ -238,27 +232,14 @@ pub async fn update_global_hotkey(
     global_hotkey: bool,
 ) -> Result<String, String> {
     let mut settings = load_app_settings()?;
+    let previous_settings = settings.clone();
     settings.global_hotkey = Some(global_hotkey);
-    save_app_settings(settings.clone())?;
+    save_app_settings(settings)?;
 
-    if let Some(hotkey) = &settings.toggle_hotkey {
-        if !hotkey.is_empty() {
-            if global_hotkey {
-                // 启用全局快捷键
-                if let Ok(shortcut) = hotkey.parse::<Shortcut>() {
-                    if let Err(e) = app.global_shortcut().register(shortcut) {
-                        return Err(format!("注册全局快捷键失败: {}", e));
-                    }
-                } else {
-                    return Err("快捷键格式无效".to_string());
-                }
-            } else {
-                // 禁用全局快捷键
-                if let Ok(shortcut) = hotkey.parse::<Shortcut>() {
-                    let _ = app.global_shortcut().unregister(shortcut);
-                }
-            }
-        }
+    if let Err(error) = crate::system_integration::refresh_global_shortcuts(&app) {
+        save_app_settings(previous_settings)?;
+        let _ = crate::system_integration::refresh_global_shortcuts(&app);
+        return Err(error);
     }
 
     Ok("全局快捷键设置已更新".to_string())

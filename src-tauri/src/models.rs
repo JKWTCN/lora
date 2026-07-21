@@ -14,6 +14,8 @@ pub struct AppData {
     pub target_path: Option<String>, // 用于快捷方式的实际目标路径
     pub is_shortcut: bool,
     pub launch_args: Option<String>, // 启动参数
+    #[serde(default)]
+    pub shortcut_hotkey: Option<String>, // 可选的单项目全局快捷键
     pub target_type: Option<String>, // 目标类型: file, folder, url
     #[serde(default)]
     pub run_as_admin: bool, // 是否始终以管理员权限启动
@@ -82,7 +84,7 @@ pub struct AppSettings {
 }
 
 // 应用数据存储结构
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AppStorage {
     pub apps: Vec<AppData>,
     pub categories: Vec<CategoryData>,

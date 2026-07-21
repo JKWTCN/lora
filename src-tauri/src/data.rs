@@ -1,6 +1,8 @@
 use crate::models::*;
 use serde_json::Value;
 use std::fs;
+use tauri::AppHandle;
+use tauri_plugin_global_shortcut::Shortcut;
 
 // 获取应用数据目录
 pub fn get_app_data_dir() -> Result<std::path::PathBuf, String> {
@@ -33,6 +35,62 @@ fn normalize_app_categories(app: &mut AppData) {
 
     app.category = category_ids[0].clone();
     app.category_ids = category_ids;
+}
+
+fn validate_project_hotkey(storage: &AppStorage, app: &mut AppData) -> Result<(), String> {
+    let Some(hotkey) = app
+        .shortcut_hotkey
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        app.shortcut_hotkey = None;
+        return Ok(());
+    };
+
+    let shortcut = hotkey
+        .parse::<Shortcut>()
+        .map_err(|error| format!("项目快捷键格式无效: {}", error))?;
+    if shortcut.mods.is_empty() {
+        return Err("项目快捷键必须包含 Ctrl、Alt、Shift 或 Win 修饰键".to_string());
+    }
+
+    if let Ok(settings) = load_app_settings() {
+        let conflicts_with_window_toggle = settings
+            .toggle_hotkey
+            .as_deref()
+            .and_then(|value| value.parse::<Shortcut>().ok())
+            .map(|existing| existing.id() == shortcut.id())
+            .unwrap_or(false);
+        if conflicts_with_window_toggle {
+            return Err("该快捷键已用于显示或隐藏 Lora".to_string());
+        }
+    }
+
+    if let Some(conflicting_app) = storage.apps.iter().find(|existing_app| {
+        existing_app.id != app.id
+            && existing_app
+                .shortcut_hotkey
+                .as_deref()
+                .and_then(|value| value.parse::<Shortcut>().ok())
+                .map(|existing| existing.id() == shortcut.id())
+                .unwrap_or(false)
+    }) {
+        return Err(format!("该快捷键已被项目“{}”使用", conflicting_app.name));
+    }
+
+    app.shortcut_hotkey = Some(hotkey.to_string());
+    Ok(())
+}
+
+fn rollback_shortcut_registration(app: &AppHandle, storage: AppStorage, error: String) -> String {
+    if let Err(rollback_error) =
+        save_app_data(storage.apps, storage.categories, storage.selected_category)
+    {
+        return format!("{}；回滚数据失败: {}", error, rollback_error);
+    }
+    let _ = crate::system_integration::refresh_global_shortcuts(app);
+    error
 }
 
 #[tauri::command]
@@ -359,10 +417,18 @@ pub fn update_settings_batch(settings_update: Value) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn delete_app(app_id: i64) -> Result<String, String> {
+pub fn delete_app(app: AppHandle, app_id: i64) -> Result<String, String> {
     let mut storage = load_app_data()?;
+    let previous_storage = storage.clone();
     storage.apps.retain(|app| app.id != app_id);
     save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+    if let Err(error) = crate::system_integration::refresh_global_shortcuts(&app) {
+        return Err(rollback_shortcut_registration(
+            &app,
+            previous_storage,
+            error,
+        ));
+    }
     Ok("应用删除成功".to_string())
 }
 
@@ -418,23 +484,34 @@ pub fn update_category_hidden(category_id: String, hidden: bool) -> Result<Strin
 }
 
 #[tauri::command]
-pub async fn add_new_app(app: AppData) -> Result<String, String> {
+pub async fn add_new_app(app_handle: AppHandle, app: AppData) -> Result<String, String> {
     let mut storage = load_app_data()?;
+    let previous_storage = storage.clone();
     let mut app = app;
     normalize_app_categories(&mut app);
+    validate_project_hotkey(&storage, &mut app)?;
     if app.usage_count.is_none() {
         app.usage_count = Some(0);
     }
     storage.apps.push(app);
     save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+    if let Err(error) = crate::system_integration::refresh_global_shortcuts(&app_handle) {
+        return Err(rollback_shortcut_registration(
+            &app_handle,
+            previous_storage,
+            error,
+        ));
+    }
     Ok("应用添加成功".to_string())
 }
 
 #[tauri::command]
-pub async fn update_app(app: AppData) -> Result<String, String> {
+pub async fn update_app(app_handle: AppHandle, app: AppData) -> Result<String, String> {
     let mut storage = load_app_data()?;
+    let previous_storage = storage.clone();
     let mut app = app;
     normalize_app_categories(&mut app);
+    validate_project_hotkey(&storage, &mut app)?;
 
     if let Some(existing_app) = storage.apps.iter_mut().find(|a| a.id == app.id) {
         let usage_count = app.usage_count.or(existing_app.usage_count).or(Some(0));
@@ -443,6 +520,13 @@ pub async fn update_app(app: AppData) -> Result<String, String> {
         existing_app.usage_count = usage_count;
         existing_app.last_launched_at = last_launched_at;
         save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+        if let Err(error) = crate::system_integration::refresh_global_shortcuts(&app_handle) {
+            return Err(rollback_shortcut_registration(
+                &app_handle,
+                previous_storage,
+                error,
+            ));
+        }
         Ok("应用更新成功".to_string())
     } else {
         Err("应用不存在".to_string())

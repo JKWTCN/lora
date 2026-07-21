@@ -360,6 +360,7 @@ interface AppData {
   target_path?: string
   is_shortcut?: boolean
   launch_args?: string // 启动参数
+  shortcut_hotkey?: string // 单项目全局快捷键
   target_type?: 'file' | 'folder' | 'url' // 目标类型
   run_as_admin?: boolean // 是否始终以管理员权限启动
   order?: number // 排序字段，用于图标拖拽排序
@@ -810,6 +811,7 @@ const saveAppData = async () => {
       categories: categoriesForBackend,
       selectedCategory: selectedCategory.value
     })
+    await invoke('refresh_shortcut_registrations')
     console.log('应用数据保存成功')
   } catch (error) {
     console.error('保存应用数据失败:', error)
