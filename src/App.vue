@@ -280,6 +280,12 @@
               @keyup.escape="hideSearchBox" @keydown="handleSearchKeydown">
             <div v-if="searchQuery" class="search-info">
               {{ $t('main.search.results', { count: filteredApps.length }) }}
+              <span v-if="startMenuResultCount > 0" class="search-source">
+                · {{ $t('main.search.startMenuIncluded', { count: startMenuResultCount }) }}
+              </span>
+              <span v-else-if="isStartMenuSearchLoading" class="search-source">
+                · {{ $t('main.search.loadingStartMenu') }}
+              </span>
               <span v-if="filteredApps.length > 0" class="search-hint">
                 • {{ $t('main.search.hint') }}
               </span>
@@ -359,6 +365,7 @@ interface AppData {
   order?: number // 排序字段，用于图标拖拽排序
   usage_count?: number // 使用次数
   last_launched_at?: number | null // 上次启动时间戳
+  is_start_menu_result?: boolean // 仅在联合搜索中临时展示
 }
 
 interface CategoryData {
@@ -568,6 +575,10 @@ const categories = ref<CategoryData[]>([
 
 // 应用数据
 const apps = ref<AppData[]>([])
+const startMenuSearchItems = ref<AppData[]>([])
+const isStartMenuSearchLoading = ref(false)
+const startMenuIconLoads = new Set<string>()
+let startMenuSearchLoadAttempted = false
 
 const getAppCategoryIds = (app: AppData) => {
   const ids = Array.isArray(app.category_ids) && app.category_ids.length > 0
@@ -987,6 +998,69 @@ const matchesSearch = (app: AppData, query: string) => {
   })
 }
 
+const loadStartMenuSearchItems = async () => {
+  if (isStartMenuSearchLoading.value || startMenuSearchLoadAttempted) {
+    return
+  }
+
+  startMenuSearchLoadAttempted = true
+  isStartMenuSearchLoading.value = true
+  try {
+    const items = await invoke('list_start_menu_items') as any[]
+    startMenuSearchItems.value = (items || []).map((item, index) => ({
+      id: -(index + 1),
+      name: item.name || '',
+      category: 'all',
+      category_ids: ['all'],
+      icon: '',
+      path: item.path || '',
+      target_path: item.target_path || undefined,
+      is_shortcut: true,
+      launch_args: item.launch_args || '',
+      target_type: item.target_type || 'file',
+      run_as_admin: false,
+      usage_count: 0,
+      last_launched_at: null,
+      is_start_menu_result: true
+    }))
+  } catch (error) {
+    console.error('加载开始菜单联合搜索数据失败:', error)
+    startMenuSearchItems.value = []
+  } finally {
+    isStartMenuSearchLoading.value = false
+  }
+}
+
+const hydrateStartMenuSearchIcons = async (results: AppData[]) => {
+  const missingItems = results
+    .filter(app => app.is_start_menu_result && !app.icon && app.path && !startMenuIconLoads.has(app.path))
+    .slice(0, 12)
+
+  if (missingItems.length === 0) {
+    return
+  }
+
+  missingItems.forEach(app => startMenuIconLoads.add(app.path))
+  const icons = await Promise.allSettled(missingItems.map(app => invoke('get_shell_file_icon', {
+    filePath: app.path
+  })))
+
+  icons.forEach((result, index) => {
+    if (result.status !== 'fulfilled' || !result.value) {
+      return
+    }
+
+    const sourceItem = missingItems[index]
+    const itemIndex = startMenuSearchItems.value.findIndex(item => item.path === sourceItem.path)
+    if (itemIndex !== -1) {
+      startMenuSearchItems.value[itemIndex] = {
+        ...startMenuSearchItems.value[itemIndex],
+        icon: result.value as string
+      }
+    }
+  })
+}
+
 const filteredApps = computed(() => {
   console.log('计算filteredApps:', {
     totalApps: apps.value.length,
@@ -997,14 +1071,15 @@ const filteredApps = computed(() => {
 
   let result = apps.value
 
+  const normalizedQuery = normalizeSearchText(searchQuery.value)
+
   // 按分类筛选
-  if (selectedCategory.value !== 'all') {
+  if (!normalizedQuery && selectedCategory.value !== 'all') {
     result = result.filter(app => appBelongsToCategory(app, selectedCategory.value))
     console.log('按分类筛选后:', result)
   }
 
   // 按搜索词筛选
-  const normalizedQuery = normalizeSearchText(searchQuery.value)
   if (normalizedQuery) {
     result = result.filter(app => matchesSearch(app, normalizedQuery))
     console.log('按搜索词筛选后:', result)
@@ -1031,12 +1106,24 @@ const filteredApps = computed(() => {
     return orderResult
   })
 
-  if (searchQuery.value) {
-    result = result.slice(0, appSettings.value.maxSearchResults || 20)
+  if (normalizedQuery) {
+    const savedPaths = new Set(result.map(app => normalizeSearchText(app.path || '')))
+    const savedNames = new Set(result.map(app => normalizeSearchText(app.name)))
+    const startMenuResults = startMenuSearchItems.value.filter(app => {
+      return matchesSearch(app, normalizedQuery)
+        && !savedPaths.has(normalizeSearchText(app.path || ''))
+        && !savedNames.has(normalizeSearchText(app.name))
+    })
+
+    result = [...result, ...startMenuResults].slice(0, appSettings.value.maxSearchResults || 20)
   }
 
   console.log('最终结果:', result)
   return result
+})
+
+const startMenuResultCount = computed(() => {
+  return filteredApps.value.filter(app => app.is_start_menu_result).length
 })
 
 watch(filteredApps, currentApps => {
@@ -1047,6 +1134,10 @@ watch(filteredApps, currentApps => {
 
   if (!currentApps.some(app => app.id === selectedAppId.value)) {
     selectedAppId.value = currentApps[0].id
+  }
+
+  if (searchQuery.value) {
+    void hydrateStartMenuSearchIcons(currentApps)
   }
 })
 
@@ -1061,6 +1152,10 @@ const formatLastLaunchTime = (timestamp?: number | null) => {
 }
 
 const getAppHoverInfo = (app: AppData) => {
+  if (app.is_start_menu_result) {
+    return t('main.tooltip.startMenuInfo', { name: app.name })
+  }
+
   return t('main.tooltip.appInfo', {
     name: app.name,
     count: app.usage_count ?? 0,
@@ -1213,18 +1308,20 @@ const launchApp = async (app: any) => {
         runAsAdmin: app.run_as_admin || false
       })
     }
-    try {
-      const usageStats = await invoke('increment_app_usage', { appId: app.id }) as {
-        usage_count: number
-        last_launched_at: number
+    if (!app.is_start_menu_result) {
+      try {
+        const usageStats = await invoke('increment_app_usage', { appId: app.id }) as {
+          usage_count: number
+          last_launched_at: number
+        }
+        const appIndex = apps.value.findIndex(item => item.id === app.id)
+        if (appIndex !== -1) {
+          apps.value[appIndex].usage_count = usageStats.usage_count
+          apps.value[appIndex].last_launched_at = usageStats.last_launched_at
+        }
+      } catch (error) {
+        console.error('更新应用使用次数失败:', error)
       }
-      const appIndex = apps.value.findIndex(item => item.id === app.id)
-      if (appIndex !== -1) {
-        apps.value[appIndex].usage_count = usageStats.usage_count
-        apps.value[appIndex].last_launched_at = usageStats.last_launched_at
-      }
-    } catch (error) {
-      console.error('更新应用使用次数失败:', error)
     }
     await hideAfterLaunchIfNeeded()
     console.log('启动成功')
@@ -1300,6 +1397,13 @@ const hideContextMenu = () => {
 // 应用右键菜单相关方法
 const showAppContextMenu = (e: MouseEvent, app: any) => {
   selectedAppId.value = app.id
+
+  if (app.is_start_menu_result) {
+    hideAppContextMenu()
+    e.preventDefault()
+    e.stopPropagation()
+    return
+  }
 
   // 隐藏其他所有菜单
   hideContextMenu()
@@ -1772,7 +1876,7 @@ const editApp = async () => {
 }
 
 const deleteSpecificApp = async (appToDelete: AppData | null) => {
-  if (appToDelete) {
+  if (appToDelete && !appToDelete.is_start_menu_result) {
     if (await confirmDialog(t('main.confirm.deleteApp', { name: appToDelete.name }))) {
       try {
         const appIndex = apps.value.findIndex(app => app.id === appToDelete.id)
@@ -2327,6 +2431,9 @@ onMounted(async () => {
   // 数据加载完成，隐藏加载指示器
   isLoading.value = false
   console.log('应用初始化完成')
+
+  // 后台预载开始菜单索引，不阻塞主界面显示；图标在命中搜索后按需加载。
+  void loadStartMenuSearchItems()
 
   // 异步设置窗口大小和监听器，不阻塞主流程
   setTimeout(async () => {
@@ -3423,7 +3530,7 @@ const handleAppPointerUp = async (event: PointerEvent) => {
 }
 
 const handleAppPointerDown = (event: PointerEvent, app: AppData, index: number) => {
-  if (appSettings.value.layoutLocked || event.button !== 0) {
+  if (app.is_start_menu_result || appSettings.value.layoutLocked || event.button !== 0) {
     return
   }
 

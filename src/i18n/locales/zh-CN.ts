@@ -57,8 +57,10 @@ export default {
   main: {
     title: 'Lora',
     search: {
-      placeholder: '搜索应用...',
+      placeholder: '搜索应用和开始菜单...',
       results: '找到 {count} 个结果',
+      startMenuIncluded: '其中 {count} 个来自开始菜单',
+      loadingStartMenu: '正在载入开始菜单',
       hint: '• 按 Enter 启动第一个 • 按 ESC 退出搜索'
     },
     sidebar: {
@@ -66,6 +68,7 @@ export default {
     },
     tooltip: {
       appInfo: '启动项目：{name}\n使用频率：{count} 次\n上次启动：{lastLaunch}',
+      startMenuInfo: '开始菜单项目：{name}\n点击即可直接启动',
       neverLaunched: '从未启动'
     },
     contextMenu: {

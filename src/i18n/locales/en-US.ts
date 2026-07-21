@@ -57,8 +57,10 @@ export default {
   main: {
     title: 'Lora',
     search: {
-      placeholder: 'Search applications...',
+      placeholder: 'Search apps and the Start Menu...',
       results: 'Found {count} results',
+      startMenuIncluded: '{count} from the Start Menu',
+      loadingStartMenu: 'Loading Start Menu',
       hint: '• Press Enter to launch first • Press ESC to exit search'
     },
     sidebar: {
@@ -66,6 +68,7 @@ export default {
     },
     tooltip: {
       appInfo: 'Launch item: {name}\nUsage frequency: {count}\nLast launch: {lastLaunch}',
+      startMenuInfo: 'Start Menu item: {name}\nClick to launch directly',
       neverLaunched: 'Never launched'
     },
     contextMenu: {
