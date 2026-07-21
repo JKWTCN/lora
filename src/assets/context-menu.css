@@ -17,7 +17,28 @@
 
 .context-menu.submenu {
   min-width: 100px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   z-index: 1000000;
+}
+
+.context-menu.submenu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.context-menu.submenu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.context-menu.submenu::-webkit-scrollbar-thumb {
+  background: #596168;
+  border: 2px solid #292d30;
+  border-radius: 999px;
+}
+
+.context-menu.submenu::-webkit-scrollbar-thumb:hover {
+  background: #707980;
 }
 
 .context-menu-item {

@@ -128,8 +128,8 @@
       <!-- 移动到子菜单 -->
       <Teleport to="body">
         <div v-if="moveToSubmenu.visible" class="context-menu submenu"
-          :style="{ left: moveToSubmenu.x + 'px', top: moveToSubmenu.y + 'px' }" @click.stop>
-          <div v-for="category in categories.filter(cat => cat.id !== selectedCategory)" :key="category.id"
+          :style="{ left: moveToSubmenu.x + 'px', top: moveToSubmenu.y + 'px', maxHeight: moveToSubmenu.maxHeight + 'px' }" @click.stop>
+          <div v-for="category in submenuCategories" :key="category.id"
             class="context-menu-item" @click="moveAppToCategory(category.id)">
             <span>{{ category.name }}</span>
           </div>
@@ -139,8 +139,8 @@
       <!-- 复制到子菜单 -->
       <Teleport to="body">
         <div v-if="copyToSubmenu.visible" class="context-menu submenu"
-          :style="{ left: copyToSubmenu.x + 'px', top: copyToSubmenu.y + 'px' }" @click.stop>
-          <div v-for="category in categories.filter(cat => cat.id !== selectedCategory)" :key="category.id"
+          :style="{ left: copyToSubmenu.x + 'px', top: copyToSubmenu.y + 'px', maxHeight: copyToSubmenu.maxHeight + 'px' }" @click.stop>
+          <div v-for="category in submenuCategories" :key="category.id"
             class="context-menu-item" @click="copyAppToCategory(category.id)">
             <span>{{ category.name }}</span>
           </div>
@@ -442,10 +442,12 @@ const moveToSubmenu = ref<{
   visible: boolean;
   x: number;
   y: number;
+  maxHeight: number;
 }>({
   visible: false,
   x: 0,
-  y: 0
+  y: 0,
+  maxHeight: 320
 })
 
 // 复制到子菜单
@@ -453,10 +455,12 @@ const copyToSubmenu = ref<{
   visible: boolean;
   x: number;
   y: number;
+  maxHeight: number;
 }>({
   visible: false,
   x: 0,
-  y: 0
+  y: 0,
+  maxHeight: 320
 })
 
 // 网格右键菜单相关
@@ -614,6 +618,10 @@ const isCategorySelectableInSidebar = (categoryId: string) => {
 
 const visibleCategories = computed(() => {
   return categories.value.filter(category => isCategorySelectableInSidebar(category.id))
+})
+
+const submenuCategories = computed(() => {
+  return visibleCategories.value.filter(category => category.id !== selectedCategory.value)
 })
 
 const getCategorySortIndex = (categoryId: string) => {
@@ -1543,18 +1551,15 @@ const copyFullPath = async () => {
   hideAppContextMenu()
 }
 
-const showMoveToSubmenu = () => {
-  hideCopyToSubmenu()
-
+const getSubmenuPosition = (itemCount: number) => {
   // 计算子菜单位置，紧贴主菜单
   let submenuX = appContextMenu.value.x + 120 // 紧贴主菜单右侧
-  let submenuY = appContextMenu.value.y
-
-  // 智能定位：确保子菜单不超出屏幕边界
   const submenuWidth = 100
-  const submenuHeight = 150 // 估算子菜单高度
   const screenWidth = window.innerWidth
   const screenHeight = window.innerHeight
+  const maxHeight = Math.min(320, Math.max(0, screenHeight - 20))
+  const submenuHeight = Math.min(itemCount * 26 + 10, maxHeight)
+  let submenuY = appContextMenu.value.y
 
   // 如果子菜单会超出右边界，则显示在主菜单左侧
   if (submenuX + submenuWidth > screenWidth) {
@@ -1566,10 +1571,21 @@ const showMoveToSubmenu = () => {
     submenuY = screenHeight - submenuHeight - 10
   }
 
+  return {
+    x: submenuX,
+    y: Math.max(10, submenuY),
+    maxHeight
+  }
+}
+
+const showMoveToSubmenu = () => {
+  hideCopyToSubmenu()
+
+  const position = getSubmenuPosition(submenuCategories.value.length)
+
   moveToSubmenu.value = {
     visible: true,
-    x: submenuX,
-    y: submenuY
+    ...position
   }
 }
 
@@ -1580,30 +1596,11 @@ const hideMoveToSubmenu = () => {
 const showCopyToSubmenu = () => {
   hideMoveToSubmenu()
 
-  // 计算子菜单位置，紧贴主菜单
-  let submenuX = appContextMenu.value.x + 120 // 紧贴主菜单右侧
-  let submenuY = appContextMenu.value.y
-
-  // 智能定位：确保子菜单不超出屏幕边界
-  const submenuWidth = 100
-  const submenuHeight = 150 // 估算子菜单高度
-  const screenWidth = window.innerWidth
-  const screenHeight = window.innerHeight
-
-  // 如果子菜单会超出右边界，则显示在主菜单左侧
-  if (submenuX + submenuWidth > screenWidth) {
-    submenuX = appContextMenu.value.x - submenuWidth
-  }
-
-  // 如果子菜单会超出下边界，则向上偏移
-  if (submenuY + submenuHeight > screenHeight) {
-    submenuY = screenHeight - submenuHeight - 10
-  }
+  const position = getSubmenuPosition(submenuCategories.value.length)
 
   copyToSubmenu.value = {
     visible: true,
-    x: submenuX,
-    y: submenuY
+    ...position
   }
 }
 
