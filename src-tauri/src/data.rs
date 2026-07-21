@@ -176,6 +176,7 @@ pub fn get_default_settings() -> AppSettings {
         auto_hide_after_launch: Some(false),
         toggle_hotkey: Some("Ctrl+Space".to_string()),
         global_hotkey: Some(true),
+        middle_mouse_toggle: Some(false),
         fuzzy_search: Some(true),
         search_in_path: Some(false),
         max_search_results: Some(20),

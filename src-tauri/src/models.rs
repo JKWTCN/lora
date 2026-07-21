@@ -59,6 +59,7 @@ pub struct AppSettings {
     // 快捷键设置
     pub toggle_hotkey: Option<String>,
     pub global_hotkey: Option<bool>,
+    pub middle_mouse_toggle: Option<bool>,
     // 搜索设置
     pub fuzzy_search: Option<bool>,
     pub search_in_path: Option<bool>,

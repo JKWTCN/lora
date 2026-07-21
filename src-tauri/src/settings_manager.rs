@@ -47,6 +47,7 @@ pub fn get_default_settings() -> AppSettings {
         auto_hide_after_launch: Some(false),
         toggle_hotkey: Some("Ctrl+Space".to_string()),
         global_hotkey: Some(true),
+        middle_mouse_toggle: Some(false),
         fuzzy_search: Some(true),
         search_in_path: Some(false),
         max_search_results: Some(20),
@@ -251,6 +252,16 @@ pub async fn update_global_hotkey(
     }
 
     Ok("全局快捷键设置已更新".to_string())
+}
+
+/// 更新鼠标中键呼出设置
+#[tauri::command]
+pub fn update_middle_mouse_toggle(middle_mouse_toggle: bool) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.middle_mouse_toggle = Some(middle_mouse_toggle);
+    save_app_settings(settings)?;
+    crate::system_integration::set_middle_mouse_toggle_enabled(middle_mouse_toggle);
+    Ok("鼠标中键呼出设置已更新".to_string())
 }
 
 /// 更新模糊搜索设置

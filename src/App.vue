@@ -37,7 +37,8 @@
         <!-- <div class="sidebar-header">
         <h2>分类</h2>
       </div> -->
-        <div class="sidebar-content" @contextmenu.prevent="showContextMenu($event, null)">
+        <div class="sidebar-content" @wheel="handleCategoryWheel"
+          @contextmenu.prevent="showContextMenu($event, null)">
           <div v-for="category in visibleCategories" :key="category.id" class="category-item"
             :class="{ active: selectedCategory === category.id }" :data-category-index="getCategorySortIndex(category.id)"
             @click="handleCategoryClick(category.id)"
@@ -411,6 +412,11 @@ let categoryPointerDragState: {
 let suppressNextCategoryClick = false
 const categorySortDragThreshold = 6
 let lastInternalSortDragEndAt = 0
+let categoryWheelDelta = 0
+let lastCategoryWheelSwitchAt = 0
+
+const CATEGORY_WHEEL_THRESHOLD = 48
+const CATEGORY_WHEEL_COOLDOWN = 160
 
 // 右键菜单相关
 const contextMenu = ref<{
@@ -1101,7 +1107,20 @@ const handleCategoryClick = async (categoryId: string) => {
 }
 
 const selectCategory = async (categoryId: string) => {
+  if (!isCategorySelectableInSidebar(categoryId) || selectedCategory.value === categoryId) {
+    return
+  }
+
   selectedCategory.value = categoryId
+
+  nextTick(() => {
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    document.querySelector('.category-item.active')?.scrollIntoView({
+      behavior: appSettings.value.enableAnimations && !reduceMotion ? 'smooth' : 'auto',
+      block: 'nearest',
+      inline: 'nearest'
+    })
+  })
 
   // 自动保存选中的分组
   try {
@@ -1588,6 +1607,57 @@ const getSubmenuPosition = (itemCount: number) => {
     y: Math.max(10, submenuY),
     maxHeight
   }
+}
+
+const normalizeWheelDelta = (event: WheelEvent) => {
+  const primaryDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
+    ? event.deltaY
+    : event.deltaX
+
+  if (event.deltaMode === event.DOM_DELTA_LINE) {
+    return primaryDelta * 16
+  }
+
+  if (event.deltaMode === event.DOM_DELTA_PAGE) {
+    return primaryDelta * Math.max(window.innerHeight, 1)
+  }
+
+  return primaryDelta
+}
+
+const handleCategoryWheel = (event: WheelEvent) => {
+  const interactionBlocked = isLoading.value
+    || categoryPointerDragState
+    || contextMenu.value.visible
+    || renameDialog.value.visible
+
+  if (event.ctrlKey || event.metaKey || interactionBlocked || visibleCategories.value.length < 2) {
+    return
+  }
+
+  const delta = normalizeWheelDelta(event)
+  if (delta === 0) {
+    return
+  }
+
+  event.preventDefault()
+  categoryWheelDelta += delta
+
+  const now = performance.now()
+  if (Math.abs(categoryWheelDelta) < CATEGORY_WHEEL_THRESHOLD
+    || now - lastCategoryWheelSwitchAt < CATEGORY_WHEEL_COOLDOWN) {
+    return
+  }
+
+  const categoryList = visibleCategories.value
+  const currentIndex = categoryList.findIndex(category => category.id === selectedCategory.value)
+  const normalizedCurrentIndex = currentIndex >= 0 ? currentIndex : 0
+  const direction = categoryWheelDelta > 0 ? 1 : -1
+  const nextIndex = (normalizedCurrentIndex + direction + categoryList.length) % categoryList.length
+
+  categoryWheelDelta = 0
+  lastCategoryWheelSwitchAt = now
+  void selectCategory(categoryList[nextIndex].id)
 }
 
 const showMoveToSubmenu = () => {

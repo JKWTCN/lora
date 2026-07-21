@@ -224,7 +224,9 @@ export default {
         setHotkey: 'Click to set hotkey',
         clear: 'Clear',
         enableGlobalHotkey: 'Enable Global Hotkey',
-        enableGlobalHotkeyDesc: 'Use hotkey to invoke Lora from any window'
+        enableGlobalHotkeyDesc: 'Use hotkey to invoke Lora from any window',
+        middleMouseToggle: 'Show or hide Lora with the middle mouse button',
+        middleMouseToggleDesc: 'Press the middle mouse button anywhere to toggle the window without blocking its normal action'
       },
       search: {
         title: 'Search Settings',

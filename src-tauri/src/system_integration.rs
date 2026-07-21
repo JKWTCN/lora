@@ -15,6 +15,100 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use crate::data::load_app_settings;
 use crate::models::AppSettings;
 
+#[cfg(target_os = "windows")]
+mod mouse_invocation {
+    use std::os::raw::c_int;
+    use std::ptr::null_mut;
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        OnceLock,
+    };
+
+    use tauri::AppHandle;
+    use winapi::shared::minwindef::{LPARAM, LRESULT, WPARAM};
+    use winapi::um::winuser::{
+        CallNextHookEx, DispatchMessageW, GetMessageW, SetWindowsHookExW, TranslateMessage,
+        UnhookWindowsHookEx, HC_ACTION, MSG, WH_MOUSE_LL, WM_MBUTTONDOWN,
+    };
+
+    static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
+    static ENABLED: AtomicBool = AtomicBool::new(false);
+    static HOOK_STARTED: AtomicBool = AtomicBool::new(false);
+
+    unsafe extern "system" fn mouse_hook(
+        code: c_int,
+        message: WPARAM,
+        event_data: LPARAM,
+    ) -> LRESULT {
+        if code == HC_ACTION
+            && message == WM_MBUTTONDOWN as WPARAM
+            && ENABLED.load(Ordering::Relaxed)
+        {
+            if let Some(app) = APP_HANDLE.get().cloned() {
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = crate::window_manager::toggle_window_visibility(app).await {
+                        eprintln!("鼠标中键切换窗口失败: {}", error);
+                    }
+                });
+            }
+        }
+
+        CallNextHookEx(null_mut(), code, message, event_data)
+    }
+
+    pub fn initialize(app: &AppHandle, enabled: bool) {
+        let _ = APP_HANDLE.set(app.clone());
+        ENABLED.store(enabled, Ordering::Relaxed);
+
+        if HOOK_STARTED.swap(true, Ordering::AcqRel) {
+            return;
+        }
+
+        std::thread::spawn(|| unsafe {
+            let hook = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook), null_mut(), 0);
+            if hook.is_null() {
+                HOOK_STARTED.store(false, Ordering::Release);
+                eprintln!("安装全局鼠标钩子失败");
+                return;
+            }
+
+            let mut message: MSG = std::mem::zeroed();
+            while GetMessageW(&mut message, null_mut(), 0, 0) > 0 {
+                TranslateMessage(&message);
+                DispatchMessageW(&message);
+            }
+
+            UnhookWindowsHookEx(hook);
+            HOOK_STARTED.store(false, Ordering::Release);
+        });
+    }
+
+    pub fn set_enabled(enabled: bool) {
+        ENABLED.store(enabled, Ordering::Relaxed);
+    }
+}
+
+/// 初始化可选的全局鼠标中键呼出功能。
+pub fn initialize_mouse_invocation(app: &AppHandle) {
+    let settings = load_app_settings().unwrap_or_else(|_| get_default_settings());
+    let enabled = settings.middle_mouse_toggle.unwrap_or(false);
+
+    #[cfg(target_os = "windows")]
+    mouse_invocation::initialize(app, enabled);
+
+    #[cfg(not(target_os = "windows"))]
+    let _ = (app, enabled);
+}
+
+/// 立即更新鼠标中键呼出的运行时状态，无需重启应用。
+pub fn set_middle_mouse_toggle_enabled(enabled: bool) {
+    #[cfg(target_os = "windows")]
+    mouse_invocation::set_enabled(enabled);
+
+    #[cfg(not(target_os = "windows"))]
+    let _ = enabled;
+}
+
 /// Windows 开机自启动实现
 #[cfg(target_os = "windows")]
 pub fn set_auto_start_windows(enable: bool) -> Result<(), String> {
@@ -246,6 +340,7 @@ fn get_default_settings() -> AppSettings {
         auto_hide_after_launch: Some(false),
         toggle_hotkey: Some("Ctrl+Space".to_string()),
         global_hotkey: Some(true),
+        middle_mouse_toggle: Some(false),
         fuzzy_search: Some(true),
         search_in_path: Some(false),
         max_search_results: Some(20),

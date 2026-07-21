@@ -224,7 +224,9 @@ export default {
         setHotkey: '点击设置快捷键',
         clear: '清除',
         enableGlobalHotkey: '启用全局快捷键',
-        enableGlobalHotkeyDesc: '在任何窗口下都能使用快捷键唤起 Lora'
+        enableGlobalHotkeyDesc: '在任何窗口下都能使用快捷键唤起 Lora',
+        middleMouseToggle: '使用鼠标中键显示或隐藏 Lora',
+        middleMouseToggleDesc: '在任意位置按下鼠标中键即可切换窗口，原有中键操作仍会正常执行'
       },
       search: {
         title: '搜索设置',

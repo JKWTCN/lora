@@ -211,6 +211,17 @@
                                 {{ $t('settings.features.hotkey.enableGlobalHotkeyDesc') }}
                             </p>
                         </div>
+
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" v-model="localSettings.middleMouseToggle"
+                                    @change="updateMiddleMouseToggle" />
+                                {{ $t('settings.features.hotkey.middleMouseToggle') }}
+                            </label>
+                            <p class="setting-description">
+                                {{ $t('settings.features.hotkey.middleMouseToggleDesc') }}
+                            </p>
+                        </div>
                     </div>
 
                     <div class="settings-group">
@@ -367,6 +378,7 @@ const localSettings = reactive({
     // 快捷键设置
     toggleHotkey: 'Ctrl+Space',
     globalHotkey: true,
+    middleMouseToggle: false,
 
     // 搜索设置
     fuzzySearch: true,
@@ -575,6 +587,18 @@ const updateGlobalHotkey = async () => {
     }
 }
 
+const updateMiddleMouseToggle = async () => {
+    try {
+        await invoke('update_middle_mouse_toggle', {
+            middleMouseToggle: localSettings.middleMouseToggle
+        })
+        markSaved()
+        console.log('鼠标中键呼出设置已更新')
+    } catch (error) {
+        console.error('更新鼠标中键呼出设置失败:', error)
+    }
+}
+
 const updateFuzzySearch = async () => {
     try {
         await invoke('update_fuzzy_search', { fuzzySearch: localSettings.fuzzySearch })
@@ -747,6 +771,7 @@ const loadSettings = async () => {
         localSettings.autoHideAfterLaunch = settings.auto_hide_after_launch || false
         localSettings.toggleHotkey = settings.toggle_hotkey || 'Ctrl+Space'
         localSettings.globalHotkey = settings.global_hotkey !== false
+        localSettings.middleMouseToggle = settings.middle_mouse_toggle === true
         localSettings.fuzzySearch = settings.fuzzy_search !== false
         localSettings.searchInPath = settings.search_in_path || false
         localSettings.maxSearchResults = settings.max_search_results || 20

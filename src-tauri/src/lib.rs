@@ -16,7 +16,8 @@ mod windows;
 use crate::backup::BackupManager;
 use crate::models::AppState;
 use crate::system_integration::{
-    create_global_shortcut_handler, initialize_global_shortcuts, initialize_tray,
+    create_global_shortcut_handler, initialize_global_shortcuts, initialize_mouse_invocation,
+    initialize_tray,
 };
 
 // 引入编译时生成的构建信息
@@ -99,6 +100,9 @@ pub fn run() {
 
             // 初始化全局快捷键
             initialize_global_shortcuts(&app.handle())?;
+
+            // 初始化可选的鼠标中键呼出
+            initialize_mouse_invocation(&app.handle());
 
             // 设置主窗口隐藏任务栏图标
             if let Some(main_window) = app.get_webview_window("main") {
@@ -214,6 +218,7 @@ pub fn run() {
             settings_manager::update_auto_hide_after_launch,
             settings_manager::update_toggle_hotkey,
             settings_manager::update_global_hotkey,
+            settings_manager::update_middle_mouse_toggle,
             settings_manager::update_fuzzy_search,
             settings_manager::update_search_in_path,
             settings_manager::update_max_search_results,
