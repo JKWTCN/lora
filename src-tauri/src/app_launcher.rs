@@ -361,7 +361,13 @@ pub fn launch_app(
         } else {
             "open"
         };
-        crate::win_native::shell_execute(&app_path, params, work_dir, Some(verb))
+        let launch_result = if verb == "open" {
+            crate::win_native::shell_execute_with_open_as_fallback(&app_path, params, work_dir)
+        } else {
+            crate::win_native::shell_execute(&app_path, params, work_dir, Some(verb))
+        };
+
+        launch_result
             .map(|_| "应用启动成功".to_string())
             .map_err(|e| format!("启动应用失败: {}", e))
     }

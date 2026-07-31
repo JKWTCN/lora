@@ -17,12 +17,12 @@ fn from_wide_buffer(buffer: &[u16]) -> String {
 }
 
 #[cfg(target_os = "windows")]
-pub fn shell_execute(
+fn shell_execute_raw(
     file: &str,
     params: Option<&str>,
     directory: Option<&str>,
     verb: Option<&str>,
-) -> Result<(), String> {
+) -> Result<(), isize> {
     use winapi::um::shellapi::ShellExecuteW;
     use winapi::um::winuser::SW_SHOWNORMAL;
 
@@ -45,7 +45,59 @@ pub fn shell_execute(
     if result > 32 {
         Ok(())
     } else {
-        Err(format!("ShellExecuteW 失败，错误码: {}", result))
+        Err(result)
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn shell_execute(
+    file: &str,
+    params: Option<&str>,
+    directory: Option<&str>,
+    verb: Option<&str>,
+) -> Result<(), String> {
+    shell_execute_raw(file, params, directory, verb)
+        .map_err(|code| format!("ShellExecuteW 失败，错误码: {}", code))
+}
+
+#[cfg(target_os = "windows")]
+fn show_open_with_dialog(file: &str) -> Result<(), String> {
+    use windows_sys::Win32::UI::Shell::{
+        SHOpenWithDialog, OAIF_ALLOW_REGISTRATION, OAIF_EXEC, OPENASINFO,
+    };
+
+    const HRESULT_CANCELLED: i32 = 0x800704C7u32 as i32;
+
+    let file_w = to_wide(file);
+    let open_as_info = OPENASINFO {
+        pcszFile: file_w.as_ptr(),
+        pcszClass: ptr::null(),
+        oaifInFlags: OAIF_ALLOW_REGISTRATION | OAIF_EXEC,
+    };
+    let result = unsafe { SHOpenWithDialog(ptr::null_mut(), &open_as_info) };
+
+    if result >= 0 || result == HRESULT_CANCELLED {
+        Ok(())
+    } else {
+        Err(format!(
+            "打开方式选择窗口启动失败，HRESULT: {:#010X}",
+            result
+        ))
+    }
+}
+
+/// Open a file normally, falling back to Windows' app picker when no valid
+/// file association exists. ShellExecuteW reports that condition as code 31.
+#[cfg(target_os = "windows")]
+pub fn shell_execute_with_open_as_fallback(
+    file: &str,
+    params: Option<&str>,
+    directory: Option<&str>,
+) -> Result<(), String> {
+    match shell_execute_raw(file, params, directory, Some("open")) {
+        Ok(()) => Ok(()),
+        Err(31) => show_open_with_dialog(file),
+        Err(code) => Err(format!("ShellExecuteW 失败，错误码: {}", code)),
     }
 }
 
