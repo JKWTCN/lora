@@ -90,6 +90,8 @@ pub struct AppStorage {
     pub apps: Vec<AppData>,
     pub categories: Vec<CategoryData>,
     pub selected_category: Option<String>, // 记住当前选中的分组
+    #[serde(default)]
+    pub workspaces: Vec<crate::workspaces::Workspace>,
 }
 
 // 应用状态结构

@@ -1,4 +1,26 @@
 export default {
+  workspaces: {
+    title: '工作区', subtitle: '一次启动多个应用，并恢复窗口布局',
+    create: '新建工作区', empty: '先将应用窗口排列好，再创建你的第一个工作区。',
+    name: '工作区名称', windowCount: '{count} 个窗口',
+    launch: '启动', launching: '正在启动…', results: '启动状态',
+    launcherInfo: '{name}\n工作区 · {count} 个窗口', launched: '工作区“{name}”已启动',
+    moveExisting: '复用并移动已打开的窗口',
+    captureHint: '调整桌面上的应用窗口后，点击“捕获当前窗口”。选择要保存的窗口，也可以使用分屏模板。',
+    capture: '捕获当前窗口', layout: '布局',
+    layouts: { captured: '捕获 / 自定义', columns: '水平分屏', rows: '垂直分屏', grid: '网格' },
+    noWindows: '没有找到可保存的应用窗口。请先打开需要的应用。',
+    configure: '配置启动和位置', path: '应用或快捷方式路径',
+    arguments: '启动参数', argumentsHint: '如项目目录、文件路径或网址',
+    admin: '以管理员身份启动', x: '水平位置', y: '垂直位置', width: '宽度', height: '高度',
+    elevatedHint: '此窗口当前以管理员权限运行。恢复它的位置需要以管理员身份运行 Lora。',
+    permissionStatus: '窗口布局未恢复：权限不足',
+    permissionHint: '其他可调整的窗口会照常恢复。请退出 Lora，右键 Lora 程序或快捷方式，选择“以管理员身份运行”，然后重试工作区。仅勾选应用的“以管理员身份启动”不能提升 Lora 的权限。',
+    maximized: '最大化', minimized: '最小化',
+    limitations: '支持普通桌面应用。特定文件、网页或项目需要填写启动参数；部分商店应用不支持捕获。恢复布局不会建立 Windows 原生贴靠组。管理高权限窗口可能需要以管理员身份运行 Lora。',
+    deleteConfirm: '删除工作区“{name}”？应用本身不会被删除。',
+    status: { waiting: '等待启动', launching: '启动并等待窗口', arranging: '正在恢复布局', restored: '布局已恢复', failed: '失败' }
+  },
   // 通用
   common: {
     confirm: '确认',

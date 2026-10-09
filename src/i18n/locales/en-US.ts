@@ -1,4 +1,26 @@
 export default {
+  workspaces: {
+    title: 'Workspaces', subtitle: 'Launch your apps together and restore their window layout',
+    create: 'New workspace', empty: 'Arrange your app windows, then create your first workspace.',
+    name: 'Workspace name', windowCount: '{count} windows',
+    launch: 'Launch', launching: 'Launching…', results: 'Launch status',
+    launcherInfo: '{name}\nWorkspace · {count} windows', launched: 'Workspace “{name}” launched',
+    moveExisting: 'Reuse and move existing windows',
+    captureHint: 'Arrange your desktop windows, then capture them. Select the windows to save or choose a split layout.',
+    capture: 'Capture current windows', layout: 'Layout',
+    layouts: { captured: 'Captured / custom', columns: 'Side by side', rows: 'Stacked', grid: 'Grid' },
+    noWindows: 'No supported app windows found. Open the apps you want to capture first.',
+    configure: 'Configure launch and position', path: 'Application or shortcut path',
+    arguments: 'Launch arguments', argumentsHint: 'Project directory, file path, or URL',
+    admin: 'Launch as administrator', x: 'Horizontal position', y: 'Vertical position', width: 'Width', height: 'Height',
+    elevatedHint: 'This window is currently elevated. Run Lora as administrator to restore its position.',
+    permissionStatus: 'Window layout not restored: insufficient permissions',
+    permissionHint: 'Other accessible windows are restored as usual. Exit Lora, right-click its executable or shortcut, choose Run as administrator, then retry the workspace. Enabling Launch as administrator for an app does not elevate Lora.',
+    maximized: 'Maximized', minimized: 'Minimized',
+    limitations: 'Supports desktop apps. Files, websites, and projects require launch arguments; some Store apps cannot be captured. Restoring a layout does not create a native Windows Snap Group. Elevated windows may require running Lora as administrator.',
+    deleteConfirm: 'Delete workspace “{name}”? The applications themselves will remain.',
+    status: { waiting: 'Waiting', launching: 'Launching and waiting for window', arranging: 'Restoring layout', restored: 'Layout restored', failed: 'Failed' }
+  },
   // 通用
   common: {
     confirm: 'Confirm',

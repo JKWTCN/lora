@@ -15,6 +15,9 @@
         <span class="app-title" data-tauri-drag-region>{{ $t('app.title') }}</span>
       </div>
       <div class="titlebar-right">
+        <button class="titlebar-button" :disabled="!!launchingWorkspaceId" @click="openWorkspaces()" :title="$t('workspaces.title')" :aria-label="$t('workspaces.title')">
+          <i class="icon-briefcase"></i>
+        </button>
         <button class="titlebar-button" @click="toggleSearch" :title="$t('main.search.placeholder')">
           <i class="icon-search"></i>
         </button>
@@ -84,6 +87,12 @@
       <Teleport to="body">
         <div v-if="appContextMenu.visible" class="context-menu"
           :style="{ left: appContextMenu.x + 'px', top: appContextMenu.y + 'px' }" @click.stop>
+          <template v-if="appContextMenu.app?.workspace_id">
+            <div class="context-menu-item" @click="launchSelectedWorkspace"><span>{{ $t('workspaces.launch') }}</span></div>
+            <div class="context-menu-item" @click="editSelectedWorkspace"><span>{{ $t('common.edit') }}</span></div>
+            <div class="context-menu-item context-menu-item-danger" @click="deleteApp"><span>{{ $t('common.delete') }}</span></div>
+          </template>
+          <template v-else>
           <div v-if="appContextMenu.app?.target_type !== 'url'" class="context-menu-item" @click="runAsAdmin">
             <span>{{ $t('main.contextMenu.runAsAdmin') }}</span>
           </div>
@@ -113,6 +122,7 @@
           <div class="context-menu-item context-menu-item-danger" @click="deleteAllApps">
             <span>{{ $t('main.contextMenu.deleteAllApps') }}</span>
           </div>
+          </template>
         </div>
       </Teleport>
 
@@ -298,19 +308,25 @@
             v-for="(app, index) in filteredApps"
             :key="app.id"
             class="app-item"
-            :class="{ selected: selectedAppId === app.id }"
+            :class="{ selected: selectedAppId === app.id, 'workspace-item': !!app.workspace_id, 'workspace-launching': app.workspace_id === launchingWorkspaceId }"
+            :aria-busy="app.workspace_id === launchingWorkspaceId"
+            :data-workspace-id="app.workspace_id"
             :data-app-id="app.id"
             :data-app-index="index"
             :title="getAppHoverInfo(app)"
             @click="handleAppClick($event, app)"
-            @dblclick="handleAppClick($event, app)"
+            @dblclick="!app.workspace_id && handleAppClick($event, app)"
             @contextmenu.prevent="showAppContextMenu($event, app)"
             @pointerdown="handleAppPointerDown($event, app, index)"
           >
             <div class="app-icon">
+              <div v-if="app.workspace_id" class="workspace-icon">
+                <i class="icon-briefcase"></i>
+                <span class="workspace-count">{{ app.workspace_id === launchingWorkspaceId ? '…' : app.workspace_window_count }}</span>
+              </div>
               <!-- 如果是 Base64 图标 (真实应用图标) -->
               <img :src="app.icon" :alt="app.name"
-                v-if="app.icon && (app.icon.startsWith('data:image/') || app.icon.startsWith('http'))" />
+                v-else-if="app.icon && (app.icon.startsWith('data:image/') || app.icon.startsWith('http'))" />
               <!-- 如果是文件类型图标标识符 -->
               <div v-else-if="app.icon && !app.icon.startsWith('data:image/') && !app.icon.startsWith('http')"
                 class="file-type-icon" :class="'file-type-' + app.icon">
@@ -333,6 +349,7 @@
       </div>
     </div>
 
+    <WorkspacePanel v-if="showWorkspaces" :initial-workspace-id="workspaceToEdit" @changed="loadWorkspaces" @close="showWorkspaces = false" />
     <!-- 设置模态框已移除，现在使用独立窗口 -->
   </div>
 </template>
@@ -346,12 +363,21 @@ import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from 'vue-i18n'
 import { alertDialog, confirmDialog } from './utils/customDialog'
 import { LAUNCHER_GRID_SIZE, LAUNCHER_ICON_SIZE, SIDEBAR_SIZE } from './designTokens'
+import WorkspacePanel from './components/WorkspacePanel.vue'
 
 const { t } = useI18n()
+const showWorkspaces = ref(false)
+const workspaceToEdit = ref<string>()
+const launchingWorkspaceId = ref('')
+const openWorkspaces = (workspaceId?: string) => {
+  clearAutoHideTimer()
+  workspaceToEdit.value = workspaceId
+  showWorkspaces.value = true
+}
 
 // 定义数据接口
 interface AppData {
-  id: number
+  id: number | string // 工作区卡片使用带前缀的字符串 ID，仅用于启动台展示
   name: string
   category: string
   category_ids?: string[]
@@ -367,6 +393,24 @@ interface AppData {
   usage_count?: number // 使用次数
   last_launched_at?: number | null // 上次启动时间戳
   is_start_menu_result?: boolean // 仅在联合搜索中临时展示
+  workspace_id?: string // 工作区卡片不写入普通应用数据
+  workspace_window_count?: number
+}
+
+interface WorkspaceSummary {
+  id: string
+  name: string
+  windows: unknown[]
+}
+interface WorkspaceLaunchResult { name: string; status: string; error: string | null; error_code?: string | null }
+const workspaces = ref<WorkspaceSummary[]>([])
+const workspaceCards = computed<AppData[]>(() => workspaces.value.map(workspace => ({
+  id: `workspace:${workspace.id}`, name: workspace.name, category: 'all', category_ids: ['all'],
+  icon: '', path: '', workspace_id: workspace.id, workspace_window_count: workspace.windows.length
+})))
+const loadWorkspaces = async () => {
+  try { workspaces.value = await invoke<WorkspaceSummary[]>('list_workspaces') }
+  catch (error) { console.error('加载工作区失败:', error) }
 }
 
 interface CategoryData {
@@ -386,7 +430,7 @@ const selectedCategory = ref('all')
 const searchQuery = ref('')
 const showSearchBox = ref(false) // 控制搜索框显示状态
 const isLoading = ref(true) // 加载状态
-const selectedAppId = ref<number | null>(null)
+const selectedAppId = ref<number | string | null>(null)
 // 设置相关状态已移除，现在使用独立设置窗口
 
 // 拖拽相关状态
@@ -732,6 +776,7 @@ const loadAppData = async () => {
   console.log('开始加载应用数据...')
   try {
     const storage = await invoke('load_app_data') as any
+    workspaces.value = storage.workspaces || []
     console.log('从后端加载的数据:', storage)
 
     // 批量更新而不是逐个赋值
@@ -771,6 +816,7 @@ const loadAppData = async () => {
       { id: 'all', name: t('main.sidebar.allApps'), icon: 'icon-apps', isDefault: true, order: 0, hidden: false }
     ]
     apps.value = []
+    workspaces.value = []
     selectedCategory.value = 'all'
   }
 }
@@ -1071,7 +1117,7 @@ const filteredApps = computed(() => {
     apps: apps.value
   })
 
-  let result = apps.value
+  let result = [...apps.value, ...workspaceCards.value]
 
   const normalizedQuery = normalizeSearchText(searchQuery.value)
 
@@ -1154,6 +1200,9 @@ const formatLastLaunchTime = (timestamp?: number | null) => {
 }
 
 const getAppHoverInfo = (app: AppData) => {
+  if (app.workspace_id) {
+    return t('workspaces.launcherInfo', { name: app.name, count: app.workspace_window_count ?? 0 })
+  }
   if (app.is_start_menu_result) {
     return t('main.tooltip.startMenuInfo', { name: app.name })
   }
@@ -1273,6 +1322,10 @@ const launchApp = async (app: any) => {
   console.log(`启动应用: ${app.name}`)
 
   selectedAppId.value = app.id
+  if (app.workspace_id) {
+    await launchWorkspaceCard(app)
+    return
+  }
   const targetPath = getLaunchTargetPath(app)
   if (!targetPath) {
     console.error('应用路径不存在')
@@ -1334,6 +1387,7 @@ const launchApp = async (app: any) => {
 }
 
 const handleAppClick = (event: MouseEvent, app: AppData) => {
+  if (app.workspace_id && event.detail > 1) return
   if (suppressNextAppClick) {
     event.preventDefault()
     event.stopPropagation()
@@ -1342,6 +1396,37 @@ const handleAppClick = (event: MouseEvent, app: AppData) => {
 
   selectedAppId.value = app.id
   void launchApp(app)
+}
+
+const launchWorkspaceCard = async (app: AppData) => {
+  if (!app.workspace_id || launchingWorkspaceId.value) return
+  clearAutoHideTimer()
+  launchingWorkspaceId.value = app.workspace_id
+  try {
+    const results = await invoke<WorkspaceLaunchResult[]>('launch_workspace', { workspaceId: app.workspace_id })
+    const failures = results.filter(result => result.status === 'failed')
+    if (failures.length) {
+      const messages = failures.map(result => `${result.name}: ${result.error_code === 'permission_denied' ? t('workspaces.permissionStatus') : result.error || t('workspaces.status.failed')}`)
+      if (failures.some(result => result.error_code === 'permission_denied')) messages.push(t('workspaces.permissionHint'))
+      await alertDialog(messages.join('\n'), { type: 'error' })
+    } else {
+      showToast(t('workspaces.launched', { name: app.name }), 'success')
+      await hideAfterLaunchIfNeeded()
+    }
+  } catch (error) {
+    await alertDialog(t('main.alert.launchFailed', { error: String(error) }), { type: 'error' })
+  } finally { launchingWorkspaceId.value = '' }
+}
+
+const launchSelectedWorkspace = () => {
+  const app = appContextMenu.value.app
+  hideAppContextMenu()
+  if (app) void launchApp(app)
+}
+const editSelectedWorkspace = () => {
+  const workspaceId = appContextMenu.value.app?.workspace_id
+  hideAppContextMenu()
+  if (workspaceId && !launchingWorkspaceId.value) openWorkspaces(workspaceId)
 }
 
 // 右键菜单相关方法
@@ -1878,6 +1963,18 @@ const editApp = async () => {
 }
 
 const deleteSpecificApp = async (appToDelete: AppData | null) => {
+  if (appToDelete?.workspace_id) {
+    if (launchingWorkspaceId.value) return
+    if (await confirmDialog(t('workspaces.deleteConfirm', { name: appToDelete.name }))) {
+      try {
+        await invoke('delete_workspace', { workspaceId: appToDelete.workspace_id })
+        await loadWorkspaces()
+      } catch (error) {
+        await alertDialog(String(error), { type: 'error' })
+      }
+    }
+    return
+  }
   if (appToDelete && !appToDelete.is_start_menu_result) {
     if (await confirmDialog(t('main.confirm.deleteApp', { name: appToDelete.name }))) {
       try {
@@ -2820,6 +2917,7 @@ const didInternalSortDragJustEnd = () => {
 }
 
 const isAppChildWindowOpen = async () => {
+  if (showWorkspaces.value || launchingWorkspaceId.value) return true
   try {
     const [isSettingsOpen, isNewProjectOpen, isEditProjectOpen] = await Promise.all([
       invoke<boolean>('is_settings_window_open'),
@@ -3428,7 +3526,13 @@ const reorderApps = async (sourceApp: AppData, sourceIndex: number, targetIndex:
     ? [...apps.value]
     : apps.value.filter(app => appBelongsToCategory(app, selectedCategory.value))
 
-  if (sourceIndex < 0 || sourceIndex >= currentApps.length || targetIndex >= currentApps.length) {
+  // 启动台也展示工作区，按应用 ID 转换位置，避免把工作区计入应用排序。
+  const targetApp = filteredApps.value[targetIndex]
+  if (!targetApp || targetApp.workspace_id || targetApp.is_start_menu_result) return
+  sourceIndex = currentApps.findIndex(app => app.id === sourceApp.id)
+  targetIndex = currentApps.findIndex(app => app.id === targetApp.id)
+
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex >= currentApps.length || targetIndex >= currentApps.length) {
     return
   }
 
@@ -3451,7 +3555,7 @@ const reorderApps = async (sourceApp: AppData, sourceIndex: number, targetIndex:
 const getAppItemIndexAtPoint = (x: number, y: number) => {
   const target = document.elementFromPoint(x, y) as HTMLElement | null
   const appItem = target?.closest('.app-item') as HTMLElement | null
-  if (!appItem) {
+  if (!appItem || appItem.dataset.workspaceId) {
     return -1
   }
 
@@ -3532,7 +3636,7 @@ const handleAppPointerUp = async (event: PointerEvent) => {
 }
 
 const handleAppPointerDown = (event: PointerEvent, app: AppData, index: number) => {
-  if (app.is_start_menu_result || appSettings.value.layoutLocked || event.button !== 0) {
+  if (app.workspace_id || app.is_start_menu_result || appSettings.value.layoutLocked || event.button !== 0) {
     return
   }
 
@@ -4022,6 +4126,12 @@ const clearDragState = () => {
   align-items: center;
   justify-content: center;
 }
+
+.workspace-icon { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: var(--accent-color); }
+.workspace-icon i { --icon-size: calc(var(--app-icon-size, 51px) * .72); }
+.workspace-count { position: absolute; right: 0; bottom: 0; min-width: 16px; padding: 2px 4px; border-radius: var(--ui-radius-xs); color: white; background: var(--accent-color); text-align: center; font-size: 10px; font-weight: 600; }
+.app-item.workspace-item, .app-item.workspace-item:active { cursor: pointer; }
+.app-item.workspace-launching { opacity: .65; cursor: progress; }
 
 .name-position-top .app-icon {
   margin-top: 4px;

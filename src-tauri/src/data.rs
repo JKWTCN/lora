@@ -99,9 +99,6 @@ pub fn save_app_data(
     categories: Vec<CategoryData>,
     selected_category: Option<String>,
 ) -> Result<String, String> {
-    let data_dir = get_app_data_dir()?;
-    let file_path = data_dir.join("apps.json");
-
     for app in &mut apps {
         normalize_app_categories(app);
     }
@@ -110,7 +107,13 @@ pub fn save_app_data(
         apps,
         categories,
         selected_category,
+        workspaces: load_app_data()?.workspaces,
     };
+    write_app_storage(&storage)
+}
+
+pub(crate) fn write_app_storage(storage: &AppStorage) -> Result<String, String> {
+    let file_path = get_app_data_dir()?.join("apps.json");
     let json_data =
         serde_json::to_string_pretty(&storage).map_err(|e| format!("序列化数据失败: {}", e))?;
 
@@ -129,6 +132,7 @@ pub fn load_app_data() -> Result<AppStorage, String> {
             apps: vec![],
             categories: vec![],
             selected_category: Some("all".to_string()),
+            workspaces: vec![],
         });
     }
 
@@ -599,9 +603,13 @@ pub fn import_app_data_from_file(file_path: String) -> Result<String, String> {
         serde_json::from_str(&json_data).map_err(|e| format!("解析导入数据失败: {}", e))?;
 
     if let Some(storage_data) = import_data.get("storage") {
-        let storage: AppStorage = serde_json::from_value(storage_data.clone())
+        let mut storage: AppStorage = serde_json::from_value(storage_data.clone())
             .map_err(|e| format!("解析存储数据失败: {}", e))?;
-        save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+        crate::workspaces::validate_workspaces(&storage.workspaces)?;
+        for app in &mut storage.apps {
+            normalize_app_categories(app);
+        }
+        write_app_storage(&storage)?;
     }
 
     if let Some(settings_data) = import_data.get("settings") {
@@ -619,12 +627,9 @@ pub fn clear_all_data() -> Result<String, String> {
         apps: vec![],
         categories: vec![],
         selected_category: Some("all".to_string()),
+        workspaces: vec![],
     };
-    save_app_data(
-        empty_storage.apps,
-        empty_storage.categories,
-        empty_storage.selected_category,
-    )?;
+    write_app_storage(&empty_storage)?;
     let default_settings = get_default_settings();
     save_app_settings(default_settings)?;
     Ok("所有数据已清空".to_string())

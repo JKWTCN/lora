@@ -13,6 +13,7 @@ mod system_integration;
 mod win_native;
 mod window_manager;
 mod windows;
+mod workspaces;
 use crate::backup::BackupManager;
 use crate::models::AppState;
 use crate::system_integration::{
@@ -160,6 +161,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            workspaces::list_workspaces,
+            workspaces::capture_workspace_windows,
+            workspaces::save_workspace,
+            workspaces::delete_workspace,
+            workspaces::launch_workspace,
             data::load_app_data,
             data::save_app_settings,
             data::load_app_settings,

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)
+![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-v2-orange.svg)
 ![Vue](https://img.shields.io/badge/Vue-3-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
@@ -118,6 +118,16 @@ lora/
 - [Tauri](https://tauri.app/) - Build smaller, faster, and more secure desktop applications with a web frontend.
 - [Vue.js](https://vuejs.org/) - The Progressive JavaScript Framework.
 - [Vite](https://vitejs.dev/) - Next Generation Frontend Tooling.
+
+## Desktop workspaces
+
+Open Workspaces using the briefcase button in the title bar. Arrange your desktop apps, create a workspace, capture the current windows, and select the apps to save. Choose a side-by-side, stacked, or grid layout, or edit individual positions and sizes. Add launch arguments to reopen specific projects, files, or websites.
+
+Saved workspaces also appear in the launcher's All Apps view with a briefcase icon and window count. Click or select one and press Enter to launch it, search by name, or right-click to edit or delete it.
+
+Launching a workspace reuses existing windows by default and launches missing apps. Positions are saved relative to each monitor's work area to adapt to resolution and scaling changes, with a fallback when a monitor is unavailable. Workspaces are included in data backups, imports, and exports.
+
+The implementation follows [PowerToys Workspaces](https://learn.microsoft.com/en-us/windows/powertoys/workspaces), using public Win32 APIs to capture, launch, and arrange windows. It does not create native Windows Snap Groups. Some Store apps, special launchers, and elevated windows may require additional configuration. Single-instance apps may not open a new window when reuse is disabled.
 
 ## 📄 License
 
