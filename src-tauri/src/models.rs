@@ -59,6 +59,7 @@ pub struct AppSettings {
     pub start_with_system: Option<bool>,
     pub start_minimized: Option<bool>,
     pub auto_hide_after_launch: Option<bool>,
+    pub open_shortcut_target_location: Option<bool>, // 打开快捷方式目标文件所在目录
     // 快捷键设置
     pub toggle_hotkey: Option<String>,
     pub global_hotkey: Option<bool>,

@@ -214,6 +214,11 @@ export default {
       }
     },
     features: {
+      fileLocation: {
+        title: '文件位置',
+        openShortcutTargetLocation: '快捷方式打开文件位置时定位到目标文件',
+        openShortcutTargetLocationDesc: '开启后，对 .lnk 快捷方式执行“打开文件位置”会打开目标文件所在目录并选中目标文件；目标无法解析或不存在时，打开快捷方式所在目录并选中快捷方式。'
+      },
       startup: {
         title: '启动设置',
         startWithSystem: '开机自动启动',

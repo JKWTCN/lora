@@ -45,6 +45,7 @@ pub fn get_default_settings() -> AppSettings {
         start_with_system: Some(false),
         start_minimized: Some(false),
         auto_hide_after_launch: Some(false),
+        open_shortcut_target_location: Some(false),
         toggle_hotkey: Some("Ctrl+Space".to_string()),
         global_hotkey: Some(true),
         middle_mouse_toggle: Some(false),
@@ -202,6 +203,17 @@ pub fn update_auto_hide_after_launch(auto_hide_after_launch: bool) -> Result<Str
     settings.auto_hide_after_launch = Some(auto_hide_after_launch);
     save_app_settings(settings)?;
     Ok("运行应用后自动隐藏设置已更新".to_string())
+}
+
+/// 更新打开快捷方式目标文件位置设置
+#[tauri::command]
+pub fn update_open_shortcut_target_location(
+    open_shortcut_target_location: bool,
+) -> Result<String, String> {
+    let mut settings = load_app_settings()?;
+    settings.open_shortcut_target_location = Some(open_shortcut_target_location);
+    save_app_settings(settings)?;
+    Ok("打开快捷方式目标文件位置设置已更新".to_string())
 }
 
 /// 更新快捷键设置

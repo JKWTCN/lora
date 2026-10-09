@@ -220,6 +220,7 @@ pub fn run() {
             settings_manager::update_start_with_system,
             settings_manager::update_start_minimized,
             settings_manager::update_auto_hide_after_launch,
+            settings_manager::update_open_shortcut_target_location,
             settings_manager::update_toggle_hotkey,
             settings_manager::update_global_hotkey,
             settings_manager::update_middle_mouse_toggle,

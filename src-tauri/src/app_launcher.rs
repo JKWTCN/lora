@@ -473,6 +473,7 @@ fn get_default_settings() -> AppSettings {
         start_with_system: Some(false),
         start_minimized: Some(false),
         auto_hide_after_launch: Some(false),
+        open_shortcut_target_location: Some(false),
         toggle_hotkey: Some("Ctrl+Space".to_string()),
         global_hotkey: Some(true),
         middle_mouse_toggle: Some(false),

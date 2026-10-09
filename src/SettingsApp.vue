@@ -201,6 +201,21 @@
                     </div>
 
                     <div class="settings-group">
+                        <h3>{{ $t('settings.features.fileLocation.title') }}</h3>
+
+                        <div class="setting-item">
+                            <label>
+                                <input type="checkbox" v-model="localSettings.openShortcutTargetLocation"
+                                    @change="updateOpenShortcutTargetLocation" />
+                                {{ $t('settings.features.fileLocation.openShortcutTargetLocation') }}
+                            </label>
+                            <p class="setting-description">
+                                {{ $t('settings.features.fileLocation.openShortcutTargetLocationDesc') }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
                         <h3>{{ $t('settings.features.hotkey.title') }}</h3>
 
                         <div class="setting-item">
@@ -386,6 +401,7 @@ const localSettings = reactive({
     startWithSystem: false,
     startMinimized: false,
     autoHideAfterLaunch: false,
+    openShortcutTargetLocation: false,
 
     // 快捷键设置
     toggleHotkey: 'Ctrl+Space',
@@ -562,6 +578,19 @@ const updateAutoHideAfterLaunch = async () => {
         console.log('运行应用后自动隐藏设置已更新')
     } catch (error) {
         console.error('更新运行应用后自动隐藏设置失败:', error)
+    }
+}
+
+const updateOpenShortcutTargetLocation = async () => {
+    try {
+        await invoke('update_open_shortcut_target_location', {
+            openShortcutTargetLocation: localSettings.openShortcutTargetLocation
+        })
+        await notifySettingsUpdated()
+        markSaved()
+    } catch (error) {
+        localSettings.openShortcutTargetLocation = !localSettings.openShortcutTargetLocation
+        console.error('更新打开快捷方式目标文件位置设置失败:', error)
     }
 }
 
@@ -793,6 +822,7 @@ const loadSettings = async () => {
         localSettings.projectNamePosition = settings.project_name_position || 'bottom'
         localSettings.startMinimized = settings.start_minimized || false
         localSettings.autoHideAfterLaunch = settings.auto_hide_after_launch || false
+        localSettings.openShortcutTargetLocation = settings.open_shortcut_target_location === true
         localSettings.toggleHotkey = settings.toggle_hotkey || 'Ctrl+Space'
         localSettings.globalHotkey = settings.global_hotkey !== false
         localSettings.middleMouseToggle = settings.middle_mouse_toggle === true

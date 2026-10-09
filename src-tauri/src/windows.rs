@@ -22,13 +22,27 @@ pub fn run_as_admin(app_path: String, launch_args: Option<String>) -> Result<Str
 #[cfg(target_os = "windows")]
 #[tauri::command]
 pub fn open_file_location(file_path: String) -> Result<String, String> {
-    let path = Path::new(&file_path);
-    let dir_path = path
-        .parent()
-        .ok_or("无法获取文件目录")?
-        .to_str()
-        .ok_or("路径包含无效字符")?;
-    crate::win_native::shell_execute(dir_path, None, None, Some("open"))
-        .map(|_| "已打开文件所在目录".to_string())
-        .map_err(|e| format!("打开目录失败: {}", e))
+    let follow_shortcut = crate::data::load_app_settings()?
+        .open_shortcut_target_location
+        .unwrap_or(false);
+    let target_path = if follow_shortcut
+        && Path::new(&file_path)
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("lnk"))
+    {
+        crate::helpers::resolve_shortcut_target(&file_path)
+            .filter(|target| Path::new(target).exists())
+    } else {
+        None
+    };
+    let path = Path::new(target_path.as_deref().unwrap_or(&file_path));
+    if !path.exists() {
+        return Err("文件或文件夹不存在".to_string());
+    }
+    let selected_path = path.to_str().ok_or("路径包含无效字符")?;
+    let params = format!("/select,\"{}\"", selected_path);
+    crate::win_native::shell_execute("explorer.exe", Some(&params), None, Some("open"))
+        .map(|_| "已打开文件所在目录并选中文件".to_string())
+        .map_err(|e| format!("打开文件位置失败: {}", e))
 }

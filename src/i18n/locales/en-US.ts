@@ -214,6 +214,11 @@ export default {
       }
     },
     features: {
+      fileLocation: {
+        title: 'File Location',
+        openShortcutTargetLocation: 'Open the target location for shortcuts',
+        openShortcutTargetLocationDesc: 'When enabled, Open File Location for a .lnk shortcut opens the target’s containing folder and selects the target. If the target cannot be resolved or does not exist, it opens the shortcut’s containing folder and selects the shortcut.'
+      },
       startup: {
         title: 'Startup Settings',
         startWithSystem: 'Start with System',
