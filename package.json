@@ -11,14 +11,14 @@
     "sync-version": "node sync-version.js"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/api": "^2.12.2",
     "@tauri-apps/plugin-opener": "^2.5.4",
     "pnpm": "^10.34.5",
     "vue": "^3.5.40",
     "vue-i18n": "^11.4.8"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.4",
+    "@tauri-apps/cli": "^2.12.1",
     "@vitejs/plugin-vue": "^6.0.8",
     "typescript": "~6.0.3",
     "vite": "^8.2.0",
