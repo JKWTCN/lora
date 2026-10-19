@@ -2360,6 +2360,7 @@ dependencies = [
  "tokio",
  "url",
  "winapi",
+ "windows",
  "windows-sys 0.61.2",
 ]
 

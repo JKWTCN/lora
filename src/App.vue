@@ -90,6 +90,10 @@
           <template v-if="appContextMenu.app?.workspace_id">
             <div class="context-menu-item" @click="launchSelectedWorkspace"><span>{{ $t('workspaces.launch') }}</span></div>
             <div class="context-menu-item" @click="editSelectedWorkspace"><span>{{ $t('common.edit') }}</span></div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item" @click="showMoveToSubmenu"><span>{{ $t('main.contextMenu.moveTo') }}</span><span class="arrow-right">▶</span></div>
+            <div class="context-menu-item" @click="showCopyToSubmenu"><span>{{ $t('main.contextMenu.copyTo') }}</span><span class="arrow-right">▶</span></div>
+            <div class="context-menu-divider"></div>
             <div class="context-menu-item context-menu-item-danger" @click="deleteApp"><span>{{ $t('common.delete') }}</span></div>
           </template>
           <template v-else>
@@ -401,13 +405,31 @@ interface WorkspaceSummary {
   id: string
   name: string
   windows: unknown[]
+  category_ids?: string[]
+  order?: number
 }
 interface WorkspaceLaunchResult { name: string; status: string; error: string | null; error_code?: string | null }
 const workspaces = ref<WorkspaceSummary[]>([])
 const workspaceCards = computed<AppData[]>(() => workspaces.value.map(workspace => ({
-  id: `workspace:${workspace.id}`, name: workspace.name, category: 'all', category_ids: ['all'],
+  id: `workspace:${workspace.id}`, name: workspace.name,
+  category: workspace.category_ids?.[0] || 'all', category_ids: workspace.category_ids?.length ? [...workspace.category_ids] : ['all'],
+  order: workspace.order,
   icon: '', path: '', workspace_id: workspace.id, workspace_window_count: workspace.windows.length
 })))
+const updateWorkspaceCard = (card: AppData) => {
+  const workspace = workspaces.value.find(workspace => workspace.id === card.workspace_id)
+  if (workspace) { workspace.category_ids = getAppCategoryIds(card); workspace.order = card.order }
+}
+const removeWorkspaceCategories = (categoryIds: string[]) => {
+  const cards = workspaceCards.value
+  workspaces.value = workspaces.value.filter(workspace => {
+    const card = cards.find(card => card.workspace_id === workspace.id)!
+    if (!getAppCategoryIds(card).some(id => categoryIds.includes(id))) return true
+    if (!removeAppCategories(card, categoryIds)) return false
+    workspace.category_ids = getAppCategoryIds(card)
+    return true
+  })
+}
 const loadWorkspaces = async () => {
   try { workspaces.value = await invoke<WorkspaceSummary[]>('list_workspaces') }
   catch (error) { console.error('加载工作区失败:', error) }
@@ -855,6 +877,7 @@ const saveAppData = async () => {
     await invoke('save_app_data', {
       apps: appsForBackend,
       categories: categoriesForBackend,
+      workspaces: workspaces.value,
       selectedCategory: selectedCategory.value
     })
     await invoke('refresh_shortcut_registrations')
@@ -1886,34 +1909,24 @@ const hideCopyToSubmenu = () => {
 }
 
 const moveAppToCategory = async (categoryId: string) => {
-  if (appContextMenu.value.app) {
-    const appIndex = apps.value.findIndex(app => app.id === appContextMenu.value.app.id)
-    if (appIndex !== -1) {
-      setAppSingleCategory(apps.value[appIndex], categoryId)
-      console.log(`已将 ${appContextMenu.value.app.name} 移动到分类: ${categoryId}`)
-
-      // 保存数据
-      await saveAppData()
-    }
+  const selected = appContextMenu.value.app
+  const app = [...apps.value, ...workspaceCards.value].find(app => app.id === selected?.id)
+  if (app) {
+    setAppSingleCategory(app, categoryId)
+    updateWorkspaceCard(app)
+    await saveAppData()
   }
   hideMoveToSubmenu()
   hideAppContextMenu()
 }
 
 const copyAppToCategory = async (categoryId: string) => {
-  if (appContextMenu.value.app) {
-    const appIndex = apps.value.findIndex(app => app.id === appContextMenu.value.app.id)
-    if (appIndex !== -1) {
-      const changed = addAppCategory(apps.value[appIndex], categoryId)
-      if (changed) {
-        console.log(`已将 ${appContextMenu.value.app.name} 复制到分类: ${categoryId}`)
-
-        // 保存数据
-        await saveAppData()
-      }
-    }
+  const selected = appContextMenu.value.app
+  const app = [...apps.value, ...workspaceCards.value].find(app => app.id === selected?.id)
+  if (app && addAppCategory(app, categoryId)) {
+    updateWorkspaceCard(app)
+    await saveAppData()
   }
-
   hideCopyToSubmenu()
   hideAppContextMenu()
 }
@@ -1967,7 +1980,13 @@ const deleteSpecificApp = async (appToDelete: AppData | null) => {
     if (launchingWorkspaceId.value) return
     if (await confirmDialog(t('workspaces.deleteConfirm', { name: appToDelete.name }))) {
       try {
-        await invoke('delete_workspace', { workspaceId: appToDelete.workspace_id })
+        if (selectedCategory.value !== 'all' && getAppCategoryIds(appToDelete).length > 1) {
+          removeAppCategories(appToDelete, [selectedCategory.value])
+          updateWorkspaceCard(appToDelete)
+          await saveAppData()
+        } else {
+          await invoke('delete_workspace', { workspaceId: appToDelete.workspace_id })
+        }
         await loadWorkspaces()
       } catch (error) {
         await alertDialog(String(error), { type: 'error' })
@@ -2019,8 +2038,10 @@ const deleteAllApps = async () => {
       // 从前端数组中移除
       if (selectedCategory.value === 'all') {
         apps.value = []
+        workspaces.value = []
       } else {
         const categoryId = selectedCategory.value
+        removeWorkspaceCategories([categoryId])
         apps.value = apps.value.filter(app => {
           if (!appBelongsToCategory(app, categoryId)) {
             return true
@@ -2264,7 +2285,7 @@ const deleteCategory = async () => {
     const categoryId = categoryToDelete.id
 
     // 确认删除操作
-    const appsInCategory = apps.value.filter(app => appBelongsToCategory(app, categoryId))
+    const appsInCategory = [...apps.value, ...workspaceCards.value].filter(app => appBelongsToCategory(app, categoryId))
     const confirmMessage = appsInCategory.length > 0
       ? t('main.confirm.deleteCategory', { name: categoryToDelete.name, count: appsInCategory.length })
       : t('main.confirm.deleteCategoryEmpty', { name: categoryToDelete.name })
@@ -2280,6 +2301,8 @@ const deleteCategory = async () => {
       }
       return removeAppCategories(app, [categoryId])
     })
+
+    removeWorkspaceCategories([categoryId])
 
     // 删除分类
     categories.value = categories.value.filter(cat => cat.id !== categoryId)
@@ -2305,7 +2328,7 @@ const deleteAllCategories = async () => {
 
   // 计算要删除的应用数量
   const deletedCategoryIds = customCategories.map(cat => cat.id)
-  const appsToDelete = apps.value.filter(app => getAppCategoryIds(app).some(categoryId => deletedCategoryIds.includes(categoryId)))
+  const appsToDelete = [...apps.value, ...workspaceCards.value].filter(app => getAppCategoryIds(app).some(categoryId => deletedCategoryIds.includes(categoryId)))
 
   const confirmMessage = appsToDelete.length > 0
     ? t('main.confirm.deleteAllCategories', { groupCount: customCategories.length, appCount: appsToDelete.length })
@@ -2322,6 +2345,8 @@ const deleteAllCategories = async () => {
     }
     return removeAppCategories(app, deletedCategoryIds)
   })
+
+  removeWorkspaceCategories(deletedCategoryIds)
 
   // 只保留默认分组
   categories.value = categories.value.filter(cat => cat.isDefault)
@@ -3510,7 +3535,7 @@ const clearCategoryDragState = () => {
 
 const saveAppsOrder = async () => {
   try {
-    await invoke('save_apps_order', { apps: apps.value })
+    await saveAppData()
     console.log('应用排序已保存')
   } catch (error) {
     console.error('保存应用排序失败:', error)
@@ -3522,13 +3547,11 @@ const reorderApps = async (sourceApp: AppData, sourceIndex: number, targetIndex:
     return
   }
 
-  const currentApps = selectedCategory.value === 'all'
-    ? [...apps.value]
-    : apps.value.filter(app => appBelongsToCategory(app, selectedCategory.value))
+  const currentApps = filteredApps.value.filter(app => !app.is_start_menu_result)
 
-  // 启动台也展示工作区，按应用 ID 转换位置，避免把工作区计入应用排序。
+  // 按卡片 ID 转换筛选后的位置。
   const targetApp = filteredApps.value[targetIndex]
-  if (!targetApp || targetApp.workspace_id || targetApp.is_start_menu_result) return
+  if (!targetApp || targetApp.is_start_menu_result) return
   sourceIndex = currentApps.findIndex(app => app.id === sourceApp.id)
   targetIndex = currentApps.findIndex(app => app.id === targetApp.id)
 
@@ -3543,7 +3566,9 @@ const reorderApps = async (sourceApp: AppData, sourceIndex: number, targetIndex:
 
   // 更新所有相关应用的 order 值
   currentApps.forEach((app, idx) => {
-    const originalApp = apps.value.find(a => a.id === app.id)
+    const originalApp = app.workspace_id
+      ? workspaces.value.find(workspace => workspace.id === app.workspace_id)
+      : apps.value.find(a => a.id === app.id)
     if (originalApp) {
       originalApp.order = idx
     }
@@ -3555,7 +3580,7 @@ const reorderApps = async (sourceApp: AppData, sourceIndex: number, targetIndex:
 const getAppItemIndexAtPoint = (x: number, y: number) => {
   const target = document.elementFromPoint(x, y) as HTMLElement | null
   const appItem = target?.closest('.app-item') as HTMLElement | null
-  if (!appItem || appItem.dataset.workspaceId) {
+  if (!appItem) {
     return -1
   }
 
@@ -3636,7 +3661,7 @@ const handleAppPointerUp = async (event: PointerEvent) => {
 }
 
 const handleAppPointerDown = (event: PointerEvent, app: AppData, index: number) => {
-  if (app.workspace_id || app.is_start_menu_result || appSettings.value.layoutLocked || event.button !== 0) {
+  if (app.is_start_menu_result || appSettings.value.layoutLocked || event.button !== 0) {
     return
   }
 

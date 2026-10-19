@@ -84,9 +84,12 @@ fn validate_project_hotkey(storage: &AppStorage, app: &mut AppData) -> Result<()
 }
 
 fn rollback_shortcut_registration(app: &AppHandle, storage: AppStorage, error: String) -> String {
-    if let Err(rollback_error) =
-        save_app_data(storage.apps, storage.categories, storage.selected_category)
-    {
+    if let Err(rollback_error) = save_app_data(
+        storage.apps,
+        storage.categories,
+        storage.selected_category,
+        None,
+    ) {
         return format!("{}；回滚数据失败: {}", error, rollback_error);
     }
     let _ = crate::system_integration::refresh_global_shortcuts(app);
@@ -98,16 +101,19 @@ pub fn save_app_data(
     mut apps: Vec<AppData>,
     categories: Vec<CategoryData>,
     selected_category: Option<String>,
+    workspaces: Option<Vec<crate::workspaces::Workspace>>,
 ) -> Result<String, String> {
     for app in &mut apps {
         normalize_app_categories(app);
     }
 
+    let workspaces = workspaces.unwrap_or(load_app_data()?.workspaces);
+    crate::workspaces::validate_workspaces(&workspaces)?;
     let storage = AppStorage {
         apps,
         categories,
         selected_category,
-        workspaces: load_app_data()?.workspaces,
+        workspaces,
     };
     write_app_storage(&storage)
 }
@@ -426,7 +432,12 @@ pub fn delete_app(app: AppHandle, app_id: i64) -> Result<String, String> {
     let mut storage = load_app_data()?;
     let previous_storage = storage.clone();
     storage.apps.retain(|app| app.id != app_id);
-    save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+    save_app_data(
+        storage.apps,
+        storage.categories,
+        storage.selected_category,
+        None,
+    )?;
     if let Err(error) = crate::system_integration::refresh_global_shortcuts(&app) {
         return Err(rollback_shortcut_registration(
             &app,
@@ -444,7 +455,12 @@ pub fn update_app_category(app_id: i64, new_category: String) -> Result<String, 
     if let Some(app) = storage.apps.iter_mut().find(|app| app.id == app_id) {
         app.category = new_category.clone();
         app.category_ids = vec![new_category];
-        save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+        save_app_data(
+            storage.apps,
+            storage.categories,
+            storage.selected_category,
+            None,
+        )?;
         Ok("应用分类更新成功".to_string())
     } else {
         Err("应用不存在".to_string())
@@ -455,7 +471,12 @@ pub fn update_app_category(app_id: i64, new_category: String) -> Result<String, 
 pub fn save_selected_category(category_id: String) -> Result<String, String> {
     let mut storage = load_app_data()?;
     storage.selected_category = Some(category_id);
-    save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+    save_app_data(
+        storage.apps,
+        storage.categories,
+        storage.selected_category,
+        None,
+    )?;
     Ok("选中分组保存成功".to_string())
 }
 
@@ -481,7 +502,12 @@ pub fn update_category_hidden(category_id: String, hidden: bool) -> Result<Strin
             storage.selected_category = Some("all".to_string());
         }
 
-        save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+        save_app_data(
+            storage.apps,
+            storage.categories,
+            storage.selected_category,
+            None,
+        )?;
         Ok("分组显示状态已更新".to_string())
     } else {
         Err("分组不存在".to_string())
@@ -499,7 +525,12 @@ pub async fn add_new_app(app_handle: AppHandle, app: AppData) -> Result<String, 
         app.usage_count = Some(0);
     }
     storage.apps.push(app);
-    save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+    save_app_data(
+        storage.apps,
+        storage.categories,
+        storage.selected_category,
+        None,
+    )?;
     if let Err(error) = crate::system_integration::refresh_global_shortcuts(&app_handle) {
         return Err(rollback_shortcut_registration(
             &app_handle,
@@ -524,7 +555,12 @@ pub async fn update_app(app_handle: AppHandle, app: AppData) -> Result<String, S
         *existing_app = app;
         existing_app.usage_count = usage_count;
         existing_app.last_launched_at = last_launched_at;
-        save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+        save_app_data(
+            storage.apps,
+            storage.categories,
+            storage.selected_category,
+            None,
+        )?;
         if let Err(error) = crate::system_integration::refresh_global_shortcuts(&app_handle) {
             return Err(rollback_shortcut_registration(
                 &app_handle,
@@ -550,7 +586,12 @@ pub fn increment_app_usage(app_id: i64) -> Result<serde_json::Value, String> {
             .as_secs() as i64;
         app.usage_count = Some(next_count);
         app.last_launched_at = Some(launch_time);
-        save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+        save_app_data(
+            storage.apps,
+            storage.categories,
+            storage.selected_category,
+            None,
+        )?;
         Ok(serde_json::json!({
             "usage_count": next_count,
             "last_launched_at": launch_time
@@ -645,6 +686,11 @@ pub fn save_apps_order(apps: Vec<AppData>) -> Result<String, String> {
         }
     }
 
-    save_app_data(storage.apps, storage.categories, storage.selected_category)?;
+    save_app_data(
+        storage.apps,
+        storage.categories,
+        storage.selected_category,
+        None,
+    )?;
     Ok("排序保存成功".to_string())
 }

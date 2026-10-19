@@ -11,6 +11,10 @@ pub struct Workspace {
     pub name: String,
     pub move_existing_windows: bool,
     pub windows: Vec<WorkspaceWindow>,
+    #[serde(default)]
+    pub category_ids: Vec<String>,
+    #[serde(default)]
+    pub order: Option<i32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -19,6 +23,10 @@ pub struct WorkspaceWindow {
     pub title: String,
     pub path: String,
     pub launch_args: String,
+    #[serde(default)]
+    pub folder_path: Option<String>,
+    #[serde(default)]
+    pub visible_bounds: bool,
     pub run_as_admin: bool,
     #[serde(default)]
     pub elevated: bool,
@@ -71,6 +79,10 @@ pub(crate) fn validate_workspaces(workspaces: &[Workspace]) -> Result<(), String
             if window.path.is_empty()
                 || window.path.contains('\0')
                 || window.launch_args.contains('\0')
+                || window
+                    .folder_path
+                    .as_ref()
+                    .is_some_and(|path| path.contains(['\0', '"']))
             {
                 return Err("工作区应用路径或参数无效".into());
             }
@@ -92,10 +104,12 @@ pub(crate) fn validate_workspaces(workspaces: &[Workspace]) -> Result<(), String
 }
 
 #[tauri::command]
-pub fn save_workspace(workspace: Workspace) -> Result<(), String> {
+pub fn save_workspace(mut workspace: Workspace) -> Result<(), String> {
     validate_workspaces(std::slice::from_ref(&workspace))?;
     let mut storage = load_app_data()?;
     if let Some(existing) = storage.workspaces.iter_mut().find(|w| w.id == workspace.id) {
+        workspace.category_ids = existing.category_ids.clone();
+        workspace.order = existing.order;
         *existing = workspace;
     } else {
         storage.workspaces.push(workspace);
@@ -180,7 +194,7 @@ mod native {
             },
         },
         um::{
-            dwmapi::{DwmGetWindowAttribute, DWMWA_CLOAKED},
+            dwmapi::{DwmFlush, DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS},
             handleapi::CloseHandle,
             processthreadsapi::{GetCurrentProcess, OpenProcess, OpenProcessToken},
             securitybaseapi::GetTokenInformation,
@@ -202,6 +216,92 @@ mod native {
     struct LiveWindow {
         hwnd: HWND,
         data: WorkspaceWindow,
+    }
+
+    // Query the Shell window rather than explorer.exe's process arguments: one process
+    // can host several folders. Keep COM objects on this worker thread.
+    fn explorer_locations() -> Vec<(usize, String, String)> {
+        use windows::{
+            core::Interface,
+            Win32::{
+                Foundation::RPC_E_CHANGED_MODE,
+                System::{
+                    Com::{
+                        CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_LOCAL_SERVER,
+                        COINIT_APARTMENTTHREADED,
+                    },
+                    Variant::VARIANT,
+                },
+                UI::Shell::{IShellWindows, IWebBrowser2, ShellWindows},
+            },
+        };
+        struct ComGuard(bool);
+        impl Drop for ComGuard {
+            fn drop(&mut self) {
+                if self.0 {
+                    unsafe { CoUninitialize() }
+                }
+            }
+        }
+        unsafe {
+            let initialized = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+            if initialized.is_err() && initialized != RPC_E_CHANGED_MODE {
+                return Vec::new();
+            }
+            let _com = ComGuard(initialized.is_ok());
+            let Ok(shell): Result<IShellWindows, _> =
+                CoCreateInstance(&ShellWindows, None, CLSCTX_LOCAL_SERVER)
+            else {
+                return Vec::new();
+            };
+            let mut locations = Vec::new();
+            for index in 0..shell.Count().unwrap_or(0) {
+                let Ok(dispatch) = shell.Item(&VARIANT::from(index)) else {
+                    continue;
+                };
+                let Ok(browser) = dispatch.cast::<IWebBrowser2>() else {
+                    continue;
+                };
+                let (Ok(handle), Ok(location)) = (browser.HWND(), browser.LocationURL()) else {
+                    continue;
+                };
+                let Ok(url) = url::Url::parse(&location.to_string()) else {
+                    continue;
+                };
+                let Ok(path) = url.to_file_path() else {
+                    continue;
+                };
+                let title = browser
+                    .LocationName()
+                    .map(|name| name.to_string())
+                    .unwrap_or_default();
+                locations.push((
+                    handle.0 as usize,
+                    path.to_string_lossy().into_owned(),
+                    title,
+                ));
+            }
+            locations
+        }
+    }
+
+    fn frame_bounds(hwnd: HWND) -> Option<RECT> {
+        let mut rect: RECT = unsafe { mem::zeroed() };
+        if unsafe {
+            DwmGetWindowAttribute(
+                hwnd,
+                DWMWA_EXTENDED_FRAME_BOUNDS,
+                &mut rect as *mut _ as _,
+                mem::size_of::<RECT>() as DWORD,
+            )
+        } >= 0
+            && rect.right > rect.left
+            && rect.bottom > rect.top
+        {
+            Some(rect)
+        } else {
+            None
+        }
     }
 
     // Token queries are advisory. If access is denied, still let the window API report its error.
@@ -403,9 +503,14 @@ mod native {
             let maximized =
                 IsZoomed(hwnd) != 0 || (minimized && placement.flags & WPF_RESTORETOMAXIMIZED != 0);
             let mut rect = placement.rcNormalPosition;
+            let mut visible_bounds = false;
             if !minimized && !maximized {
                 if GetWindowRect(hwnd, &mut rect) == 0 {
                     return None;
+                }
+                if let Some(frame) = frame_bounds(hwnd) {
+                    rect = frame;
+                    visible_bounds = true;
                 }
             } else {
                 // WINDOWPLACEMENT uses workspace coordinates, GetWindowRect screen coordinates.
@@ -430,6 +535,8 @@ mod native {
                 title: wide(&title),
                 path,
                 launch_args: String::new(),
+                folder_path: None,
+                visible_bounds,
                 run_as_admin: false,
                 elevated,
                 monitor: monitor.id,
@@ -452,9 +559,25 @@ mod native {
     }
 
     fn windows() -> Result<Vec<LiveWindow>, String> {
-        let mut result = Vec::new();
+        let mut result: Vec<LiveWindow> = Vec::new();
         if unsafe { EnumWindows(Some(collect_window), &mut result as *mut _ as LPARAM) } == 0 {
             return Err("无法枚举应用窗口".into());
+        }
+        if result
+            .iter()
+            .any(|live| live.data.path.to_lowercase().ends_with("\\explorer.exe"))
+        {
+            let locations = explorer_locations();
+            for live in &mut result {
+                if !live.data.path.to_lowercase().ends_with("\\explorer.exe") {
+                    continue;
+                }
+                let location = locations
+                    .iter()
+                    .filter(|(handle, _, _)| *handle == live.hwnd as usize)
+                    .min_by_key(|(_, _, title)| *title != live.data.title);
+                live.data.folder_path = location.map(|(_, path, _)| path.clone());
+            }
         }
         Ok(result)
     }
@@ -476,6 +599,11 @@ mod native {
                     live.data.path = app.path.clone();
                     live.data.launch_args = app.launch_args.clone().unwrap_or_default();
                     live.data.run_as_admin = app.run_as_admin;
+                }
+                if let Some(folder) = &live.data.folder_path {
+                    // Use the actual executable, not a shortcut with another folder baked in.
+                    live.data.path = executable(&live.data);
+                    live.data.launch_args = format!("/n,\"{}\"", folder);
                 }
                 CapturedWindow {
                     key: format!("{:x}", live.hwnd as usize),
@@ -506,6 +634,12 @@ mod native {
                 !used.contains(&(w.hwnd as usize))
                     && !excluded.contains(&(w.hwnd as usize))
                     && w.data.path.eq_ignore_ascii_case(path)
+                    && saved.folder_path.as_ref().is_none_or(|folder| {
+                        w.data
+                            .folder_path
+                            .as_ref()
+                            .is_some_and(|live| live.eq_ignore_ascii_case(folder))
+                    })
             })
             .min_by_key(|w| {
                 let distance = (w.data.x - saved.x).abs()
@@ -553,20 +687,10 @@ mod native {
             .unwrap_or(&monitors[0]);
         let w = monitor.work.right - monitor.work.left;
         let h = monitor.work.bottom - monitor.work.top;
-        let width = (saved.width * f64::from(w))
-            .round()
-            .clamp(100.0, f64::from(w.max(100))) as i32;
-        let height = (saved.height * f64::from(h))
-            .round()
-            .clamp(80.0, f64::from(h.max(80))) as i32;
-        let left = monitor.work.left
-            + (saved.x * f64::from(w))
-                .round()
-                .clamp(0.0, f64::from((w - width).max(0))) as i32;
-        let top = monitor.work.top
-            + (saved.y * f64::from(h))
-                .round()
-                .clamp(0.0, f64::from((h - height).max(0))) as i32;
+        let width = (saved.width * f64::from(w)).round() as i32;
+        let height = (saved.height * f64::from(h)).round() as i32;
+        let left = monitor.work.left + (saved.x * f64::from(w)).round() as i32;
+        let top = monitor.work.top + (saved.y * f64::from(h)).round() as i32;
         let dx = monitor.work.left - monitor.bounds.left;
         let dy = monitor.work.top - monitor.bounds.top;
         unsafe {
@@ -581,10 +705,68 @@ mod native {
                 right: left + width - dx,
                 bottom: top + height - dy,
             };
-            placement.flags = WPF_ASYNCWINDOWPLACEMENT;
+            placement.flags = 0;
             placement.showCmd = SW_RESTORE as u32;
             if SetWindowPlacement(hwnd, &placement) == 0 {
                 return Err(ArrangeError::window_api("调整窗口失败"));
+            }
+            // Wait for the compositor before comparing its frame to the new outer bounds.
+            DwmFlush();
+            // GetWindowRect includes invisible resize borders. Clamp the visible frame,
+            // then expand back to outer bounds so a snapped window stays flush to an edge.
+            // Measure after restoring on the destination monitor, using its current DPI.
+            let mut outer: RECT = mem::zeroed();
+            let mut insets = (0, 0, 0, 0);
+            if GetWindowRect(hwnd, &mut outer) != 0 {
+                if let Some(frame) = frame_bounds(hwnd) {
+                    insets = (
+                        frame.left - outer.left,
+                        frame.top - outer.top,
+                        outer.right - frame.right,
+                        outer.bottom - frame.bottom,
+                    );
+                }
+            }
+            let (border_left, border_top, border_right, border_bottom) = insets;
+            let (visible_left, visible_top, visible_width, visible_height) = if saved.visible_bounds
+            {
+                (left, top, width, height)
+            } else {
+                // Compatibility with workspaces captured using GetWindowRect.
+                (
+                    left + border_left,
+                    top + border_top,
+                    width - border_left - border_right,
+                    height - border_top - border_bottom,
+                )
+            };
+            let visible_width = visible_width.clamp(100.min(w), w);
+            let visible_height = visible_height.clamp(80.min(h), h);
+            let visible_left =
+                visible_left.clamp(monitor.work.left, monitor.work.right - visible_width);
+            let visible_top =
+                visible_top.clamp(monitor.work.top, monitor.work.bottom - visible_height);
+            let left = visible_left - border_left;
+            let top = visible_top - border_top;
+            let width = visible_width + border_left + border_right;
+            let height = visible_height + border_top + border_bottom;
+            placement.rcNormalPosition = RECT {
+                left: left - dx,
+                top: top - dy,
+                right: left + width - dx,
+                bottom: top + height - dy,
+            };
+            if SetWindowPos(
+                hwnd,
+                ptr::null_mut(),
+                left,
+                top,
+                width,
+                height,
+                SWP_NOACTIVATE | SWP_NOZORDER,
+            ) == 0
+            {
+                return Err(ArrangeError::window_api("调整窗口边框失败"));
             }
             // PowerToys places on the target monitor before maximizing, then applies again for DPI.
             if saved.minimized {
@@ -657,7 +839,13 @@ mod native {
                 progress(index, &results[index]);
                 match crate::app_launcher::launch_app(
                     saved.path.clone(),
-                    Some(saved.launch_args.clone()),
+                    Some(
+                        saved
+                            .folder_path
+                            .as_ref()
+                            .map(|folder| format!("/n,\"{}\"", folder))
+                            .unwrap_or_else(|| saved.launch_args.clone()),
+                    ),
                     Some(saved.run_as_admin),
                 ) {
                     Ok(_) => pending.push(index),

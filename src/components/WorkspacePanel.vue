@@ -56,7 +56,7 @@
           <details v-if="entry.selected">
             <summary>{{ t('workspaces.configure') }}</summary>
             <label>{{ t('workspaces.path') }}<input v-model="entry.window.path" required :disabled="busy" /></label>
-            <label>{{ t('workspaces.arguments') }}<input v-model="entry.window.launch_args" :placeholder="t('workspaces.argumentsHint')" :disabled="busy" /></label>
+            <label>{{ t('workspaces.arguments') }}<input v-model="entry.window.launch_args" @input="entry.window.folder_path = null" :placeholder="t('workspaces.argumentsHint')" :disabled="busy" /></label>
             <label class="checkbox"><input v-model="entry.window.run_as_admin" type="checkbox" :disabled="busy" />{{ t('workspaces.admin') }}</label>
             <p class="hint">{{ entry.window.monitor }}</p>
             <div class="geometry">
@@ -85,7 +85,7 @@ import { confirmDialog } from '../utils/customDialog'
 interface WorkspaceWindow {
   name: string; title: string; path: string; launch_args: string; run_as_admin: boolean; elevated: boolean
   monitor: string; monitor_device: string; x: number; y: number; width: number; height: number
-  maximized: boolean; minimized: boolean
+  maximized: boolean; minimized: boolean; visible_bounds?: boolean; folder_path?: string | null
 }
 interface Workspace { id: string; name: string; move_existing_windows: boolean; windows: WorkspaceWindow[] }
 interface Entry { key: string; window: WorkspaceWindow; captured: WorkspaceWindow; selected: boolean }
@@ -165,7 +165,7 @@ const applyLayout = () => {
     const rows = Math.ceil(windows.length / columns)
     windows.forEach((window, index) => {
       window.x = (index % columns) / columns; window.y = Math.floor(index / columns) / rows
-      window.width = 1 / columns; window.height = 1 / rows; window.maximized = false; window.minimized = false
+      window.width = 1 / columns; window.height = 1 / rows; window.visible_bounds = true; window.maximized = false; window.minimized = false
     })
   }
 }
@@ -173,13 +173,14 @@ const changeLayout = () => {
   if (layout.value !== 'captured') { applyLayout(); return }
   for (const entry of entries.value) {
     for (const field of geometryFields) entry.window[field] = entry.captured[field]
+    entry.window.visible_bounds = entry.captured.visible_bounds
     entry.window.maximized = entry.captured.maximized
     entry.window.minimized = entry.captured.minimized
   }
 }
 const setGeometry = (window: WorkspaceWindow, field: GeometryField, event: Event) => {
   const value = (event.target as HTMLInputElement).valueAsNumber
-  if (Number.isFinite(value)) window[field] = value / 100
+  if (Number.isFinite(value)) { window[field] = value / 100; window.visible_bounds = true }
   layout.value = 'captured'
 }
 const save = async () => {
